@@ -1,0 +1,7 @@
+name = "wiki-comments-api"
+main = "index.js"
+compatibility_date = "2024-09-01"
+
+[[kv_namespaces]]
+binding = "COMMENTS"
+id = "1017e78afe8e4cae8839ee353057aa20"

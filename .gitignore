@@ -1,0 +1,13 @@
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+node_modules/
+.env
+.env.*
+!.env.example
+*.tmp
+*.swp
+.vite/
+dist/
+build/output/

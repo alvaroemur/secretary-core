@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Secretary — Arquitectura</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 20px; background: #fafafa; color: #222; }
+    header { border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 16px; }
+    .row { display: flex; justify-content: space-between; align-items: baseline; }
+    h1 { font-size: 18px; margin: 0; }
+    .meta { font-size: 12px; color: #777; }
+    nav { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+    nav button {
+      font-size: 13px; padding: 6px 12px; cursor: pointer;
+      border: 1px solid #ccc; background: #fff; border-radius: 4px;
+    }
+    nav button.active { background: #222; color: #fff; border-color: #222; }
+    nav button:hover:not(.active) { background: #eee; }
+    #source-name { font-family: ui-monospace, monospace; font-size: 12px; color: #555; }
+    #diagram { background: #fff; border: 1px solid #e3e3e3; border-radius: 6px; padding: 20px; overflow: auto; min-height: 300px; }
+    .err { color: #b00; background: #fff3f3; padding: 12px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 13px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="row">
+      <h1>Secretary — Arquitectura</h1>
+      <div class="meta">
+        <span id="source-name"></span>
+        &nbsp;·&nbsp; <button onclick="loadCurrent()">Recargar</button>
+      </div>
+    </div>
+    <nav id="nav"></nav>
+  </header>
+  <div id="diagram">Cargando…</div>
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
+
+    const DIAGRAMS = [
+      { id: "l1", label: "L1 · System",             file: "system.mmd" },
+      { id: "m1", label: "M1 · Extraction",         file: "m1-extraction.mmd" },
+      { id: "m2", label: "M2 · Transformation",     file: "m2-transformation.mmd" },
+      { id: "m3", label: "M3 · Dispatch",           file: "m3-dispatch.mmd" },
+    ];
+
+    const target = document.getElementById("diagram");
+    const nav = document.getElementById("nav");
+    const sourceName = document.getElementById("source-name");
+
+    function currentId() {
+      const h = location.hash.replace(/^#/, "");
+      return DIAGRAMS.some(d => d.id === h) ? h : "l1";
+    }
+
+    function renderNav() {
+      const active = currentId();
+      nav.innerHTML = "";
+      for (const d of DIAGRAMS) {
+        const b = document.createElement("button");
+        b.textContent = d.label;
+        if (d.id === active) b.classList.add("active");
+        b.onclick = () => { location.hash = d.id; };
+        nav.appendChild(b);
+      }
+    }
+
+    async function loadCurrent() {
+      const d = DIAGRAMS.find(x => x.id === currentId());
+      sourceName.textContent = d.file;
+      target.innerHTML = "Cargando…";
+      try {
+        const res = await fetch(d.file + "?ts=" + Date.now());
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const src = await res.text();
+        const { svg } = await mermaid.render("arq-" + d.id + "-" + Date.now(), src);
+        target.innerHTML = svg;
+      } catch (e) {
+        target.innerHTML = `<div class="err">No pude renderizar ${d.file}: ${e.message}
+
+Si abriste este HTML con doble click (file://), serví la carpeta:
+    python3 -m http.server 8765 --directory /Users/alvaromur/Cowork/secretary
+y abrí http://localhost:8765/arquitectura.html</div>`;
+      }
+    }
+
+    window.loadCurrent = loadCurrent;
+    window.addEventListener("hashchange", () => { renderNav(); loadCurrent(); });
+    renderNav();
+    loadCurrent();
+  </script>
+</body>
+</html>

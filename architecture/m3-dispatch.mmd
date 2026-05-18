@@ -1,0 +1,140 @@
+flowchart TB
+
+%% Modulo 3 - Dispatch / Handover (flowchart nivel 2)
+%% Tres procesos coreografiados:
+%%   S  - dispatch automatico (modo A o B)
+%%   H1 - revision humana del brief (issue)
+%%   H2 - revision humana del PR
+%% Leyenda:
+%%   [paso]            proceso
+%%   {X condicion?}    gateway exclusivo - una rama
+%%   {+ paralelo}      gateway paralelo - fork/join todas las ramas
+%%   {O opcion}        gateway inclusivo - una o mas ramas
+%%   ([trigger])       inicio/fin
+%%   [(store)]         data store persistente interno
+%%   [(store)] dashed  data store persistente externo (Gmail, GitHub, etc.)
+%%   [/evento/]        evento o mensaje transitorio (one-shot)
+%%   -->               flujo de control (orden de ejecucion)
+%%   -.->              flujo de datos / mensaje entre procesos
+
+    %% ───────────────────────────────────────────────────
+    %% S - Dispatch automatico
+    %% ───────────────────────────────────────────────────
+    subgraph S[" S · dispatch automatico "]
+        direction TB
+        T([trigger: cron / post-extraccion])
+        T_A([trigger alternativo:<br/>label dispatch:ejecutar<br/>en issue])
+        F[filtrar acciones<br/>con destino=repo]
+        D0{"X hay acciones<br/>pendientes?"}
+        C[cargar contexto]
+        H[generar handover<br/>skill handover]
+        REG_B[registrar nota local<br/>en notas/]
+        DM{"X modo?<br/>default = B"}
+
+        IB[crear issue<br/>gh issue create<br/>body = HANDOVER.md]
+
+        EA[lanzar agente<br/>ejecutor en repo]
+        CA[commits en<br/>rama nueva<br/>referencia issue #N]
+        PA[abrir PR<br/>Closes #N]
+
+        END_S([fin S])
+
+        IN_acc[(acciones.md)]
+        IN_wiki[(wiki/articulos)]
+        IN_mem[(memory/<br/>evidencias)]
+        OUT_notas[(notas /<br/>handovers<br/>indice maestro)]
+        OUT_issue[(GitHub Issue<br/>repo destino)]
+        OUT_branch[(Rama remota<br/>repo destino)]
+        OUT_PR[(GitHub PR<br/>Closes issue)]
+
+        T --> F --> D0
+        D0 -- no --> END_S
+        D0 -- sí --> C --> H --> REG_B --> DM
+        DM -- B brief --> IB --> END_S
+        DM -- A ejecutable --> EA --> CA --> PA --> END_S
+
+        %% arranque alternativo: el modo A puede iniciarse
+        %% directamente desde el label, saltandose F/C/H
+        T_A --> EA
+
+        IN_acc -. lee .-> F
+        IN_wiki -. lee .-> C
+        IN_mem -. lee .-> C
+        REG_B -. escribe .-> OUT_notas
+        IB -. crea .-> OUT_issue
+        CA -. push .-> OUT_branch
+        PA -. abre .-> OUT_PR
+    end
+
+    %% ───────────────────────────────────────────────────
+    %% H1 - Revision humana del brief (issue)
+    %% ───────────────────────────────────────────────────
+    subgraph H1[" H1 · revision del brief "]
+        direction TB
+        T_H1([trigger: notif movil<br/>issue creado])
+        Read[Álvaro lee issue<br/>en app GitHub]
+        Comment[comentar / refinar<br/>contexto en el issue]
+        D_promo{"X aprobar<br/>ejecucion?"}
+        Trigger_A[poner label<br/>dispatch:ejecutar]
+        ManualWork[trabajar el repo<br/>a mano]
+        PushManual[commits +<br/>push rama]
+        OpenPR[abrir PR manual<br/>Closes #N]
+        END_H1([fin H1])
+
+        T_H1 --> Read --> Comment --> D_promo
+        D_promo -- sí, automatizar --> Trigger_A --> END_H1
+        D_promo -- no, lo hago yo --> ManualWork --> PushManual --> OpenPR --> END_H1
+
+        %% datos H1
+        OUT_issue -. lee .-> Read
+        Comment -. comenta .-> OUT_issue
+        Trigger_A -. aplica label .-> OUT_issue
+        PushManual -. push .-> OUT_branch
+        OpenPR -. abre .-> OUT_PR
+    end
+
+    %% ───────────────────────────────────────────────────
+    %% H2 - Revision humana del PR
+    %% ───────────────────────────────────────────────────
+    subgraph H2[" H2 · revision del PR "]
+        direction TB
+        T_H2([trigger: notif movil<br/>PR abierto])
+        ReadPR[Álvaro lee PR<br/>en app GitHub]
+        D_pr{"X PR esta OK?"}
+        Merge[merge a main]
+        Request[pedir cambios<br/>comentar PR]
+        END_H2([fin H2])
+
+        OUT_main[(Rama main<br/>actualizada)]
+
+        T_H2 --> ReadPR --> D_pr
+        D_pr -- sí --> Merge --> END_H2
+        D_pr -- no --> Request --> END_H2
+
+        %% datos H2
+        OUT_PR -. lee .-> ReadPR
+        Merge -. merge .-> OUT_main
+        Request -. comenta .-> OUT_PR
+    end
+
+    %% ───────────────────────────────────────────────────
+    %% Coreografia entre procesos (mensajes / eventos)
+    %% ───────────────────────────────────────────────────
+    OUT_issue -. evento .-> T_H1
+    OUT_issue -. evento label .-> T_A
+    OUT_PR -. evento .-> T_H2
+
+    %% --- estilos ---
+    classDef inicio    fill:#c8e6c9,stroke:#2e7d32,color:#000;
+    classDef fin       fill:#ffcdd2,stroke:#c62828,color:#000;
+    classDef actividad fill:#bbdefb,stroke:#1565c0,color:#000;
+    classDef gateway   fill:#fff9c4,stroke:#f9a825,color:#000;
+    classDef io        fill:#e0e0e0,stroke:#616161,color:#000;
+    classDef ioExt     fill:#f5f5f5,stroke:#616161,stroke-dasharray:5 5,color:#000;
+
+    class T,T_A,T_H1,T_H2 inicio;
+    class END_S,END_H1,END_H2 fin;
+    class F,C,H,REG_B,IB,EA,CA,PA,Read,Comment,Trigger_A,ManualWork,PushManual,OpenPR,ReadPR,Merge,Request actividad;
+    class D0,DM,D_promo,D_pr gateway;
+    class IN_acc,IN_wiki,IN_mem,OUT_notas io;
+    class OUT_issue,OUT_branch,OUT_PR,OUT_main ioExt;

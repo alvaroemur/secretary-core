@@ -18,8 +18,17 @@ from datetime import date, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SECRETARY = ROOT.parent
-ARTICULOS = ROOT / "articulos"
+# SECRETARY = directorio raíz de la instance (datos: correo/, reuniones/,
+# whatsapp/, ...). Cuando build.py vive en secretary-core (engine) vía
+# symlink, ROOT.parent resuelve al engine en vez de a los datos. Tomar el
+# path NO resuelto para respetar la ruta de invocación; permitir override
+# vía env var para rutinas/CI.
+SECRETARY = Path(os.environ.get("SECRETARY_DATA") or Path(__file__).absolute().parent.parent.parent)
+# ARTICULOS cuelga de SECRETARY (la instance / worktree) para permitir que una
+# rutina aislada (ej. wiki-update en un git worktree) construya desde sus propios
+# artículos vía `SECRETARY_DATA=<worktree>`. Por defecto resuelve a la misma ruta
+# de siempre (instance/wiki/articulos). OUTPUT y ASSETS siguen colgando del engine.
+ARTICULOS = SECRETARY / "wiki" / "articulos"
 ASSETS = ROOT / "assets"
 OUTPUT = ROOT / "output"
 
@@ -611,37 +620,66 @@ def _parse_event_date(text: str) -> str:
     return ""
 
 
-def parse_whatsapp_acciones() -> list[Pendiente]:
-    text = _read_file(SECRETARY / "whatsapp" / "memory" / "acciones.md")
+def parse_acciones_md(path: Path, source: str, max_age_days: int = 30) -> list[Pendiente]:
+    """Parser genérico de memory/acciones.md (formato común de los módulos).
+    Devuelve sólo items con estado=pendiente que sigan vivos: con deadline
+    futuro O detectados en los últimos `max_age_days`. Excluye `[update]`."""
+    text = _read_file(path)
     if not text:
         return []
 
+    today = date.today()
+    cutoff_iso = date.fromordinal(today.toordinal() - max_age_days).isoformat()
+
     pendientes: list[Pendiente] = []
-    blocks = re.split(r"^## acc-", text, flags=re.MULTILINE)
+    blocks = re.split(r"(?m)^## acc-", text)
     for block in blocks[1:]:
+        first_line, _, rest = block.partition("\n")
+        if "[update]" in first_line:
+            continue
+        id_m = re.match(r"(\d{8})-\d{3}", first_line)
+        if not id_m:
+            continue
+        raw = id_m.group(1)
+        acc_date_iso = f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}"
+
         fields: dict[str, str] = {}
-        for line in block.split("\n"):
+        for line in (first_line + "\n" + rest).split("\n"):
             m = re.match(r"^- (\w+):\s*(.+)", line.strip())
             if m:
                 fields[m.group(1)] = m.group(2).strip()
 
         if fields.get("estado", "") != "pendiente":
             continue
-
         accion = fields.get("accion", "")
         if not accion or accion.startswith("<"):
             continue
-        deadline = fields.get("deadline", "—")
-        if deadline == "—" or not re.match(r"\d{4}-\d{2}-\d{2}", deadline):
-            deadline = ""
 
-        urgency = 1 if deadline else 2
+        deadline = fields.get("deadline", "—")
+        deadline_iso = deadline if re.match(r"\d{4}-\d{2}-\d{2}", deadline) else ""
+
+        if deadline_iso and deadline_iso >= today.isoformat():
+            pass
+        elif acc_date_iso >= cutoff_iso:
+            pass
+        else:
+            continue
+
+        if deadline_iso:
+            try:
+                delta = (date.fromisoformat(deadline_iso) - today).days
+                urgency = 0 if delta <= 1 else 1
+            except ValueError:
+                urgency = 2
+        else:
+            urgency = 2
+
         pendientes.append(Pendiente(
             texto=accion,
-            source="whatsapp",
-            deadline=deadline,
+            source=source,
+            deadline=deadline_iso,
             urgency=urgency,
-            detail=fields.get("contexto", ""),
+            detail=fields.get("contexto", "") or fields.get("responsable", ""),
         ))
     return pendientes
 
@@ -705,11 +743,12 @@ def render_dashboard(arts: list[Articulo], by_slug: dict[str, Articulo], index_j
     now_str = datetime.now().strftime("%d %b %Y, %H:%M")
 
     correo_pend, eventos, proyectos, inbox_count = parse_correo_estado()
-    wa_pend = parse_whatsapp_acciones()
+    wa_pend = parse_acciones_md(SECRETARY / "whatsapp" / "memory" / "acciones.md", "whatsapp")
+    reu_pend = parse_acciones_md(SECRETARY / "reuniones" / "memory" / "acciones.md", "reuniones")
     jobs = parse_job_search()
     heatmap = compute_heatmap(arts)
 
-    all_pend = sorted(correo_pend + wa_pend, key=lambda p: p.sort_key)
+    all_pend = sorted(correo_pend + wa_pend + reu_pend, key=lambda p: p.sort_key)
     recent = sorted(arts, key=lambda a: str(a.meta.get("ultima_actualizacion", "")), reverse=True)[:10]
     by_cat: dict[str, list[Articulo]] = {}
     for a in arts:

@@ -1,83 +1,91 @@
-# Getting started (from zero)
+# I've never used any of this — where do I start?
 
-If you've only used ChatGPT, Claude.ai, or similar chatbots and have never heard of "AI coding agents" — this page is for you.
+Welcome! If your experience with AI is chatting with ChatGPT or Claude.ai, you're in the right place. This page explains everything from scratch — no coding experience needed.
 
-## What's different here?
+## First, a quick "wait, what?"
 
-Regular chatbots (ChatGPT, Claude.ai) are like texting a smart friend — you ask questions, they answer. That's it.
+You know how ChatGPT works: you type, it replies. It's a conversation. Great for questions, but it can't *do* anything outside that chat window.
 
-**AI coding agents** are different: they can actually *do things* on your computer. They read files, run commands, create folders, connect to your email, and work autonomously. Think of it as giving the AI hands, not just a mouth.
+There's a newer kind of AI tool — **AI coding agents** — that can actually do things on your computer. Open files, create folders, connect to your Gmail, run programs. It's like the difference between *talking about* organizing your desk and *having someone actually organize it*.
 
-**secretary** uses this to build a personal assistant that processes your email, chats, meetings, and files — automatically, every day, while you sleep.
+**secretary** is a system that uses these agents to be your personal assistant. You set it up once, and then every day it:
 
-## What you need
+- Reads your email and cleans your inbox
+- Processes your WhatsApp conversations
+- Summarizes your meetings
+- Organizes your Google Drive
+- Builds a private personal wiki with everything it learns
+
+You stay in control — it reports everything it did and asks before taking big actions.
+
+## OK, what do I need?
+
+Just three things:
 
 1. A computer (Mac, Windows, or Linux)
-2. A free account on one of the tools below
-3. ~30 minutes for initial setup (the AI walks you through it)
+2. One of the free tools listed below
+3. About 30 minutes — the AI does the heavy lifting, you just answer its questions
 
-## Pick your tool (free options)
+## Choose your tool
 
-### Option A — Cursor (recommended for beginners)
+### Cursor — free, best for beginners
 
-[Cursor](https://cursor.com) is a code editor with a built-in AI agent. It has a free tier.
+[Cursor](https://cursor.com) looks like a normal app, but has a built-in AI that can read and modify files. It has a free tier that's enough to get started.
 
-1. Download Cursor from [cursor.com](https://cursor.com)
-2. Install and open it
-3. Open a terminal inside Cursor (menu: Terminal → New Terminal)
-4. Clone the repo:
+**Steps:**
+
+1. Go to [cursor.com](https://cursor.com) and download it
+2. Install and open it — it looks like a text editor, don't worry
+3. Go to the menu: **Terminal → New Terminal** (a black box will appear at the bottom — that's normal)
+4. Type this and press Enter:
    ```
    git clone https://github.com/alvaroemur/secretary-core.git
-   cd secretary-core
    ```
-5. Open the AI chat panel (Cmd+L on Mac, Ctrl+L on Windows)
-6. Paste the setup prompt from the [README](../README.md#quick-start--paste-this-into-your-ai-coding-agent)
+5. Then type: `cd secretary-core`
+6. Now open the AI panel: press **Cmd+L** (Mac) or **Ctrl+L** (Windows)
+7. Paste this message into the AI chat:
 
-The AI will read the repo, ask you questions about your setup, and configure everything step by step.
+> Clone https://github.com/alvaroemur/secretary-core and help me set it up as my personal assistant. Read the README.md first, then walk me through creating my instance, picking channels, and scheduling the routines. Ask me questions as you go.
 
-### Option B — Claude Code (most powerful)
+That's it. The AI reads the whole project, understands how it works, and walks you through setting it up step by step. It'll ask you things like "what's your email?" and "which WhatsApp chats do you want to track?" — just answer naturally.
 
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is Anthropic's CLI agent. It's what secretary was built with. Requires a paid plan (Pro, Max, or API).
+### Windsurf — also free
 
-1. Install: `npm install -g @anthropic-ai/claude-code`
-2. Run: `claude` and authenticate
-3. Clone and enter the repo:
-   ```
-   git clone https://github.com/alvaroemur/secretary-core.git
-   cd secretary-core
-   ```
-4. Paste the setup prompt from the [README](../README.md#quick-start--paste-this-into-your-ai-coding-agent)
+[Windsurf](https://windsurf.com) works the same way as Cursor. Download, install, open terminal, clone the repo, paste the prompt. Pick whichever one you like more.
 
-Claude Code is the only tool that supports **scheduled tasks** (routines that run automatically every day). The others require manual runs or external scheduling.
+### Claude Code — paid, but the most powerful
 
-### Option C — Windsurf
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is what secretary was actually built with. It runs in the terminal (no editor UI). Requires a Claude Pro or Max subscription.
 
-[Windsurf](https://windsurf.com) is another AI-powered editor with a free tier. Same flow as Cursor: install, open terminal, clone repo, paste prompt into the AI chat.
+The big advantage: it supports **scheduled tasks** — the routines run automatically every day without you doing anything. With Cursor/Windsurf, you'd need to trigger them manually or set up external scheduling.
 
-### Option D — ChatGPT (limited)
+### What about ChatGPT?
 
-If you only have ChatGPT, you can still read the routine templates and adapt the ideas manually. But ChatGPT can't run commands on your computer or access your files, so it can't set up or run secretary automatically. Consider it a starting point to understand the system before moving to one of the tools above.
+ChatGPT can't access your computer, so it can't set up or run secretary. But you can still read the [routine templates](../routines/) to understand the system and get ideas. If you like what you see, grab one of the tools above to actually run it.
 
-## What happens after setup?
+## What does it look like in practice?
 
-Once configured, your AI assistant will:
+Once everything is set up, your typical day looks like this:
 
-- **Every morning**: review your email, create draft replies, clean your inbox, and open a report you can read on GitHub
-- **Every evening**: process your WhatsApp chats, meeting transcriptions, and Drive files
-- **Every night**: consolidate everything into your personal wiki — a private, searchable knowledge base about your contacts, projects, and topics
+**You wake up** — secretary already reviewed your email overnight. There's a report waiting on GitHub with a summary: important messages, draft replies it prepared for you, what it archived, follow-ups it suggests. You skim it, tweak a draft or two, send.
 
-You review the reports as Pull Requests on GitHub (the AI will explain this during setup). You stay in control — nothing is sent or deleted without your approval.
+**End of day** — it processed your WhatsApp chats and meetings. New contacts and projects get added to your private wiki automatically. Action items are tracked.
 
-## FAQ
+**Over time** — your wiki grows into a personal knowledge base. "Who was that person I met at the conference?" "What did we decide in that meeting?" "When did I last talk to this client?" All searchable, all connected.
 
-**Is my data safe?**
-Your data stays on your computer and in your private GitHub repository. The AI processes it locally. secretary-core (this repo) is just the engine — it contains no personal data.
+## Common questions
 
 **Do I need to know how to code?**
-No. The AI agent handles the technical setup. You just answer questions about your preferences (which email to process, which WhatsApp chats matter, what language you prefer).
+Nope. The AI agent handles all the technical parts. You just tell it about yourself and your preferences.
+
+**Is my data private?**
+Yes. Everything stays on your computer and in your private GitHub repository. This repo (secretary-core) is just the blueprint — it has zero personal data.
+
+**Can I use it in Spanish / Portuguese / any language?**
+Yes! The engine is in English, but during setup the AI will ask your preference and adapt everything — your policies, wiki, prompts, reports — to your language.
 
 **What if I get stuck?**
-Open an issue on [GitHub](https://github.com/alvaroemur/secretary-core/issues) describing where you got stuck. Include what tool you're using and what error you see.
+Drop a message in [GitHub Issues](https://github.com/alvaroemur/secretary-core/issues) describing what happened. Include what tool you're using and what you see on screen. Someone will help.
 
-**Can I use this in Spanish / Portuguese / other languages?**
-Yes. The engine is in English but your instance (policies, wiki, routine prompts) can be in any language. Tell the AI your preference during setup.
+**What if I want to start small?**
+Totally fine. You can activate just email and nothing else. Or just WhatsApp. Add more channels whenever you're ready — the system is modular.

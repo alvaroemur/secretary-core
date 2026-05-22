@@ -53,15 +53,27 @@ That's it. The AI takes care of downloading the project, reading it, and walking
 
 [Windsurf](https://windsurf.com) works the same way as Cursor. Download, install, open the AI chat, and paste the same message from above. Pick whichever one you like more.
 
+### Kimi — free, alternative from China 🌏
+
+[Kimi](https://kimi.ai) is an app by Moonshot AI with its own model. It also has agent capabilities and a free tier. If you already use it or want to explore beyond the usual ecosystem, it works: download, open the chat, paste the same prompt.
+
 ### Claude Code — paid, but the most powerful 💪
 
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is what secretary was actually built with. It's a command-line tool (more technical). Requires a Claude Pro or Max subscription.
 
-The big advantage: it supports **scheduled tasks** — the routines run automatically every day without you doing anything. With Cursor/Windsurf, you'd need to trigger them manually or set up external scheduling.
+The big advantage: it supports **scheduled tasks** — the routines run automatically every day without you doing anything. With the other tools, you'd need to trigger them manually or set up external scheduling.
 
 ### What about ChatGPT? 🤷
 
 ChatGPT can't access your computer, so it can't set up or run secretary. But you can still read the [routine templates](../routines/) to understand the system and get ideas. If you like what you see, grab one of the tools above to actually run it.
+
+### Another tool?
+
+Any AI app that can read files and run commands on your computer should work. The ones above are the most well-known, but the field moves fast — if your favorite tool has an "agent" mode, give it a try.
+
+## A note on compatibility 🔧
+
+I use Mac + the Google ecosystem (Gmail, Google Drive, Google Calendar, Google Meet), so the routines are written from that perspective. If you use **Windows + Microsoft** (Outlook, OneDrive, Teams, Office 365) or any other combination, don't worry — the routines are *templates* that the AI adapts to your stack. The logic is the same: read email, process chats, summarize meetings. What changes are the specific tools, and that's exactly what the AI helps you configure when you tell it what you use.
 
 ## What does it look like in practice? 🌅
 

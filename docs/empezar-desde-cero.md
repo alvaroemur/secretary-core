@@ -53,15 +53,23 @@ Eso es todo. La IA se encarga de descargar el proyecto, leerlo, y guiarte paso a
 
 [Windsurf](https://windsurf.com) funciona igual que Cursor. Descargas, instalas, abres el chat de la IA y pegas el mismo mensaje de arriba. Elige el que más te guste.
 
+### Kimi — gratis, alternativa desde China 🌏
+
+[Kimi](https://kimi.ai) es una app de Moonshot AI con su propio modelo. También tiene capacidades de agente y un plan gratuito. Si ya la usas o te interesa explorar fuera del ecosistema de siempre, funciona: descargas, abres el chat, pegas el mismo prompt.
+
 ### Claude Code — de pago, pero el más potente 💪
 
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) es con lo que se construyó secretary. Es una herramienta de línea de comandos (más técnica). Requiere suscripción Claude Pro o Max.
 
-La gran ventaja: soporta **tareas programadas** — las rutinas corren automáticamente todos los días sin que hagas nada. Con Cursor/Windsurf tendrías que ejecutarlas a mano o buscar una forma de programarlas.
+La gran ventaja: soporta **tareas programadas** — las rutinas corren automáticamente todos los días sin que hagas nada. Con las otras herramientas tendrías que ejecutarlas a mano o buscar una forma de programarlas.
 
 ### ¿Y ChatGPT? 🤷
 
 ChatGPT no puede acceder a tu computadora, así que no puede configurar ni correr secretary. Pero puedes leer los [templates de rutinas](../routines/) para entender el sistema y sacar ideas. Si te gusta lo que ves, agarra una de las herramientas de arriba para ponerlo a andar.
+
+### ¿Otra herramienta?
+
+Cualquier app de IA que pueda leer archivos y ejecutar comandos en tu computadora debería funcionar. Las de arriba son las más conocidas, pero el campo se mueve rápido — si tu herramienta favorita tiene modo "agente", pruébala.
 
 ## ¿Cómo se ve en la práctica? 🌅
 
@@ -72,6 +80,10 @@ Una vez configurado, tu día típico se ve así:
 🌙 **Al final del día** — procesó tus chats de WhatsApp y reuniones. Contactos y proyectos nuevos se agregan a tu wiki privada automáticamente. Los pendientes quedan rastreados.
 
 📚 **Con el tiempo** — tu wiki crece y se convierte en una base de conocimiento personal. "¿Quién era esa persona que conocí en la conferencia?" "¿Qué decidimos en esa reunión?" "¿Cuándo fue la última vez que hablé con este cliente?" Todo buscable, todo conectado.
+
+## Una nota sobre compatibilidad 🔧
+
+Yo uso Mac + el ecosistema de Google (Gmail, Google Drive, Google Calendar, Google Meet), así que las rutinas están escritas desde ese contexto. Si tú usas **Windows + Microsoft** (Outlook, OneDrive, Teams, Office 365) o cualquier otra combinación, no te preocupes — las rutinas son *templates* que la IA adapta a tu stack. La lógica es la misma: leer correo, procesar chats, resumir reuniones. Lo que cambia son las herramientas específicas, y eso es justamente lo que la IA te ayuda a configurar cuando le dices qué usas.
 
 ## Preguntas frecuentes ❓
 

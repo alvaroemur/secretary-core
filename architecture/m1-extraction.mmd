@@ -1,109 +1,109 @@
 flowchart TB
 
-%% Modulo 1 - Extraccion (flowchart nivel 2)
-%% Leyenda:
-%%   [paso]            proceso
-%%   {X condicion?}    gateway exclusivo - una rama
-%%   {+ paralelo}      gateway paralelo - fork/join todas las ramas
-%%   {O opcion}        gateway inclusivo - una o mas ramas
-%%   ([trigger])       inicio/fin
-%%   [(store)]         data store persistente interno
-%%   [(store)] dashed  data store persistente externo (Gmail, GitHub, etc.)
-%%   [/evento/]        evento o mensaje transitorio (one-shot)
-%%   -->               flujo de control (orden de ejecucion)
-%%   -.->              flujo de datos (lectura o escritura)
+%% Module 1 - Extraction (level 2 flowchart)
+%% Legend:
+%%   [step]            process
+%%   {X condition?}    exclusive gateway - one branch
+%%   {+ parallel}      parallel gateway - fork/join all branches
+%%   {O option}        inclusive gateway - one or more branches
+%%   ([trigger])       start/end
+%%   [(store)]         persistent internal data store
+%%   [(store)] dashed  persistent external data store (Gmail, GitHub, etc.)
+%%   [/event/]         transient event or message (one-shot)
+%%   -->               control flow (execution order)
+%%   -.->              data flow (read or write)
 
-    %% --- 1.1 revision-correo ---
-    subgraph S1[" 1.1 revision-correo "]
+    %% --- 1.1 mail-review ---
+    subgraph S1[" 1.1 mail-review "]
         direction TB
         T1([trigger: cron / manual])
         F1[fetch threads]
-        C1[clasificar thread<br/>LLM]
-        D1{"X tipo?"}
-        A1[extraer accion]
-        E1[guardar extracto]
-        L1[aplicar label]
-        END1([fin])
+        C1[classify thread<br/>LLM]
+        D1{"X type?"}
+        A1[extract action]
+        E1[save extract]
+        L1[apply label]
+        END1([end])
 
-        IN1[(Gmail<br/>threads por label)]
+        IN1[(Gmail<br/>threads by label)]
         OUT1a[(acciones.md)]
-        OUT1b[(memory/correo)]
+        OUT1b[(memory/mail)]
         OUT1c[(Gmail<br/>labels)]
 
         %% control
         T1 --> F1 --> C1 --> D1
-        D1 -- accionable --> A1 --> L1
-        D1 -- informativo --> E1 --> L1
-        D1 -- desahogo / ruido --> L1
+        D1 -- actionable --> A1 --> L1
+        D1 -- informational --> E1 --> L1
+        D1 -- venting / noise --> L1
         L1 --> END1
 
-        %% datos
-        IN1 -. lee .-> F1
-        A1 -. escribe .-> OUT1a
-        E1 -. escribe .-> OUT1b
-        L1 -. aplica .-> OUT1c
+        %% data
+        IN1 -. read .-> F1
+        A1 -. write .-> OUT1a
+        E1 -. write .-> OUT1b
+        L1 -. apply .-> OUT1c
     end
 
     %% --- 1.2 whatsapp-update ---
     subgraph S2[" 1.2 whatsapp-update "]
         direction TB
         T2([trigger: cron / manual])
-        F2[leer chats]
-        C2[clasificar mensaje<br/>LLM]
-        D2{"X tipo?"}
-        A2[extraer accion]
-        E2[guardar extracto]
-        SG2[marcar señal contextual<br/>NO accion]
-        END2([fin])
+        F2[read chats]
+        C2[classify message<br/>LLM]
+        D2{"X type?"}
+        A2[extract action]
+        E2[save extract]
+        SG2[mark contextual signal<br/>not action]
+        END2([end])
 
-        IN2[(WhatsApp<br/>chats recientes)]
+        IN2[(WhatsApp<br/>recent chats)]
         OUT2a[(acciones.md)]
         OUT2b[(memory/whatsapp)]
 
         %% control
         T2 --> F2 --> C2 --> D2
-        D2 -- accionable --> A2 --> END2
-        D2 -- informativo --> E2 --> END2
-        D2 -- desahogo 1-on-1 --> SG2 --> END2
+        D2 -- actionable --> A2 --> END2
+        D2 -- informational --> E2 --> END2
+        D2 -- "venting (1-on-1)" --> SG2 --> END2
 
-        %% datos
-        IN2 -. lee .-> F2
-        A2 -. escribe .-> OUT2a
-        E2 -. escribe .-> OUT2b
-        SG2 -. escribe .-> OUT2b
+        %% data
+        IN2 -. read .-> F2
+        A2 -. write .-> OUT2a
+        E2 -. write .-> OUT2b
+        SG2 -. write .-> OUT2b
     end
 
-    %% --- 1.3 reuniones-update ---
-    subgraph S3[" 1.3 reuniones-update "]
+    %% --- 1.3 meetings-update ---
+    subgraph S3[" 1.3 meetings-update "]
         direction TB
         T3([trigger: cron / manual])
-        F3[leer transcripts]
-        M3[match transcript<br/>con evento]
-        R3[resumir reunion<br/>LLM]
-        D3{"X hay acciones?"}
-        A3[extraer acciones]
-        E3[guardar resumen]
-        END3([fin])
+        F3[read transcripts]
+        M3[match transcript<br/>to event]
+        R3[summarize meeting<br/>LLM]
+        D3{"X actions found?"}
+        A3[extract actions]
+        E3[save summary]
+        END3([end])
 
         IN3a[(Tactiq<br/>transcripts)]
-        IN3b[(Google Calendar<br/>eventos)]
+        IN3b[(Google Calendar<br/>events)]
         OUT3a[(acciones.md)]
-        OUT3b[(memory/reuniones)]
+        OUT3b[(memory/meetings)]
 
         %% control
         T3 --> F3 --> M3 --> R3 --> D3
-        D3 -- sí --> A3 --> E3
+        D3 -- yes --> A3 --> E3
         D3 -- no --> E3
         E3 --> END3
 
-        %% datos
-        IN3a -. lee .-> F3
-        IN3b -. lee .-> M3
-        A3 -. escribe .-> OUT3a
-        E3 -. escribe .-> OUT3b
+        %% data
+        IN3a -. read .-> F3
+        IN3b -. read .-> M3
+        A3 -. write .-> OUT3a
+        E3 -. write .-> OUT3b
     end
 
-    %% --- estilos ---
+    %% --- styles ---
     classDef inicio    fill:#c8e6c9,stroke:#2e7d32,color:#000;
     classDef fin       fill:#ffcdd2,stroke:#c62828,color:#000;
     classDef actividad fill:#bbdefb,stroke:#1565c0,color:#000;

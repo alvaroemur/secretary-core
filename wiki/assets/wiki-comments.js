@@ -358,7 +358,7 @@
         id: genId(),
         anchor: { text: "", section: heading.id },
         comment: text,
-        author: "alvaro",
+        author: "user",
         created: new Date().toISOString(),
         status: "open",
         replies: []
@@ -472,7 +472,7 @@
         id: genId(),
         anchor: { text: pendingSelection.text, section: pendingSelection.section },
         comment: text,
-        author: "alvaro",
+        author: "user",
         created: new Date().toISOString(),
         status: "open",
         replies: []
@@ -589,7 +589,7 @@
           type: "merge",
           anchor: null,
           comment: actionModal.querySelector("#merge-note").value.trim() || "Propuesta de fusión",
-          author: "alvaro",
+          author: "user",
           created: new Date().toISOString(),
           status: "open",
           replies: [],
@@ -606,7 +606,7 @@
           type: "move",
           anchor: null,
           comment: actionModal.querySelector("#move-note").value.trim() || "Propuesta de movimiento",
-          author: "alvaro",
+          author: "user",
           created: new Date().toISOString(),
           status: "open",
           replies: [],
@@ -673,7 +673,7 @@
         id: genId(),
         anchor: null,
         comment: text.trim(),
-        author: "alvaro",
+        author: "user",
         created: new Date().toISOString(),
         status: "open",
         replies: []
@@ -816,7 +816,7 @@
         var id = btn.dataset.id;
         var text = prompt("Respuesta:");
         if (!text || !text.trim()) return;
-        var reply = { author: "alvaro", text: text.trim(), created: new Date().toISOString() };
+        var reply = { author: "user", text: text.trim(), created: new Date().toISOString() };
         var c = comments.find(function (x) { return x.id === id; });
         if (!c) return;
         if (!c.replies) c.replies = [];

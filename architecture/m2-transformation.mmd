@@ -1,62 +1,62 @@
 flowchart TB
 
-%% Modulo 2 - Transformacion / Carga / Presentacion (flowchart nivel 2)
-%% Leyenda:
-%%   [paso]            proceso
-%%   {X condicion?}    gateway exclusivo - una rama
-%%   {+ paralelo}      gateway paralelo - fork/join todas las ramas
-%%   {O opcion}        gateway inclusivo - una o mas ramas
-%%   ([trigger])       inicio/fin
-%%   [(store)]         data store persistente interno
-%%   [(store)] dashed  data store persistente externo (Gmail, GitHub, etc.)
-%%   [/evento/]        evento o mensaje transitorio (one-shot)
-%%   -->               flujo de control (orden de ejecucion)
-%%   -.->              flujo de datos (lectura o escritura)
+%% Module 2 - Transformation / Load / Presentation (level 2 flowchart)
+%% Legend:
+%%   [step]            process
+%%   {X condition?}    exclusive gateway - one branch
+%%   {+ parallel}      parallel gateway - fork/join all branches
+%%   {O option}        inclusive gateway - one or more branches
+%%   ([trigger])       start/end
+%%   [(store)]         persistent internal data store
+%%   [(store)] dashed  persistent external data store (Gmail, GitHub, etc.)
+%%   [/event/]         transient event or message (one-shot)
+%%   -->               control flow (execution order)
+%%   -.->              data flow (read or write)
 
     %% --- 2.1 wiki-update ---
     subgraph S1[" 2.1 wiki-update "]
         direction TB
-        T1([trigger: cron / post-extraccion])
-        SC1[escanear desde<br/>ultima corrida]
-        D1{"X hay evidencias<br/>nuevas?"}
-        DEC1[decidir articulos<br/>a tocar]
+        T1([trigger: cron / post-extraction])
+        SC1[scan since<br/>last run]
+        D1{"X new evidence<br/>found?"}
+        DEC1[decide articles<br/>to update]
         ME1[merge via<br/>skill wiki-write]
-        END1([fin])
+        END1([end])
 
-        IN1[(memory/<br/>evidencias)]
+        IN1[(memory/<br/>evidence)]
         OUT1[(wiki/articulos<br/>markdown)]
 
         %% control
         T1 --> SC1 --> D1
         D1 -- no --> END1
-        D1 -- sí --> DEC1 --> ME1 --> END1
+        D1 -- yes --> DEC1 --> ME1 --> END1
 
-        %% datos
-        IN1 -. lee .-> SC1
-        ME1 -. escribe .-> OUT1
+        %% data
+        IN1 -. read .-> SC1
+        ME1 -. write .-> OUT1
     end
 
     %% --- 2.2 wiki-build ---
     subgraph S2[" 2.2 wiki-build "]
         direction TB
         T2([trigger: post wiki-update / manual])
-        FORK2{"+ render<br/>en paralelo"}
-        R2a[render articulos<br/>md a html]
+        FORK2{"+ render<br/>in parallel"}
+        R2a[render articles<br/>md to html]
         R2b[render home<br/>dashboard]
-        R2c[render acciones.html]
-        R2d[render notas.html]
-        R2e[render estado.html]
-        JOIN2{"+ esperar<br/>renders"}
-        D2{"X cambios<br/>en output?"}
+        R2c[render actions.html]
+        R2d[render notes.html]
+        R2e[render status.html]
+        JOIN2{"+ wait for<br/>renders"}
+        D2{"X changes<br/>in output?"}
         CP2[commit + push<br/>auto-deploy]
-        END2([fin])
+        END2([end])
 
         IN2a[(wiki/articulos)]
         IN2b[(acciones.md)]
-        IN2c[(notas /<br/>handovers)]
-        IN2d[(memory/<br/>logs rutinas)]
-        OUT2a[(wiki/output<br/>panel HTML)]
-        OUT2b[(Repo remoto<br/>alvaroemur/wiki<br/>Pages opcional)]
+        IN2c[(notes /<br/>handovers)]
+        IN2d[(memory/<br/>routine logs)]
+        OUT2a[(wiki/output<br/>HTML panel)]
+        OUT2b[(Remote repo<br/>Pages optional)]
 
         %% control
         T2 --> FORK2
@@ -66,28 +66,28 @@ flowchart TB
         FORK2 --> R2d --> JOIN2
         FORK2 --> R2e --> JOIN2
         JOIN2 --> D2
-        D2 -- sí --> CP2 --> END2
+        D2 -- yes --> CP2 --> END2
         D2 -- no --> END2
 
-        %% datos: entrada
-        IN2a -. lee .-> R2a
-        IN2a -. resumenes .-> R2b
+        %% data: input
+        IN2a -. read .-> R2a
+        IN2a -. summaries .-> R2b
         IN2b -. top N .-> R2b
-        IN2c -. recientes .-> R2b
-        IN2b -. lee .-> R2c
-        IN2c -. lee .-> R2d
-        IN2d -. lee .-> R2e
+        IN2c -. recent .-> R2b
+        IN2b -. read .-> R2c
+        IN2c -. read .-> R2d
+        IN2d -. read .-> R2e
 
-        %% datos: salida
-        R2a -. escribe .-> OUT2a
-        R2b -. escribe .-> OUT2a
-        R2c -. escribe .-> OUT2a
-        R2d -. escribe .-> OUT2a
-        R2e -. escribe .-> OUT2a
+        %% data: output
+        R2a -. write .-> OUT2a
+        R2b -. write .-> OUT2a
+        R2c -. write .-> OUT2a
+        R2d -. write .-> OUT2a
+        R2e -. write .-> OUT2a
         CP2 -. push .-> OUT2b
     end
 
-    %% --- estilos ---
+    %% --- styles ---
     classDef inicio    fill:#c8e6c9,stroke:#2e7d32,color:#000;
     classDef fin       fill:#ffcdd2,stroke:#c62828,color:#000;
     classDef actividad fill:#bbdefb,stroke:#1565c0,color:#000;

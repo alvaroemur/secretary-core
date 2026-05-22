@@ -1,29 +1,29 @@
 flowchart LR
 
-%% Secretary — Arquitectura nivel 1 (DFD)
-%% Convencion:
-%%   [X]    entidad externa
-%%   ([X])  proceso (numerado)
+%% Secretary — Level 1 architecture (DFD)
+%% Convention:
+%%   [X]    external entity
+%%   ([X])  process (numbered)
 %%   [(X)]  data store
 %%
-%% Fuente de verdad editable. Reflejar aqui cualquier cambio
-%% estructural antes (o a la par) de implementarlo en codigo.
+%% Editable source of truth. Reflect any structural change
+%% here before (or alongside) implementing it in code.
 
-    %% --- Entidades externas ---
+    %% --- External entities ---
     Gmail[Gmail]
     WA[WhatsApp]
-    Tactiq[Tactiq / Reuniones]
+    Tactiq[Tactiq / Meetings]
     Cal[Google Calendar]
-    Alvaro[Álvaro]
-    Repos[Repos externos<br/>propuesta-gauss, etc.]
+    User[User]
+    Repos[External repos]
 
-    %% --- Modulo 1: Extraccion ---
-    subgraph M1[" 1. Extraccion "]
+    %% --- Module 1: Extraction ---
+    subgraph M1[" 1. Extraction "]
         direction TB
-        P1([1.1 revision-correo])
+        P1([1.1 mail-review])
         P2([1.2 whatsapp-update])
-        P3([1.3 reuniones-update])
-        DS_mem[("memory/<br/>evidencias")]
+        P3([1.3 meetings-update])
+        DS_mem[("memory/<br/>evidence")]
         DS_acc[("acciones.md")]
         P1 --> DS_mem
         P2 --> DS_mem
@@ -33,26 +33,26 @@ flowchart LR
         P3 --> DS_acc
     end
 
-    %% --- Modulo 2: Transformacion / Carga / Presentacion ---
-    subgraph M2[" 2. Transformacion / Carga / Presentacion "]
+    %% --- Module 2: Transformation / Load / Presentation ---
+    subgraph M2[" 2. Transformation / Load / Presentation "]
         direction TB
         P4([2.1 wiki-update])
         P5([2.2 wiki-build])
         DS_wiki[("wiki/articulos")]
-        DS_html[("wiki/output<br/>panel HTML<br/>home + acciones<br/>+ notas + wiki<br/>+ estado")]
+        DS_html[("wiki/output<br/>HTML panel<br/>home + actions<br/>+ notes + wiki<br/>+ status")]
         P4 --> DS_wiki
         DS_wiki --> P5 --> DS_html
     end
 
-    %% --- Modulo 3: Dispatch / Handover ---
+    %% --- Module 3: Dispatch / Handover ---
     subgraph M3[" 3. Dispatch / Handover "]
         direction TB
         P6([3.1 dispatch])
-        DS_notas[("notas /<br/>handovers")]
+        DS_notas[("notes /<br/>handovers")]
         P6 --> DS_notas
     end
 
-    %% --- Flujos entre modulos ---
+    %% --- Flows between modules ---
     Gmail --> P1
     WA --> P2
     Tactiq --> P3
@@ -60,20 +60,20 @@ flowchart LR
 
     DS_mem --> P4
     DS_acc --> P6
-    DS_wiki -. contexto .-> P6
+    DS_wiki -. context .-> P6
 
-    %% wiki-build agrega acciones y notas al panel HTML
+    %% wiki-build adds actions and notes to the HTML panel
     DS_acc --> P5
     DS_notas --> P5
-    DS_mem -. logs estado .-> P5
+    DS_mem -. status logs .-> P5
 
     P6 --> Repos
-    DS_notas --> Alvaro
-    DS_html --> Alvaro
+    DS_notas --> User
+    DS_html --> User
 
-    %% --- estilos ---
+    %% --- styles ---
     classDef actividad fill:#bbdefb,stroke:#1565c0,color:#000;
     classDef io        fill:#e0e0e0,stroke:#616161,color:#000;
 
     class P1,P2,P3,P4,P5,P6 actividad;
-    class Gmail,WA,Tactiq,Cal,Alvaro,Repos,DS_mem,DS_acc,DS_wiki,DS_html,DS_notas io;
+    class Gmail,WA,Tactiq,Cal,User,Repos,DS_mem,DS_acc,DS_wiki,DS_html,DS_notas io;

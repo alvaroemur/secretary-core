@@ -1,81 +1,80 @@
-# Política de procesamiento — WhatsApp
+# Processing policy — WhatsApp
 
-> Plantilla de ejemplo. Reemplaza placeholders `<...>` con los chats,
-> grupos y contactos reales del usuario.
+> Example template. Replace `<...>` placeholders with the user's actual
+> chats, groups, and contacts.
 
-## Regla general (whitelist estricta)
+## General rule (strict whitelist)
 
-**Sólo se procesan los chats explícitamente listados en la whitelist (Aprobados).**
-El resto de WhatsApp (potencialmente cientos de chats) se captura en `inbox/chats/` pero NO se generan memos automáticos.
+**Only chats explicitly listed in the whitelist (Approved) are processed.**
+All other WhatsApp chats (potentially hundreds) are captured in `inbox/chats/` but NO automatic memos are generated.
 
-Esto es porque WhatsApp contiene una mezcla de conversaciones personales, profesionales y casuales. Una vez identificado qué vale la pena procesar, se agrega a la whitelist.
+This is because WhatsApp contains a mix of personal, professional, and casual conversations. Once a chat is identified as worth processing, it gets added to the whitelist.
 
-## Excepciones
+## Exceptions
 
-### Contactos nuevos
-Si aparece un contacto nuevo (primera vez que escribe) y NO está en la whitelist, se anota en `estado.md` como "Contacto nuevo detectado" para que el usuario decida si agregarlo o no.
+### New contacts
+If a new contact appears (first time writing) and is NOT on the whitelist, it is noted in `estado.md` as "New contact detected" so the user can decide whether to add them.
 
-### Pendientes de aprobación
-Si un chat de la whitelist estuvo inactivo >30 días y se reactiva, se sigue procesando (ya está aprobado).
+### Pending approval
+If a whitelisted chat was inactive for >30 days and reactivates, it continues to be processed (already approved).
 
-## Whitelist — Aprobados
+## Whitelist — Approved
 
-> Reemplaza los siguientes ejemplos con los chats reales del usuario.
-> Mantener un slug en `kebab-case` por chat para nombrar el archivo de
-> memo asociado.
+> Replace the following examples with the user's actual chats.
+> Keep a `kebab-case` slug per chat for naming the associated memo file.
 
-### Grupos de proyectos (procesar siempre — info accionable)
+### Project groups (always process — actionable info)
 - `<PROJECT_GROUP_1>` (`<project-group-1>.md`)
 - `<PROJECT_GROUP_2>` (`<project-group-2>.md`)
-- `<PROJECT_GROUP_3>` (`<project-group-3>.md`) — canal operativo; entregas con deadlines reales
+- `<PROJECT_GROUP_3>` (`<project-group-3>.md`) — operations channel; deliveries with real deadlines
 
-### Grupos de radar (monitorear por novedades)
+### Radar groups (monitor for news)
 - `<RADAR_GROUP_1>` (`<radar-group-1>.md`)
 - `<RADAR_GROUP_2>` (`<radar-group-2>.md`)
-- `<RADAR_GROUP_3>` (`<radar-group-3>.md`) — convocatorias, búsquedas de orgs, ecosistema relevante
-- `<RADAR_GROUP_4>` (`<radar-group-4>.md`) — Demo Days, eventos del ecosistema
+- `<RADAR_GROUP_3>` (`<radar-group-3>.md`) — calls for proposals, org searches, relevant ecosystem
+- `<RADAR_GROUP_4>` (`<radar-group-4>.md`) — Demo Days, ecosystem events
 
-### Personas (1-on-1)
+### People (1-on-1)
 - `<CONTACT_NAME_1>` (`<contact-1>.md`)
-- `<CONTACT_NAME_2>` — `<PHONE>` — sin chat aún
+- `<CONTACT_NAME_2>` — `<PHONE>` — no chat yet
 - `<CONTACT_NAME_3>` (`<contact-3>.md`)
-- `<CONTACT_NAME_4>` (`<contact-4>.md`) — JID `<JID>@lid` (variante privacy del número ya en glosario; confirmar identidad)
-- `<CONTACT_NAME_5>` (`<contact-5>.md`) — lead vía `<REFERRER_NAME>` (`<JID>@lid`)
-- `<CONTACT_NAME_6>` (`<contact-6>.md`) — relación cercana; contexto importante sobre dinámica del grupo
+- `<CONTACT_NAME_4>` (`<contact-4>.md`) — JID `<JID>@lid` (privacy variant of the number already in glossary; confirm identity)
+- `<CONTACT_NAME_5>` (`<contact-5>.md`) — lead via `<REFERRER_NAME>` (`<JID>@lid`)
+- `<CONTACT_NAME_6>` (`<contact-6>.md`) — close relationship; important context about group dynamics
 
-<!-- TODO: confirm if generic — completar con los contactos reales del usuario -->
+<!-- TODO: fill in with the user's actual contacts -->
 
-## Bloqueados explícitos
-<!-- JIDs/nombres que nunca deben procesarse ni aparecer en el reporte de triage -->
-(ninguno por ahora)
+## Explicitly blocked
+<!-- JIDs/names that must never be processed or appear in the triage report -->
+(none for now)
 
-## Triage de chats fuera del whitelist
+## Triage for chats outside the whitelist
 
-La rutina NO genera memos para chats fuera de la whitelist, pero SÍ hace **triage** de su actividad y lista candidatos en `estado.md` para que el usuario decida.
+The routine does NOT generate memos for chats outside the whitelist, but it DOES **triage** their activity and lists candidates in `estado.md` for the user to decide.
 
-### Reglas de clasificación del triage (subagente "triage")
+### Triage classification rules (sub-agent "triage")
 
-- **señal_alta** → aparece en `estado.md` como "candidato para whitelist". Cumple ≥1 de:
-  - >5 mensajes nuevos con texto real
-  - Menciona ≥1 entidad existente en wiki (persona, org, tema)
-  - Contacto nuevo (primera vez que escribe en chat 1-on-1)
-  - Mensaje con palabra clave: "deadline", "convocatoria", "fondo", "propuesta", "reunión", "factura", "pago", URLs a docs/forms
+- **high_signal** → appears in `estado.md` as "whitelist candidate". Meets >= 1 of:
+  - >5 new messages with actual text
+  - Mentions >= 1 existing entity in wiki (person, org, topic)
+  - New contact (first time writing in a 1-on-1 chat)
+  - Message with keyword: "deadline", "call for proposals", "grant", "proposal", "meeting", "invoice", "payment", URLs to docs/forms
 
-- **señal_media** → aparece en `estado.md` como "actividad menor" (1-línea). 1-3 mensajes con contenido textual mínimo (scheduling, "ok", "gracias")
+- **medium_signal** → appears in `estado.md` as "minor activity" (1-liner). 1-3 messages with minimal text content (scheduling, "ok", "thanks")
 
-- **señal_baja** → aparece sólo en stats de `estado.md`. Solo media sin caption, solo emojis/reacciones
+- **low_signal** → appears only in `estado.md` stats. Media-only without caption, emoji-only/reactions
 
-### Cómo ajustar la rutina
+### How to adjust the routine
 
-- **Para sumar un chat al procesamiento profundo**: agregar slug/JID a la sección Aprobados (en la categoría que corresponda)
-- **Para silenciar un chat permanentemente**: agregar a Bloqueados
-- **Para que un contacto nuevo no se reporte como nuevo otra vez**: agregar a `memory/_glosario.md` con sus alias
+- **To add a chat to deep processing**: add slug/JID to the Approved section (in the appropriate category)
+- **To permanently silence a chat**: add to Blocked
+- **To stop a new contact from being reported as new again**: add to `memory/_glosario.md` with their aliases
 
-## Notas operativas
+## Operational notes
 
-- **Tipo de procesamiento por categoría**:
-  - *Proyectos*: extraer acciones, deadlines, decisiones, evidencias para wiki
-  - *Radar*: extraer novedades, oportunidades, links interesantes; sin acciones forzadas
-  - *Personas*: extraer compromisos, info personal/profesional relevante para sus perfiles en wiki
-- **Mensajes con sender desconocido (`?`)**: en dumps históricos, algunos mensajes de grupo no traen `participant`. Estos mensajes se incluyen en el análisis de **temas** (de qué se habló) pero se **omiten del análisis de personas** (no se atribuyen a nadie). En los memos aparecen sin autor o como "remitente no identificado".
-- **Mensajes en vivo (capturados por la rutina de fetch)**: traen `participant` correcto, atribución 100% confiable.
+- **Processing type by category**:
+  - *Projects*: extract actions, deadlines, decisions, evidence for wiki
+  - *Radar*: extract news, opportunities, interesting links; no forced actions
+  - *People*: extract commitments, relevant personal/professional info for their wiki profiles
+- **Messages with unknown sender (`?`)**: in historical dumps, some group messages lack a `participant` field. These messages are included in **topic** analysis (what was discussed) but are **omitted from person analysis** (not attributed to anyone). In memos they appear without author or as "unidentified sender".
+- **Live messages (captured by the fetch routine)**: carry the correct `participant`, 100% reliable attribution.

@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Secretary — Arquitectura</title>
+  <title>Secretary — Architecture</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 20px; background: #fafafa; color: #222; }
     header { border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 16px; }
@@ -24,15 +24,15 @@
 <body>
   <header>
     <div class="row">
-      <h1>Secretary — Arquitectura</h1>
+      <h1>Secretary — Architecture</h1>
       <div class="meta">
         <span id="source-name"></span>
-        &nbsp;·&nbsp; <button onclick="loadCurrent()">Recargar</button>
+        &nbsp;·&nbsp; <button onclick="loadCurrent()">Reload</button>
       </div>
     </div>
     <nav id="nav"></nav>
   </header>
-  <div id="diagram">Cargando…</div>
+  <div id="diagram">Loading...</div>
 
   <script type="module">
     import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
@@ -69,7 +69,7 @@
     async function loadCurrent() {
       const d = DIAGRAMS.find(x => x.id === currentId());
       sourceName.textContent = d.file;
-      target.innerHTML = "Cargando…";
+      target.innerHTML = "Loading...";
       try {
         const res = await fetch(d.file + "?ts=" + Date.now());
         if (!res.ok) throw new Error("HTTP " + res.status);
@@ -77,11 +77,11 @@
         const { svg } = await mermaid.render("arq-" + d.id + "-" + Date.now(), src);
         target.innerHTML = svg;
       } catch (e) {
-        target.innerHTML = `<div class="err">No pude renderizar ${d.file}: ${e.message}
+        target.innerHTML = `<div class="err">Could not render ${d.file}: ${e.message}
 
-Si abriste este HTML con doble click (file://), serví la carpeta:
-    python3 -m http.server 8765 --directory /Users/alvaromur/Cowork/secretary
-y abrí http://localhost:8765/arquitectura.html</div>`;
+If you opened this HTML via file://, serve the folder instead:
+    python3 -m http.server 8765 --directory architecture/
+then open http://localhost:8765/index.html</div>`;
       }
     }
 

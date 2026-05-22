@@ -1,28 +1,28 @@
-# Wiki personal
+# Personal Wiki
 
-Wiki estilo Wikipedia sobre Álvaro Mur. Destino de agregación donde diversas apps y rutinas (procesamiento de correo, transcripciones de Meet, índices de Drive, calendario) consolidan el conocimiento que van recopilando.
+Wikipedia-style personal wiki. An aggregation destination where various apps and routines (mail processing, Meet transcriptions, Drive indexes, calendar) consolidate the knowledge they gather about the user.
 
-## Estructura
+## Structure
 
-- `articulos/` — fuentes en Markdown. Una subcarpeta por categoría.
-  - `alvaro-mur.md` — perfil principal.
-  - `personas/` — un `.md` por persona relevante.
-  - `organizaciones/` — empresas, clientes, proyectos.
-  - `temas/` — áreas, intereses, actividades recurrentes.
-- `assets/` — CSS y JS para el visor.
-- `build/build.py` — generador estático.
-- `output/` — HTML generado. Abrir `output/index.html` en el navegador.
-- `memory/indice.md` — log de cambios mantenido por agentes.
+- `articulos/` — Markdown sources. One subfolder per category.
+  - `user-profile.md` — main profile article.
+  - `personas/` — one `.md` per relevant person.
+  - `organizaciones/` — companies, clients, projects.
+  - `temas/` — areas, interests, recurring activities.
+- `assets/` — CSS and JS for the viewer.
+- `build/build.py` — static site generator.
+- `output/` — generated HTML. Open `output/index.html` in the browser.
+- `memory/indice.md` — change log maintained by agents.
 
-## Formato de un artículo
+## Article format
 
 ```markdown
 ---
-titulo: Nombre del artículo
+titulo: Article name
 tipo: persona            # persona | organizacion | tema | perfil
 infobox:
-  Campo: Valor
-  Otro campo: Valor
+  Field: Value
+  Other field: Value
 categorias: [personas]
 ultima_actualizacion: 2026-04-22
 fuentes:
@@ -32,10 +32,10 @@ fuentes:
     ref: https://drive.google.com/...
 ---
 
-## Sección
-Contenido Markdown.
+## Section
+Markdown content.
 
-Enlaces internos: [[personas/juan-perez]] o [[alvaro-mur]].
+Internal links: [[personas/juan-perez]] or [[user-profile]].
 ```
 
 ## Build
@@ -44,18 +44,18 @@ Enlaces internos: [[personas/juan-perez]] o [[alvaro-mur]].
 python3 secretary/wiki/build/build.py
 ```
 
-Genera `output/` con un HTML por artículo más `index.html` (portada con búsqueda cliente, artículos recientes, categorías).
+Generates `output/` with one HTML file per article plus `index.html` (landing page with client-side search, recent articles, categories).
 
-Sin dependencias externas: parseo de frontmatter y Markdown hecho a mano con la biblioteca estándar.
+No external dependencies: frontmatter and Markdown parsing done with the standard library.
 
-## Contrato para rutinas externas
+## Contract for external routines
 
-Cualquier agente/rutina que quiera escribir en la wiki debe:
+Any agent or routine that wants to write to the wiki must:
 
-1. Crear o editar un `.md` en la subcarpeta correcta de `articulos/`.
-2. Respetar el frontmatter. Actualizar `ultima_actualizacion` (YYYY-MM-DD) y añadir entradas a `fuentes`.
-3. Usar `[[slug]]` o `[[categoria/slug]]` para enlaces internos; el builder los resuelve.
-4. Añadir una línea a `memory/indice.md` con fecha + resumen del cambio.
-5. Ejecutar `build.py` (o dejarlo a una tarea de rebuild).
+1. Create or edit a `.md` file in the correct subfolder of `articulos/`.
+2. Respect the frontmatter. Update `ultima_actualizacion` (YYYY-MM-DD) and add entries to `fuentes`.
+3. Use `[[slug]]` or `[[category/slug]]` for internal links; the builder resolves them.
+4. Add a line to `memory/indice.md` with date + summary of the change.
+5. Run `build.py` (or leave it to a rebuild task).
 
-No inventar datos: los campos desconocidos se dejan como `[por rellenar]`.
+Do not invent data: unknown fields should be left as `[to be filled]`.

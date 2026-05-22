@@ -11,16 +11,15 @@ import pino from "pino";
 import { Boom } from "@hapi/boom";
 import path from "path";
 import fs from "fs/promises";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const AUTH_DIR = path.resolve(__dirname, "../auth");
-const INBOX_DIR = path.resolve(__dirname, "../inbox");
-const CHATS_DIR = path.join(INBOX_DIR, "chats");
-const MEDIA_DIR = path.join(INBOX_DIR, "media");
-const CONTACTS_FILE = path.join(INBOX_DIR, "contacts.json");
-const STATE_FILE = path.join(INBOX_DIR, ".last-fetch");
-const POLICY_FILE = path.resolve(__dirname, "../politica.md");
+import {
+  AUTH_DIR,
+  INBOX_DIR,
+  CHATS_DIR,
+  MEDIA_DIR,
+  CONTACTS_FILE,
+  STATE_FILE,
+  POLICY_FILE,
+} from "./paths.js";
 
 const logger = pino({ level: "silent" });
 const LISTEN_SECONDS = parseInt(process.env.LISTEN_SECONDS ?? "120", 10);

@@ -1,44 +1,44 @@
-# Ajustes y correcciones del usuario
+# User settings and corrections
 
-Última actualización: YYYY-MM-DD
+Last updated: YYYY-MM-DD
 
 ---
 
-> Plantilla de ejemplo. Reemplaza los placeholders y los ejemplos
-> fechados con correcciones reales del usuario a medida que ocurran.
+> Example template. Replace the placeholders and dated examples
+> with the user's actual corrections as they occur.
 
-Este archivo registra correcciones que `<USER_NAME>` hace a las decisiones de la rutina. La rutina debe leerlo antes de actuar y aplicar estos ajustes como reglas persistentes.
+This file records corrections that `<USER_NAME>` makes to the routine's decisions. The routine must read it before acting and apply these adjustments as persistent rules.
 
-## Correcciones de clasificación
+## Classification corrections
 
-- YYYY-MM-DD: No crear borradores para notificaciones automáticas de servicios de almacenamiento compartido (ej. shares de Drive). Nadie responde a eso. Excepción: si el contenido del correo incluye un mensaje personal explícito.
-- YYYY-MM-DD: `<CONTACT_NAME>` (`<sender@example.com>`) es un familiar/contacto cercano del usuario. La comunicación con él/ella ocurre por otro canal (no por email). No crear borradores para sus correos automáticos (Drive shares, etc.).
-- YYYY-MM-DD: Correos del banco/servicio sensible (`<sender@example.com>`) o cualquier mención a la tarjeta/cuenta `<ACCOUNT_REF>` → **NO archivar automáticamente**. El usuario no la utiliza activamente. Dejar en inbox y marcar como acción requerida.
-- YYYY-MM-DD: Cola/Eliminar debe **archivar** (no solo etiquetar). Periódicamente (ej. los viernes) la rutina hace un reporte extendido que resume todo lo archivado/eliminado del periodo, analiza qué podría ser relevante, y sugiere unsubscribes para lo que no lo es.
-- YYYY-MM-DD: **Oportunidades de trabajo y convocatorias NUNCA van a Cola/Eliminar.** La rutina debe revisar cada alerta de empleo y evaluar relevancia vs. el perfil del usuario (áreas temáticas, geografía, seniority) y dejar en inbox las que encajen para que él/ella priorice. Archivar solo las claramente irrelevantes. Ir mejorando el criterio con el feedback.
+- YYYY-MM-DD: Do not create drafts for automatic notifications from shared storage services (e.g. Drive shares). Nobody responds to those. Exception: if the email body includes an explicit personal message.
+- YYYY-MM-DD: `<CONTACT_NAME>` (`<sender@example.com>`) is a family member/close contact of the user. Communication with them happens through another channel (not email). Do not create drafts for their automatic emails (Drive shares, etc.).
+- YYYY-MM-DD: Emails from the sensitive bank/service (`<sender@example.com>`) or any mention of the card/account `<ACCOUNT_REF>` → **DO NOT archive automatically**. The user does not actively use it. Keep in inbox and mark as action required.
+- YYYY-MM-DD: Queue/Delete must **archive** (not just label). Periodically (e.g. Fridays) the routine produces an extended report summarizing everything archived/deleted in the period, analyzes what might be relevant, and suggests unsubscribes for what is not.
+- YYYY-MM-DD: **Job opportunities and calls for proposals NEVER go to Queue/Delete.** The routine must review each job alert and evaluate relevance vs. the user's profile (subject areas, geography, seniority) and keep relevant ones in inbox so the user can prioritize. Archive only clearly irrelevant ones. Improve criteria over time with feedback.
 
-- YYYY-MM-DD: **NUNCA mover correos a la papelera (TRASH).** La rutina NO tiene permiso de borrar correos bajo ninguna circunstancia. "Cola/Eliminar" significa archivar (`--remove INBOX`), NO `--add TRASH`.
+- YYYY-MM-DD: **NEVER move emails to trash (TRASH).** The routine does NOT have permission to delete emails under any circumstance. "Queue/Delete" means archive (`--remove INBOX`), NOT `--add TRASH`.
 
-## Correcciones de tono / borradores
+## Tone / draft corrections
 
-- Despedida preferida: `<SIGN_OFF>` (ej. "Saludos", "Abrazo").
-- Trato preferido: `<tuteo | usted | voseo>` cuando sea apropiado.
-- Estilo: ser conciso.
+- Preferred sign-off: `<SIGN_OFF>` (e.g. "Best regards", "Cheers").
+- Preferred register: `<formal | informal>` as appropriate.
+- Style: be concise.
 
-## Correcciones de comportamiento
+## Behavior corrections
 
-- YYYY-MM-DD: Si el usuario reporta que la rutina está siendo demasiado agresiva archivando/eliminando, **preferir dejar en inbox ante la duda** hasta que indique lo contrario. Solo archivar/eliminar cuando haya certeza alta de que el correo no requiere atención.
-- YYYY-MM-DD: **NUNCA aceptar, rechazar ni responder invitaciones de calendario automáticamente.** Solo reportarlas en el resumen. Actuar sobre el calendario únicamente cuando el usuario lo pida explícitamente.
-- YYYY-MM-DD: **Borradores siempre dentro del hilo.** Usar el comando del CLI que permite responder al messageId original (`--reply-to-message-id <messageId>`), nunca crear borradores huérfanos vía APIs que no soporten reply-to.
-- YYYY-MM-DD: Sobre pagos pendientes, definir prioridad por servicio: marcar urgentes los que afecten producción/operación; los demás pueden esperar.
-- YYYY-MM-DD: **Reporte semanal periódico.** Además de la revisión diaria, hacer un reporte extendido que cubra todo lo archivado y flaggeado como Cola/Eliminar desde el reporte anterior. Incluir: resumen de lo que llegó, análisis de qué podría ser relevante, y para lo que no lo es, investigar si se puede hacer unsubscribe (link o instrucciones).
-- YYYY-MM-DD: **Eventos con deadline ≠ informativos.** Cuando un correo de un proyecto activo menciona una fecha futura, leer el cuerpo completo y extraer toda acción implícita: registro, RSVP, formulario a completar, presencia esperada, difusión de materiales. Marcarlas como "Acción requerida" en el reporte con deadline explícito, **no** como "evento próximo, sin acciones". Si sugieres una respuesta, crearla como borrador (no solo describirla).
+- YYYY-MM-DD: If the user reports the routine is being too aggressive archiving/deleting, **prefer keeping in inbox when in doubt** until they indicate otherwise. Only archive/delete when there is high certainty the email does not require attention.
+- YYYY-MM-DD: **NEVER accept, decline, or respond to calendar invitations automatically.** Only report them in the summary. Act on the calendar only when the user explicitly requests it.
+- YYYY-MM-DD: **Drafts always within the thread.** Use the CLI command that replies to the original messageId (`--reply-to-message-id <messageId>`), never create orphan drafts via APIs that don't support reply-to.
+- YYYY-MM-DD: For pending payments, define priority by service: mark urgent those that affect production/operations; the rest can wait.
+- YYYY-MM-DD: **Periodic weekly report.** In addition to the daily review, produce an extended report covering everything archived and flagged as Queue/Delete since the previous report. Include: summary of what arrived, analysis of what might be relevant, and for what is not, investigate whether unsubscribe is possible (link or instructions).
+- YYYY-MM-DD: **Events with deadlines are not merely informational.** When an email from an active project mentions a future date, read the full body and extract every implicit action: registration, RSVP, form to complete, expected attendance, material distribution. Mark them as "Action required" in the report with an explicit deadline, **not** as "upcoming event, no actions". If you suggest a response, create it as a draft (not just describe it).
 
-## Formato
+## Format
 
-Cuando el usuario corrija algo, agregarlo aquí con fecha y contexto breve. Ejemplo:
+When the user corrects something, add it here with date and brief context. Example:
 
 ```
-- YYYY-MM-DD: "No archives correos de <sender>, siempre los quiero ver" → mover a policy.md como regla de inbox
-- YYYY-MM-DD: "El tono del borrador para <persona> fue muy formal" → registrar preferencia de tono
+- YYYY-MM-DD: "Don't archive emails from <sender>, I always want to see them" → move to policy.md as inbox rule
+- YYYY-MM-DD: "The draft tone for <person> was too formal" → record tone preference
 ```

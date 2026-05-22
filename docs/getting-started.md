@@ -36,32 +36,26 @@ Just three things:
 
 ### Cursor — free, best for beginners ⭐
 
-[Cursor](https://cursor.com) looks like a normal app, but has a built-in AI that can read and modify files. It has a free tier that's enough to get started.
+[Cursor](https://cursor.com) is an app with a built-in AI that can do things on your computer. It has a free tier that's enough to get started.
 
 **Steps:**
 
 1. Go to [cursor.com](https://cursor.com) and download it
-2. Install and open it — it looks like a text editor, don't worry
-3. Go to the menu: **Terminal → New Terminal** (a black box will appear at the bottom — that's normal)
-4. Type this and press Enter:
-   ```
-   git clone https://github.com/alvaroemur/secretary-core.git
-   ```
-5. Then type: `cd secretary-core`
-6. Now open the AI panel: press **Cmd+L** (Mac) or **Ctrl+L** (Windows)
-7. Paste this message into the AI chat:
+2. Install and open it
+3. Open the AI chat: press **Cmd+L** (Mac) or **Ctrl+L** (Windows)
+4. Paste this message:
 
 > Clone https://github.com/alvaroemur/secretary-core and help me set it up as my personal assistant. Read the README.md first, then walk me through creating my instance, picking channels, and scheduling the routines. Ask me questions as you go.
 
-That's it. The AI reads the whole project, understands how it works, and walks you through setting it up step by step. It'll ask you things like "what's your email?" and "which WhatsApp chats do you want to track?" — just answer naturally.
+That's it. The AI takes care of downloading the project, reading it, and walking you through setup step by step. It'll ask you things like "what's your email?" and "which WhatsApp chats do you want to track?" — just answer naturally. 💬
 
 ### Windsurf — also free 🏄
 
-[Windsurf](https://windsurf.com) works the same way as Cursor. Download, install, open terminal, clone the repo, paste the prompt. Pick whichever one you like more.
+[Windsurf](https://windsurf.com) works the same way as Cursor. Download, install, open the AI chat, and paste the same message from above. Pick whichever one you like more.
 
 ### Claude Code — paid, but the most powerful 💪
 
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is what secretary was actually built with. It runs in the terminal (no editor UI). Requires a Claude Pro or Max subscription.
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is what secretary was actually built with. It's a command-line tool (more technical). Requires a Claude Pro or Max subscription.
 
 The big advantage: it supports **scheduled tasks** — the routines run automatically every day without you doing anything. With Cursor/Windsurf, you'd need to trigger them manually or set up external scheduling.
 

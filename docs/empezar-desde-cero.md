@@ -45,7 +45,7 @@ Solo tres cosas:
 3. Abre el chat de la IA: presiona **Cmd+L** (Mac) o **Ctrl+L** (Windows)
 4. Pega este mensaje:
 
-> Clone https://github.com/alvaroemur/secretary-core and help me set it up as my personal assistant. Read the README.md first, then walk me through creating my instance, picking channels, and scheduling the routines. Ask me questions as you go. Speak to me in Spanish.
+> Clona https://github.com/alvaroemur/secretary-core y ayúdame a configurarlo como mi asistente personal. Lee el README.md primero, luego guíame paso a paso para crear mi instancia, elegir qué canales activar y programar las rutinas. Hazme preguntas sobre la marcha.
 
 Eso es todo. La IA se encarga de descargar el proyecto, leerlo, y guiarte paso a paso. Te va a preguntar cosas como "¿cuál es tu correo?" y "¿qué chats de WhatsApp quieres rastrear?" — solo responde con naturalidad. 💬
 

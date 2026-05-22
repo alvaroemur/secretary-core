@@ -262,7 +262,7 @@ def render_markdown(body: str, resolve_wikilink) -> tuple[str, list[Heading]]:
 
 @dataclass
 class Articulo:
-    slug: str            # e.g. "alvaro-mur" o "personas/juan"
+    slug: str            # e.g. "user-profile" or "personas/juan"
     path: Path
     meta: dict
     body: str

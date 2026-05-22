@@ -11,3 +11,5 @@ node_modules/
 .vite/
 dist/
 build/output/
+wiki/articulos/
+wiki/output/

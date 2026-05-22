@@ -61,7 +61,7 @@ That's it. The AI takes care of downloading the project, reading it, and walking
 
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is what secretary was actually built with. It's a command-line tool (more technical). Requires a Claude Pro or Max subscription.
 
-The big advantage: it supports **scheduled tasks** — the routines run automatically every day without you doing anything. With the other tools, you'd need to trigger them manually or set up external scheduling.
+It has built-in **scheduled tasks** — the routines run automatically every day without you doing anything. But this isn't exclusive: with any of the other tools you can achieve the same thing by setting up a cron job that calls the model's API. It's a few dollars a month and the AI itself can help you set it up and estimate the cost. 💸
 
 ### What about ChatGPT? 🤷
 

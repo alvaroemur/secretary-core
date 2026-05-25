@@ -48,6 +48,28 @@ npx tsx fetch.ts --since "$(cat $WORKTREE/whatsapp/estado.md | grep 'last_fetch'
 
 This produces one file per chat in `inbox/chats/<jid-or-slug>.md`, each containing the new messages in chronological order.
 
+`fetch.ts` flags:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--listen <s>` | 300 | Hard cap on the listen window |
+| `--quiet <s>` | 15 | Stop early after this long with no new message |
+| `--since <iso\|epoch>` | — | Only keep messages newer than this |
+| `--output <dir>` | instance inbox | Redirect inbox writes (e.g. the worktree) |
+| `--history` | off | On-demand backfill mode (see below) |
+| `--chat <jid\|number>` | all | With `--history`, target a single chat |
+| `--count <n>` | 50 | With `--history`, messages per chat (server max 50) |
+
+Default mode **drains until quiet**: it keeps listening while messages arrive and stops once the stream goes silent, so a large offline backlog is never cut off mid-stream (the old fixed 90–120s window dropped late-arriving chats).
+
+**On-demand history** (`--history --chat <jid|number>`) pages backwards through a chat the device has already seen, anchoring on its most recent known message (anchors persist in `inbox/.anchors.json` across runs).
+
+> **Hard limit (WhatsApp multi-device):** a linked companion device receives each message only once — live or buffered while it was offline — and gets **no** history re-sync on reconnect. `--history` can only page back from a message the device already knows. A conversation the device never received and that has left the server's offline buffer is **not recoverable** without re-linking (`dump.ts` clears auth on purpose to force a full history sync via QR). The practical defense against missing messages is running this routine often enough that the offline buffer is always drained before it expires.
+
+### Contact / whitelist matching
+
+Most chats now arrive under privacy-mode `@lid` JIDs, not `<number>@s.whatsapp.net`. `fetch.ts` matches the whitelist by **phone number**, normalizing either direction via Baileys' LID↔PN mapping (`signalRepository.lidMapping`), so a whitelist entry like `` `51904319536` `` matches a chat that arrives as `24679586738177@lid`. The policy whitelist may list identities as bare numbers, `<number>@s.whatsapp.net`, `<id>@lid`, or `` `slug.md` ``.
+
 ## Step 2 — Load context
 
 1. **Policy** (`$INSTANCE/whatsapp/policy.md`) — The whitelist. Three tiers:
@@ -258,7 +280,7 @@ This routine relies on scripts and data living in separate repos:
 
 | Component | Location | Purpose |
 |---|---|---|
-| `fetch.ts` | `$CORE/whatsapp/src/` | Captures new messages via WhatsApp Web bridge |
+| `fetch.ts` | `$CORE/whatsapp/src/` | Drains new/offline messages (until quiet); `--history` pages back through a seen chat |
 | `dump.ts` | `$CORE/whatsapp/src/` | Full history dump (one-time or reset) |
 | `login.ts` | `$CORE/whatsapp/src/` | QR code authentication |
 | `fix-group-senders.ts` | `$CORE/whatsapp/src/` | Repairs missing sender info in group messages |

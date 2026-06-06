@@ -13,3 +13,9 @@ dist/
 build/output/
 wiki/articulos/
 wiki/output/
+
+# WhatsApp session credentials & personal data — NEVER commit (public repo)
+whatsapp/auth/
+whatsapp/inbox/
+whatsapp/media/
+whatsapp/qr.png

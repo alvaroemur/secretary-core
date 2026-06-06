@@ -10,9 +10,9 @@ import QRCode from "qrcode";
 import { exec } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
+import { AUTH_DIR } from "./paths.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const AUTH_DIR = path.resolve(__dirname, "../auth");
 const QR_PATH = path.resolve(__dirname, "../qr.png");
 
 const logger = pino({ level: "silent" });

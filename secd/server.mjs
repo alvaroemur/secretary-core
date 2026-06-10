@@ -19,6 +19,7 @@ import { buildContextCard } from './lib/context.mjs';
 import { queryObjectives, upsertObjective } from './lib/objectives.mjs';
 import { recall } from './lib/memory.mjs';
 import { runRelay } from './lib/relay.mjs';
+import { describe as describeLlm } from './lib/llm.mjs';
 
 const instance = resolveInstance();
 const TOKEN = loadOrCreateToken(instance);
@@ -93,6 +94,7 @@ const server = createServer(async (req, res) => {
       instance,
       entities: idx.entities.length,
       authRequired: true,
+      relay: describeLlm(instance),
     }, origin);
   }
 
@@ -138,7 +140,8 @@ const server = createServer(async (req, res) => {
       const card =
         body.contextCard ||
         buildContextCard(instance, { chatId: body.chatId, name: body.name });
-      return send(res, 200, runRelay({ contextCard: card, messages: body.messages || [] }), origin);
+      const relayOut = await runRelay(instance, { contextCard: card, messages: body.messages || [] });
+      return send(res, 200, relayOut, origin);
     }
 
     if (path === '/signal' && req.method === 'POST') {

@@ -6,10 +6,20 @@ conversation, and accepts signals back into Secretary. It is the bridge defined
 in **Feature 007 — Axon × Secretary** (RFC in the instance repo at
 `_design/specs/007-axon-secretary-relay/spec.md`).
 
-> **Status: MVP (P1 + P2 scaffold).** Read side is real and tested against a live
-> instance; the relay is a deterministic stub with the final shape, ready to be
-> backed by Claude. Written in zero-dependency ESM JavaScript so it runs with a
-> bare `node` (to be ported to TS to match the engine).
+> **Status: MVP (P1 + P2).** Read side is real and tested against a live instance.
+> The relay now runs a **real LLM** when one is configured (OpenAI by default;
+> provider-swappable to Claude), and falls back to a deterministic stub otherwise.
+> Zero-dependency ESM JavaScript so it runs with a bare `node` (to be ported to TS).
+
+## Relay LLM config
+
+The relay reads credentials from, in order:
+
+1. `<instance>/.secd/llm.json` → `{ "provider": "openai"|"anthropic", "apiKey": "…", "model": "…" }` (gitignored)
+2. env `OPENAI_API_KEY` (→ `gpt-4o-mini`) or `ANTHROPIC_API_KEY` (→ Claude Haiku)
+
+With nothing configured, `/relay` returns the deterministic stub. `GET /health`
+reports `relay: { configured, provider, model }`.
 
 ## Run
 
@@ -41,7 +51,7 @@ npm test     # offline checks against $SECRETARY_INSTANCE (resolver, context, ob
 | GET | `/objectives?entity=&estado=&nivel=` | yes | query the objectives store |
 | POST | `/objectives` | yes | create/update an objective (daemon mints id/date) |
 | GET | `/recall?q=` | yes | free-text search over wiki articles |
-| POST | `/relay` | yes | **stub** intention + objective + reply suggestions |
+| POST | `/relay` | yes | LLM-backed (or stub) intention + objective + reply suggestions |
 | POST | `/signal` | yes | record a durable fact (scaffold → `whatsapp/memory/relay-signals.md`) |
 | POST | `/capture` | yes | persist a scraped conversation (scaffold → `whatsapp/inbox/axon/`) |
 
@@ -70,6 +80,8 @@ secd/
 
 ## Not done yet (see RFC)
 
-- Real relay backed by Claude (P2): swap `lib/relay.mjs` keeping its shape.
+- Relay is live on OpenAI; switching to Claude is a config change (`provider: "anthropic"`).
 - `secd` lifecycle (login item / Secretary runtime) — currently run by hand.
 - `/capture` and `/signal` are scaffolds; full wiki-lazy integration is P3.
+- Tighter objective↔entity grounding (e.g. relationship objectives linked to the
+  people in an org, not just the org) so replies cite the right numbers.

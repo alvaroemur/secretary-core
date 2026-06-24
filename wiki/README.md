@@ -41,7 +41,7 @@ Internal links: [[personas/juan-perez]] or [[user-profile]].
 ## Build
 
 ```
-python3 secretary/wiki/build/build.py
+python3 secretary/memoria/wiki/build/build.py
 ```
 
 Generates `output/` with one HTML file per article plus `index.html` (landing page with client-side search, recent articles, categories).

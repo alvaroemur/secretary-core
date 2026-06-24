@@ -3,7 +3,8 @@
 // Convención (ver `.secretary.yml` de cada instancia):
 //   - El engine vive en secretary-core/whatsapp/src/ (este archivo).
 //   - Los datos (auth, inbox, politica, ...) viven en la instancia,
-//     bajo `whatsapp/` relativo a la raíz de la instancia.
+//     bajo `extractores/whatsapp/` relativo a la raíz de la instancia
+//     (ver paths.whatsapp en `.secretary.yml`).
 //   - La instancia se identifica con la env var `SECRETARY_INSTANCE`,
 //     apuntando a su raíz (ej. `~/my-secretary`).
 //
@@ -19,6 +20,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DATA_ROOT = process.env.SECRETARY_INSTANCE
   ? path.resolve(
       process.env.SECRETARY_INSTANCE.replace(/^~/, process.env.HOME ?? "~"),
+      "extractores",
       "whatsapp"
     )
   : path.resolve(__dirname, "..");

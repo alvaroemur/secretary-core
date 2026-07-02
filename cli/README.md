@@ -62,23 +62,15 @@ secretary fresh all --format markdown  # bloque heartbeat
 
 secretary acc fold acc-… pr:owner/repo#N
 
-secretary routines setup            # interactive api-cron + LaunchAgent wizard
+secretary routines setup            # interactive router + LaunchAgent wizard
 ```
 
 ## Routines setup
 
-Scheduled routines run via **api-cron** only: macOS LaunchAgents call
-`run-routine.sh` → HTTP chat completions (OpenAI-compatible API).
-
-Canonical setup (new instance or update):
-
-```bash
-secretary routines setup
-```
-
-The wizard patches `dispatch.routines` in `.secretary.yml`, ensures `.env.example`,
-runs the instance `install-routine-schedule.sh`, and offers LaunchAgent reload.
-Instance resolves via `SECRETARY_INSTANCE` (default `~/.secretary`).
+`secretary routines setup` is the canonical entry for configuring `dispatch.routines`
+(`claude-scheduled` | `cursor-cron` | `api-cron`), routine enable/disable, `.env` keys,
+`install-routine-schedule.sh`, and LaunchAgent reload. Instance wrapper:
+`~/.secretary/scripts/routines/setup.sh`.
 
 Operator docs live in the instance: `operational/routines-executor.md`.
 

@@ -1,4 +1,4 @@
-"""Interactive setup wizard for secretary scheduled routines (api-cron only)."""
+"""Interactive wizard for secretary routines router and LaunchAgent schedule."""
 
 from __future__ import annotations
 
@@ -13,10 +13,24 @@ import yaml
 
 from secretary.config import instance_root
 
+EXECUTORS = ("claude-scheduled", "cursor-cron", "api-cron")
 DEFAULT_API_BASE = "https://nano-gpt.com/api/v1"
 DEFAULT_API_KEY_ENV = "SECRETARY_ROUTINES_API_KEY"
-DEFAULT_MODEL = "minimax/minimax-m2.7"
-EXECUTOR = "api-cron"
+DEFAULT_MODEL_API = "minimax/minimax-m2.7"
+DEFAULT_MODEL_CURSOR = "auto"
+
+
+def _paths() -> dict[str, Path]:
+    inst = instance_root()
+    return {
+        "instance": inst,
+        "config": inst / ".secretary.yml",
+        "manifest": inst / ".cursor/routines/manifest.yaml",
+        "env": inst / ".env",
+        "env_example": inst / ".env.example",
+        "install_script": inst / "scripts/routines/install-routine-schedule.sh",
+        "launchd_dir": Path.home() / "Library/LaunchAgents",
+    }
 
 
 def _banner(title: str) -> None:
@@ -76,26 +90,16 @@ def _dump_yaml(data: dict[str, Any]) -> str:
     return yaml.safe_dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 
-def _paths(instance: Path) -> dict[str, Path]:
-    return {
-        "config": instance / ".secretary.yml",
-        "manifest": instance / ".cursor/routines/manifest.yaml",
-        "env": instance / ".env",
-        "env_example": instance / ".env.example",
-        "install": instance / "scripts/routines/install-routine-schedule.sh",
-    }
-
-
-def _read_routines_config(instance: Path) -> dict[str, Any]:
-    cfg = _load_yaml(_paths(instance)["config"])
+def _read_routines_config(config_path: Path) -> dict[str, Any]:
+    cfg = _load_yaml(config_path)
     routines = (cfg.get("dispatch") or {}).get("routines") or {}
     api = routines.get("api") or {}
     disabled = routines.get("disabled") or []
     if not isinstance(disabled, list):
         disabled = []
     return {
-        "executor": EXECUTOR,
-        "model": routines.get("model", DEFAULT_MODEL),
+        "executor": routines.get("executor", "cursor-cron"),
+        "model": routines.get("model", DEFAULT_MODEL_CURSOR),
         "api_base_url": api.get("base_url", DEFAULT_API_BASE),
         "api_key_env": api.get("api_key_env", DEFAULT_API_KEY_ENV),
         "disabled": [str(x) for x in disabled],
@@ -151,16 +155,16 @@ def _git_fetch_main(instance: Path) -> None:
         print(f"  WARN: git fetch failed: {exc}")
 
 
-def _ensure_env_example(env_example: Path) -> None:
+def _ensure_env_example(env_example_path: Path) -> None:
     content = """# General NanoGPT (Cursor, ad-hoc) — optional
 # NANOGPT_API_KEY=
 
 # Cron/routines only (api-cron LaunchAgents)
 SECRETARY_ROUTINES_API_KEY=
 """
-    if not env_example.is_file():
-        env_example.write_text(content, encoding="utf-8")
-        print(f"  Created {env_example}")
+    if not env_example_path.is_file():
+        env_example_path.write_text(content, encoding="utf-8")
+        print(f"  Created {env_example_path}")
 
 
 def _env_has_key(env_path: Path, var_name: str) -> bool:
@@ -179,31 +183,35 @@ def _env_has_key(env_path: Path, var_name: str) -> bool:
 
 def _preview_dispatch_block(state: dict[str, Any]) -> str:
     block: dict[str, Any] = {
-        "executor": EXECUTOR,
+        "executor": state["executor"],
         "model": state["model"],
-        "api": {
+    }
+    if state["executor"] == "api-cron":
+        block["api"] = {
             "base_url": state["api_base_url"],
             "api_key_env": state["api_key_env"],
-        },
-    }
+        }
     disabled = state.get("disabled") or []
     if disabled:
         block["disabled"] = sorted(disabled)
     return yaml.safe_dump({"dispatch": {"routines": block}}, allow_unicode=True, sort_keys=False)
 
 
-def _merge_write_config(instance: Path, state: dict[str, Any]) -> None:
-    config_path = _paths(instance)["config"]
+def _merge_write_config(config_path: Path, state: dict[str, Any]) -> None:
     cfg = _load_yaml(config_path)
     dispatch = cfg.setdefault("dispatch", {})
     routines = dispatch.setdefault("routines", {})
 
-    routines["executor"] = EXECUTOR
+    routines["executor"] = state["executor"]
     routines["model"] = state["model"]
-    routines["api"] = {
-        "base_url": state["api_base_url"],
-        "api_key_env": state["api_key_env"],
-    }
+
+    if state["executor"] == "api-cron":
+        routines["api"] = {
+            "base_url": state["api_base_url"],
+            "api_key_env": state["api_key_env"],
+        }
+    else:
+        routines.pop("api", None)
 
     disabled = state.get("disabled") or []
     if disabled:
@@ -215,19 +223,23 @@ def _merge_write_config(instance: Path, state: dict[str, Any]) -> None:
     print(f"  Wrote {config_path}")
 
 
-def _run_installer(instance: Path) -> int:
-    install = _paths(instance)["install"]
-    if not install.is_file():
-        print(f"  ERROR: missing {install}", file=sys.stderr)
+def _run_installer(install_script: Path, instance: Path) -> int:
+    if not install_script.is_file():
+        print(f"  ERROR: missing {install_script}", file=sys.stderr)
         return 1
     env = os.environ.copy()
     env["SECRETARY_INSTANCE"] = str(instance)
-    print(f"  Running {install}")
-    return subprocess.run(["bash", str(install)], cwd=instance, env=env).returncode
+    print(f"  Running {install_script}")
+    result = subprocess.run(["bash", str(install_script)], cwd=instance, env=env)
+    return result.returncode
 
 
-def _reload_launchagents(instance: Path, routine_ids: list[str]) -> None:
-    launchd_dir = Path.home() / "Library/LaunchAgents"
+def _reload_launchagents(
+    routine_ids: list[str], executor: str, launchd_dir: Path
+) -> None:
+    if executor == "claude-scheduled":
+        print("  claude-scheduled — no LaunchAgents to reload.")
+        return
     uid = os.getuid()
     domain = f"gui/{uid}"
     for rid in routine_ids:
@@ -243,28 +255,57 @@ def _reload_launchagents(instance: Path, routine_ids: list[str]) -> None:
 
 
 def _run_verify(instance: Path) -> None:
-    for name in ("validate_ordenamiento.py", "contract_health.py"):
-        script = instance / "scripts/ci" / name
+    validators = [
+        instance / "scripts/ci/validate_ordenamiento.py",
+        instance / "scripts/ci/contract_health.py",
+    ]
+    for script in validators:
         if not script.is_file():
             continue
-        print(f"  Running {name}...")
+        print(f"  Running {script.name}...")
         subprocess.run([sys.executable, str(script)], cwd=instance, check=False)
 
 
-def _step_api(state: dict[str, Any], paths: dict[str, Path]) -> None:
-    print("\n  Executor: api-cron (LaunchAgents → HTTP chat completions)")
-    state["api_base_url"] = _prompt("API base URL", state.get("api_base_url", DEFAULT_API_BASE))
-    state["model"] = _prompt("Model id", state.get("model", DEFAULT_MODEL))
-    key_env = state.get("api_key_env", DEFAULT_API_KEY_ENV)
-    print(f"\n  API key env var: {key_env} (value never shown)")
-    _ensure_env_example(paths["env_example"])
-    if not _env_has_key(paths["env"], key_env):
-        print(f"\n  WARN: {key_env} is not set in {paths['env']}")
-        print(f"  Edit {paths['env']} and add {key_env}=<your-key>")
-        print(f"  Copy from {paths['env_example']} if needed.")
-        _prompt_yes_no("Continue setup anyway?", default=True)
-    else:
-        print(f"  OK: {key_env} is set in .env (value not displayed).")
+def _step_mode() -> str:
+    return _menu_choice("Setup mode", ["New setup", "Update existing"])
+
+
+def _step_fetch(mode: str, instance: Path) -> None:
+    if mode == "Update existing" and _prompt_yes_no("Git fetch origin main?", default=False):
+        _git_fetch_main(instance)
+
+
+def _step_executor(current: dict[str, Any]) -> str:
+    cur = current["executor"]
+    print(f"\n  Current executor: {cur}")
+    return _menu_choice("Routines executor (router)", list(EXECUTORS), current=cur)
+
+
+def _step_executor_options(state: dict[str, Any], paths: dict[str, Path]) -> None:
+    executor = state["executor"]
+    if executor == "api-cron":
+        state["api_base_url"] = _prompt(
+            "API base URL", state.get("api_base_url", DEFAULT_API_BASE)
+        )
+        state["model"] = _prompt("Model id", state.get("model", DEFAULT_MODEL_API))
+        key_env = state.get("api_key_env", DEFAULT_API_KEY_ENV)
+        print(f"\n  API key env var: {key_env} (value never shown)")
+        _ensure_env_example(paths["env_example"])
+        if not _env_has_key(paths["env"], key_env):
+            print(f"\n  WARN: {key_env} is not set in {paths['env']}")
+            print(f"  Edit {paths['env']} and add {key_env}=<your-key>")
+            print(f"  Copy from {paths['env_example']} if needed.")
+            _prompt_yes_no("Continue setup anyway?", default=True)
+        else:
+            print(f"  OK: {key_env} is set in .env (value not displayed).")
+    elif executor == "cursor-cron":
+        state["model"] = _prompt(
+            "Model for Cursor agent", state.get("model", DEFAULT_MODEL_CURSOR)
+        )
+    elif executor == "claude-scheduled":
+        print("\n  claude-scheduled uses Claude Code MCP scheduled-tasks (cloud).")
+        print("  Disable local LaunchAgents and other routers to avoid duplicate runs.")
+        print("  Enable each routine playbook in Claude Code scheduled-tasks UI / MCP.")
 
 
 def _step_routines(state: dict[str, Any], manifest_path: Path) -> None:
@@ -310,27 +351,36 @@ def _step_routines(state: dict[str, Any], manifest_path: Path) -> None:
     state["disabled"] = sorted(rid for rid, on in enabled_map.items() if not on)
 
 
+def _mcp_note(executor: str) -> None:
+    if executor == "claude-scheduled":
+        print("\n  MCP: Enable Claude Code scheduled-tasks for each routine playbook.")
+        print("  Disable LaunchAgents / other routers to avoid duplicate runs.")
+    else:
+        print("\n  MCP: Disable Claude Code scheduled-tasks (UI / MCP list)")
+        print("  to avoid duplicate PRs while using local LaunchAgents.")
+
+
 def run_setup() -> int:
-    """Interactive TUI wizard for api-cron routines setup."""
-    instance = instance_root()
-    paths = _paths(instance)
+    """Run the interactive routines setup wizard."""
+    paths = _paths()
+    instance = paths["instance"]
+    config_path = paths["config"]
 
     print("Secretary routines setup")
     print(f"  Instance: {instance}")
-    print("  Executor: api-cron (only supported mode)")
 
-    if not paths["config"].is_file():
-        print(f"  ERROR: missing {paths['config']}", file=sys.stderr)
+    if not config_path.is_file():
+        print(f"  ERROR: missing {config_path}", file=sys.stderr)
         return 1
 
-    current = _read_routines_config(instance)
+    current = _read_routines_config(config_path)
     state: dict[str, Any] = dict(current)
 
-    mode = _menu_choice("Setup mode", ["New setup", "Update existing"])
-    if mode == "Update existing" and _prompt_yes_no("Git fetch origin main?", default=False):
-        _git_fetch_main(instance)
+    mode = _step_mode()
+    _step_fetch(mode, instance)
 
-    _step_api(state, paths)
+    state["executor"] = _step_executor(current)
+    _step_executor_options(state, paths)
     _step_routines(state, paths["manifest"])
 
     _banner("Preview — dispatch.routines")
@@ -340,10 +390,10 @@ def run_setup() -> int:
         print("Aborted.")
         return 0
 
-    _merge_write_config(instance, state)
+    _merge_write_config(config_path, state)
     _ensure_env_example(paths["env_example"])
 
-    rc = _run_installer(instance)
+    rc = _run_installer(paths["install_script"], instance)
     if rc != 0:
         print(f"  Installer exited {rc}", file=sys.stderr)
         return rc
@@ -356,9 +406,9 @@ def run_setup() -> int:
     ]
 
     if _prompt_yes_no("Reload LaunchAgents (bootout + bootstrap)?", default=True):
-        _reload_launchagents(instance, active_ids)
+        _reload_launchagents(active_ids, state["executor"], paths["launchd_dir"])
 
-    print("\n  Note: disable Claude Code scheduled-tasks if still enabled (avoid duplicate runs).")
+    _mcp_note(state["executor"])
 
     if _prompt_yes_no("\nRun validators (validate_ordenamiento / contract_health)?", default=True):
         _run_verify(instance)

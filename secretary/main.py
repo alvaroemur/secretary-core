@@ -38,7 +38,7 @@ app = typer.Typer(
 config_app = typer.Typer(help="Instance config and path resolution.")
 wiki_app = typer.Typer(help="Wiki build and related ops.")
 acc_app = typer.Typer(help="Action ledger operations.")
-routines_app = typer.Typer(help="Scheduled routines (api-cron LaunchAgents).")
+routines_app = typer.Typer(help="Scheduled routines router and LaunchAgent setup.")
 app.add_typer(config_app, name="config")
 app.add_typer(wiki_app, name="wiki")
 app.add_typer(acc_app, name="acc")
@@ -310,8 +310,8 @@ def acc_fold(
 
 @routines_app.command("setup")
 def routines_setup() -> None:
-    """Interactive wizard: api-cron config, LaunchAgent schedule, .env."""
-    from secretary.routines_setup import run_setup
+    """Interactive wizard: router (claude-scheduled | cursor-cron | api-cron), schedule, LaunchAgents."""
+    from secretary.routines.setup import run_setup
 
     raise typer.Exit(run_setup())
 

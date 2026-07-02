@@ -1,0 +1,17 @@
+{
+  "name": "secd",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Secretary local daemon — exposes Secretary context to the Axon extension over loopback (Feature 007).",
+  "bin": {
+    "secd": "server.mjs"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test/run.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

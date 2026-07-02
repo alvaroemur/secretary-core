@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from secretary.config import instance_root, load_config
+from secretary.config import instance_root, load_config, resolve_path_key
 
 TZ = ZoneInfo("America/Lima")
 DEFAULT_REPO = "alvaroemur/cowork-secretary"
@@ -28,6 +28,36 @@ MODULE_PREFIX = {
 }
 
 ALL_MODULES = ("mail", "meeting", "drive", "whatsapp")
+
+# Dotted keys in `.secretary.yml` → paths (spec 012 / skills-contract).
+_MODULE_MEMORY_KEY = {
+    "mail": "mail.memory",
+    "meeting": "meetings.memory",
+    "drive": "drive.memory",
+    "whatsapp": "whatsapp.memory",
+}
+_MODULE_STATE_KEY = {
+    "mail": "mail.state",
+    "drive": "drive.state",
+    "whatsapp": "whatsapp.state",
+}
+_MEETINGS_SUMMARIES_KEY = "meetings.summaries"
+
+
+def _rel_path(key: str) -> str:
+    """Resolve a config path key to a repo-relative path string."""
+    return resolve_path_key(key).relative_to(instance_root()).as_posix()
+
+
+def _module_dir(module: str) -> str:
+    """Repo-relative extractor module directory (trailing slash for git log)."""
+    root = resolve_path_key(_MODULE_MEMORY_KEY[module]).parent
+    return root.relative_to(instance_root()).as_posix() + "/"
+
+
+def _procesados_jsonl(module: str) -> str:
+    memory = Path(_rel_path(_MODULE_MEMORY_KEY[module]))
+    return (memory / "_procesados.jsonl").as_posix()
 
 
 @dataclass
@@ -200,7 +230,7 @@ def _pr_extractor_files(branch: str) -> list[str]:
     )
     if r.returncode != 0:
         return []
-    return [ln for ln in r.stdout.splitlines() if ln.startswith("extractores/")]
+    return [ln for ln in r.stdout.splitlines() if ln.startswith("extractors/")]
 
 
 def _gog_available() -> bool:
@@ -209,8 +239,8 @@ def _gog_available() -> bool:
 
 def _mail_fuente_viva() -> dict[str, Any]:
     out: dict[str, Any] = {"gog_available": _gog_available()}
-    estado_path = "extractores/correo/estado.md"
-    main_text = git_show_main(estado_path)
+    state_path = _rel_path(_MODULE_STATE_KEY["mail"])
+    main_text = git_show_main(state_path)
     if main_text:
         out["estado_md_date"] = _parse_estado_date(main_text)
     if not out["gog_available"]:
@@ -263,7 +293,7 @@ def _mail_fuente_viva() -> dict[str, Any]:
 
 def _meeting_fuente_viva() -> dict[str, Any]:
     out: dict[str, Any] = {"gog_available": _gog_available(), "tactiq_root": TACTIQ_ROOT}
-    proc = git_show_main("extractores/reuniones/memory/_procesados.jsonl")
+    proc = git_show_main(_procesados_jsonl("meeting"))
     if proc:
         for line in reversed(proc.splitlines()):
             if '"_meta"' in line:
@@ -324,7 +354,7 @@ def _latest_main_summary() -> dict[str, str] | None:
             "-r",
             "--name-only",
             "origin/main",
-            "extractores/reuniones/resumenes/",
+            _rel_path(_MEETINGS_SUMMARIES_KEY) + "/",
         ]
     )
     if r.returncode != 0 or not r.stdout.strip():
@@ -344,8 +374,8 @@ def _latest_main_summary() -> dict[str, str] | None:
 
 
 def _drive_fuente_viva() -> dict[str, Any]:
-    estado_path = "extractores/drive/estado.md"
-    main_text = git_show_main(estado_path)
+    state_path = _rel_path(_MODULE_STATE_KEY["drive"])
+    main_text = git_show_main(state_path)
     out: dict[str, Any] = {}
     if main_text:
         fecha = _parse_estado_date(main_text, "Fecha:")
@@ -356,14 +386,13 @@ def _drive_fuente_viva() -> dict[str, Any]:
 
 
 def _whatsapp_fuente_viva() -> dict[str, Any]:
-    estado_path = "extractores/whatsapp/estado.md"
-    main_text = git_show_main(estado_path)
+    state_path = _rel_path(_MODULE_STATE_KEY["whatsapp"])
+    main_text = git_show_main(state_path)
     out: dict[str, Any] = {}
     if main_text:
-        out["estado_md_date"] = _parse_estado_date(main_text)
+        out["estado_md_date"] = _parse_estado_date(main_text) or _parse_estado_date(main_text, "fecha:")
         out["estado_excerpt"] = main_text.splitlines()[:8]
-    proc_path = "extractores/whatsapp/memory/_procesados.jsonl"
-    proc = git_show_main(proc_path)
+    proc = git_show_main(_procesados_jsonl("whatsapp"))
     if proc:
         for line in reversed(proc.splitlines()):
             if '"_routine_run"' in line:
@@ -376,42 +405,40 @@ def _whatsapp_fuente_viva() -> dict[str, Any]:
 
 
 def _main_block(module: str) -> dict[str, Any]:
-    prefix = MODULE_PREFIX[module]
     block: dict[str, Any] = {}
     if module == "mail":
-        rel = "extractores/correo/estado.md"
+        rel = _rel_path(_MODULE_STATE_KEY["mail"])
         text = git_show_main(rel)
         block["estado_md"] = {
             "path": rel,
             "updated": _parse_estado_date(text) if text else None,
         }
-        block["last_merge"] = git_log_main("extractores/correo/")
+        block["last_merge"] = git_log_main(_module_dir("mail"))
     elif module == "meeting":
-        block["last_merge"] = git_log_main("extractores/reuniones/")
-        block["_procesados_jsonl"] = git_log_main("extractores/reuniones/memory/_procesados.jsonl")
+        block["last_merge"] = git_log_main(_module_dir("meeting"))
+        block["_procesados_jsonl"] = git_log_main(_procesados_jsonl("meeting"))
     elif module == "drive":
-        rel = "extractores/drive/estado.md"
+        rel = _rel_path(_MODULE_STATE_KEY["drive"])
         text = git_show_main(rel)
         block["estado_md"] = {"path": rel, "fecha": _parse_estado_date(text, "Fecha:") if text else None}
-        block["last_merge"] = git_log_main("extractores/drive/")
+        block["last_merge"] = git_log_main(_module_dir("drive"))
     elif module == "whatsapp":
-        rel = "extractores/whatsapp/estado.md"
+        rel = _rel_path(_MODULE_STATE_KEY["whatsapp"])
         text = git_show_main(rel)
         block["estado_md"] = {
             "path": rel,
-            "updated": _parse_estado_date(text) if text else None,
+            "updated": (_parse_estado_date(text) or _parse_estado_date(text, "fecha:")) if text else None,
         }
-        block["last_merge"] = git_log_main("extractores/whatsapp/")
+        block["last_merge"] = git_log_main(_module_dir("whatsapp"))
     return block
 
 
 def _working_block(module: str) -> dict[str, Any]:
-    prefix = MODULE_PREFIX[module]
     paths = {
-        "mail": ["extractores/correo/estado.md"],
-        "meeting": ["extractores/reuniones/memory/_procesados.jsonl"],
-        "drive": ["extractores/drive/estado.md"],
-        "whatsapp": ["extractores/whatsapp/estado.md"],
+        "mail": [_rel_path(_MODULE_STATE_KEY["mail"])],
+        "meeting": [_procesados_jsonl("meeting")],
+        "drive": [_rel_path(_MODULE_STATE_KEY["drive"])],
+        "whatsapp": [_rel_path(_MODULE_STATE_KEY["whatsapp"])],
     }
     return {p: git_local_diff(p) for p in paths.get(module, [])}
 
@@ -470,7 +497,7 @@ def format_markdown_heartbeat(data: dict[str, Any]) -> str:
             parts.append(f"main: última merge `{lm.get('timestamp', '—')}` ({subj})")
         ed = main.get("estado_md") or {}
         if ed.get("updated") or ed.get("fecha"):
-            parts.append(f"main `estado.md` → `{ed.get('updated') or ed.get('fecha')}`")
+            parts.append(f"main `state.md` → `{ed.get('updated') or ed.get('fecha')}`")
         for pr in mod.get("auto_pr") or []:
             n = len(pr.get("files") or [])
             parts.append(f"PR #{pr.get('number')} `{pr.get('branch')}` ({n} arch)")

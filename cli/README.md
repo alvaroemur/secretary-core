@@ -61,7 +61,26 @@ secretary fresh all --local          # incluye diff working vs main
 secretary fresh all --format markdown  # bloque heartbeat
 
 secretary acc fold acc-… pr:owner/repo#N
+
+secretary routines setup            # interactive api-cron + LaunchAgent wizard
 ```
+
+## Routines setup
+
+Scheduled routines run via **api-cron** only: macOS LaunchAgents call
+`run-routine.sh` → HTTP chat completions (OpenAI-compatible API).
+
+Canonical setup (new instance or update):
+
+```bash
+secretary routines setup
+```
+
+The wizard patches `dispatch.routines` in `.secretary.yml`, ensures `.env.example`,
+runs the instance `install-routine-schedule.sh`, and offers LaunchAgent reload.
+Instance resolves via `SECRETARY_INSTANCE` (default `~/.secretary`).
+
+Operator docs live in the instance: `operational/routines-executor.md`.
 
 ## Wiki build staging
 
@@ -71,6 +90,7 @@ symlinks, sets `SECRETARY_DATA` to it, and runs the engine builder — no instan
 
 ## Phase 2 (not in MVP)
 
+- `secretary routines run <id>` — headless single-routine invoke
 - `secretary heartbeat run` — invoke sec-heartbeat ingest headlessly
 - `secretary dispatch list` — open dispatch issues across allowlist
 - `secretary wiki serve` — wrapper over `wiki/serve.py`

@@ -38,9 +38,11 @@ app = typer.Typer(
 config_app = typer.Typer(help="Instance config and path resolution.")
 wiki_app = typer.Typer(help="Wiki build and related ops.")
 acc_app = typer.Typer(help="Action ledger operations.")
+routines_app = typer.Typer(help="Scheduled routines (api-cron LaunchAgents).")
 app.add_typer(config_app, name="config")
 app.add_typer(wiki_app, name="wiki")
 app.add_typer(acc_app, name="acc")
+app.add_typer(routines_app, name="routines")
 
 
 class OutputFormat(str, Enum):
@@ -304,6 +306,14 @@ def acc_fold(
         console.print(f"[red]secretary acc fold:[/red] {exc}", stderr=True)
         raise typer.Exit(1) from exc
     console.print(msg)
+
+
+@routines_app.command("setup")
+def routines_setup() -> None:
+    """Interactive wizard: api-cron config, LaunchAgent schedule, .env."""
+    from secretary.routines_setup import run_setup
+
+    raise typer.Exit(run_setup())
 
 
 def run() -> None:

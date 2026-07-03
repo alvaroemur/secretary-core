@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 from enum import Enum
+from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
@@ -26,6 +27,13 @@ from secretary.fresh import (
 )
 from secretary.recall import format_json, format_table, search
 from secretary.status import post_status
+from secretary.modules import (
+    health_for_module,
+    health_rows,
+    list_modules,
+    load_contract,
+    merge_contract,
+)
 from secretary.validate import VALIDATORS, run_all, run_validator
 
 console = Console()
@@ -39,10 +47,14 @@ config_app = typer.Typer(help="Instance config and path resolution.")
 wiki_app = typer.Typer(help="Wiki build and related ops.")
 acc_app = typer.Typer(help="Action ledger operations.")
 routines_app = typer.Typer(help="Scheduled routines router and LaunchAgent setup.")
+modules_app = typer.Typer(help="Module contracts and health (spec 015).")
+contract_app = typer.Typer(help="Read or update module contract.yaml.")
 app.add_typer(config_app, name="config")
 app.add_typer(wiki_app, name="wiki")
 app.add_typer(acc_app, name="acc")
 app.add_typer(routines_app, name="routines")
+app.add_typer(modules_app, name="modules")
+modules_app.add_typer(contract_app, name="contract")
 
 
 class OutputFormat(str, Enum):
@@ -314,6 +326,124 @@ def routines_setup() -> None:
     from secretary.routines.setup import run_setup
 
     raise typer.Exit(run_setup())
+
+
+@modules_app.command("list")
+def modules_list(
+    out_fmt: OutputFormat = typer.Option(
+        OutputFormat.table, "--format", "-f", help="Output format."
+    ),
+) -> None:
+    """List extractors and loops with contract metadata."""
+    items = list_modules()
+    if out_fmt == OutputFormat.json:
+        console.print(json.dumps(items, ensure_ascii=False, indent=2))
+        return
+    table = Table(title="Modules")
+    table.add_column("id")
+    table.add_column("plane")
+    table.add_column("kind")
+    table.add_column("routine")
+    for item in items:
+        table.add_row(
+            item["id"],
+            item.get("plane", "—"),
+            str(item.get("kind") or ("missing" if item.get("missing_contract") else "—")),
+            str(item.get("routine") or "—"),
+        )
+    console.print(table)
+
+
+@modules_app.command("health")
+def modules_health(
+    module: Annotated[
+        Optional[str],
+        typer.Option("--module", "-m", help="Filter to one module id."),
+    ] = None,
+    out_fmt: OutputFormat = typer.Option(
+        OutputFormat.table, "--format", "-f", help="Output format."
+    ),
+) -> None:
+    """Audit contract freshness and loop success criteria."""
+    try:
+        if module:
+            data = health_for_module(module)
+            rows = data.get("criteria") or []
+        else:
+            rows = health_rows()
+            data = None
+    except (FileNotFoundError, KeyError, RuntimeError, json.JSONDecodeError) as exc:
+        console.print(f"[red]secretary modules health:[/red] {exc}", stderr=True)
+        raise typer.Exit(1) from exc
+
+    if out_fmt == OutputFormat.json:
+        if module:
+            console.print(json.dumps(data, ensure_ascii=False, indent=2))
+        else:
+            console.print(json.dumps(rows, ensure_ascii=False, indent=2))
+        return
+
+    table = Table(title="Module health")
+    table.add_column("module")
+    table.add_column("kind")
+    table.add_column("health")
+    table.add_column("gap")
+    for r in rows:
+        table.add_row(
+            str(r.get("module") or r.get("id") or "—"),
+            str(r.get("kind") or "—"),
+            str(r.get("health") or "—"),
+            str(r.get("gap") or "—"),
+        )
+    console.print(table)
+
+
+@contract_app.command("get")
+def modules_contract_get(
+    module_id: Annotated[str, typer.Argument(help="Module id, e.g. mail or job-search")],
+    out_fmt: OutputFormat = typer.Option(
+        OutputFormat.json, "--format", "-f", help="Output format."
+    ),
+) -> None:
+    """Return full contract.yaml for a module."""
+    try:
+        contract = load_contract(module_id)
+    except (KeyError, FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]secretary modules contract get:[/red] {exc}", stderr=True)
+        raise typer.Exit(1) from exc
+    if out_fmt == OutputFormat.json:
+        console.print(json.dumps(contract, ensure_ascii=False, indent=2))
+    else:
+        console.print(yaml.dump(contract, allow_unicode=True, default_flow_style=False))
+
+
+@contract_app.command("put")
+def modules_contract_put(
+    module_id: Annotated[str, typer.Argument(help="Module id")],
+    patch_file: Annotated[
+        Optional[Path],
+        typer.Option("--file", help="YAML/JSON patch file (shallow merge)."),
+    ] = None,
+) -> None:
+    """Admin update — shallow-merge patch into contract.yaml (human gate)."""
+    if patch_file is None:
+        console.print("[red]Error:[/red] --file required", stderr=True)
+        raise typer.Exit(2)
+    text = patch_file.read_text(encoding="utf-8")
+    try:
+        patch = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        console.print(f"[red]YAML inválido:[/red] {exc}", stderr=True)
+        raise typer.Exit(1) from exc
+    if not isinstance(patch, dict):
+        console.print("[red]Error:[/red] patch debe ser un objeto YAML/JSON", stderr=True)
+        raise typer.Exit(1)
+    try:
+        merged = merge_contract(module_id, patch)
+    except (KeyError, FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]secretary modules contract put:[/red] {exc}", stderr=True)
+        raise typer.Exit(1) from exc
+    console.print(json.dumps({"ok": True, "module": module_id, "contract": merged}, ensure_ascii=False))
 
 
 def run() -> None:

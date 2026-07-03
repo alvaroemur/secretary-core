@@ -68,7 +68,7 @@ export function extractSummary(text, maxChars = 600) {
 
 /** Load all wiki articles of a category as {slug, title, frontmatter, body, path}. */
 export function loadWikiCategory(instance, category) {
-  const dir = join(instance, 'wiki', 'articulos', category);
+  const dir = join(instance, 'knowledge', 'wiki', 'articulos', category);
   return listMd(dir).map((path) => {
     const text = readSafe(path);
     const fm = parseFrontmatter(text);
@@ -90,8 +90,8 @@ export function loadWikiCategory(instance, category) {
  */
 export function openActionsFor(instance, wikilinkSlug) {
   const files = [
-    join(instance, 'whatsapp', 'memory', 'acciones.md'),
-    join(instance, 'reuniones', 'memory', 'acciones.md'),
+    join(instance, 'extractors', 'whatsapp', 'memory', 'acciones.md'),
+    join(instance, 'extractors', 'meetings', 'memory', 'acciones.md'),
   ];
   const needle = `[[${wikilinkSlug}`; // matches [[personas/x]] and [[personas/x|Alias]]
   const actions = [];

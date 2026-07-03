@@ -43,7 +43,7 @@ export function buildIndex(instance) {
   }
   // whatsapp chats.md may carry jid → chat-name hints (best effort)
   const jidByName = {};
-  const chats = readSafe(join(instance, 'whatsapp', 'memory', 'chats.md'));
+  const chats = readSafe(join(instance, 'extractors', 'whatsapp', 'memory', 'chats.md'));
   for (const block of chats.split(/\n(?=##\s)/)) {
     const name = (block.match(/^##\s+[\d-]+\s+—\s+(.+)/m) || [])[1];
     const jid = (block.match(/-\s*jid:\s*(.+)/) || [])[1]?.trim();

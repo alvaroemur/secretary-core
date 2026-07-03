@@ -7,7 +7,7 @@ import { basename, join } from 'node:path';
 import { parseFrontmatter } from './memory.mjs';
 
 function storeDir(instance) {
-  return join(instance, 'objetivos');
+  return join(instance, 'knowledge', 'objectives');
 }
 
 function walk(dir) {

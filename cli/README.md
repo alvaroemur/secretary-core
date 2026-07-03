@@ -59,6 +59,10 @@ secretary fresh mail                 # Paso 0 fresh-first (tabla)
 secretary fresh meeting --format json
 secretary fresh all --local          # incluye diff working vs main
 secretary fresh all --format markdown  # bloque heartbeat
+secretary modules list --format json
+secretary modules health
+secretary modules health --module mail --format json
+secretary modules contract get job-search --format json
 
 secretary acc fold acc-… pr:owner/repo#N
 

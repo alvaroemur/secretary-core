@@ -34,6 +34,7 @@ from secretary.modules import (
     load_contract,
     merge_contract,
 )
+from secretary.portal import run_aggregate
 from secretary.validate import VALIDATORS, run_all, run_validator
 
 console = Console()
@@ -50,12 +51,14 @@ routines_app = typer.Typer(help="Scheduled routines router and LaunchAgent setup
 modules_app = typer.Typer(help="Module contracts and health (spec 015).")
 contract_app = typer.Typer(help="Read or update module contract.yaml.")
 dream_app = typer.Typer(help="sec-dream deterministic collection (spec 020).")
+portal_app = typer.Typer(help="Operator portal (spec 019).")
 app.add_typer(config_app, name="config")
 app.add_typer(wiki_app, name="wiki")
 app.add_typer(acc_app, name="acc")
 app.add_typer(routines_app, name="routines")
 app.add_typer(modules_app, name="modules")
 app.add_typer(dream_app, name="dream")
+app.add_typer(portal_app, name="portal")
 modules_app.add_typer(contract_app, name="contract")
 
 
@@ -329,6 +332,45 @@ def routines_setup() -> None:
 
     raise typer.Exit(run_setup())
 
+
+
+
+@portal_app.command("aggregate")
+def portal_aggregate(
+    output: Annotated[
+        Optional[str],
+        typer.Option("--output", "-o", help="Ruta de salida (default: subsystem/portal/live-data.json)."),
+    ] = None,
+    stdout: Annotated[
+        bool,
+        typer.Option("--stdout", help="Imprimir JSON en stdout en vez de escribir archivo."),
+    ] = False,
+    validate_only: Annotated[
+        Optional[str],
+        typer.Option("--validate-only", help="Validar JSON existente contra schema."),
+    ] = None,
+    serve: Annotated[
+        bool,
+        typer.Option("--serve", help="Servir portal estático + POST /api/refresh."),
+    ] = False,
+    port: Annotated[
+        int,
+        typer.Option("--port", help="Puerto para --serve (default 8765)."),
+    ] = 8765,
+) -> None:
+    """Generar snapshot portal (scripts/portal/aggregate.py en la instancia)."""
+    try:
+        rc = run_aggregate(
+            output=output,
+            stdout=stdout,
+            validate_only=validate_only,
+            serve=serve,
+            port=port,
+        )
+    except FileNotFoundError as exc:
+        console.print(f"[red]secretary portal aggregate:[/red] {exc}", stderr=True)
+        raise typer.Exit(1) from exc
+    raise typer.Exit(rc)
 
 @dream_app.command("collect")
 def dream_collect(

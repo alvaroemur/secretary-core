@@ -66,6 +66,10 @@ secretary modules contract get job-search --format json
 
 secretary acc fold acc-… pr:owner/repo#N
 
+secretary portal aggregate          # snapshot → subsystem/portal/live-data.json
+secretary portal aggregate --serve  # static server + POST /api/refresh
+
+
 secretary routines setup            # interactive router + LaunchAgent wizard
 ```
 

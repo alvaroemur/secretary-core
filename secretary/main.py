@@ -49,11 +49,13 @@ acc_app = typer.Typer(help="Action ledger operations.")
 routines_app = typer.Typer(help="Scheduled routines router and LaunchAgent setup.")
 modules_app = typer.Typer(help="Module contracts and health (spec 015).")
 contract_app = typer.Typer(help="Read or update module contract.yaml.")
+dream_app = typer.Typer(help="sec-dream deterministic collection (spec 020).")
 app.add_typer(config_app, name="config")
 app.add_typer(wiki_app, name="wiki")
 app.add_typer(acc_app, name="acc")
 app.add_typer(routines_app, name="routines")
 app.add_typer(modules_app, name="modules")
+app.add_typer(dream_app, name="dream")
 modules_app.add_typer(contract_app, name="contract")
 
 
@@ -326,6 +328,18 @@ def routines_setup() -> None:
     from secretary.routines.setup import run_setup
 
     raise typer.Exit(run_setup())
+
+
+@dream_app.command("collect")
+def dream_collect(
+    write_collect: Annotated[
+        bool, typer.Option("--write-collect", help="Also write a collect/ snapshot (gitignored).")
+    ] = False,
+) -> None:
+    """Run the instance's deterministic sec-dream Phase 1 gather (scripts/dream/collect.py)."""
+    from secretary.dream import run_collect
+
+    raise typer.Exit(run_collect(write_collect=write_collect))
 
 
 @modules_app.command("list")

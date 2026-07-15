@@ -22,13 +22,16 @@ DEFAULT_MODEL_CURSOR = "auto"
 
 def _paths() -> dict[str, Path]:
     inst = instance_root()
+    routines_pkg = Path(__file__).resolve().parent
     return {
         "instance": inst,
         "config": inst / ".secretary.yml",
         "manifest": inst / ".cursor/routines/manifest.yaml",
         "env": inst / ".env",
         "env_example": inst / ".env.example",
-        "install_script": inst / "scripts/routines/install-routine-schedule.sh",
+        # Installer lives in this package; LaunchAgents point at core run-routine.sh.
+        "install_script": routines_pkg / "install-routine-schedule.sh",
+        "run_script": routines_pkg / "run-routine.sh",
         "launchd_dir": Path.home() / "Library/LaunchAgents",
     }
 
@@ -229,7 +232,11 @@ def _run_installer(install_script: Path, instance: Path) -> int:
         return 1
     env = os.environ.copy()
     env["SECRETARY_INSTANCE"] = str(instance)
+    # Package root → engine root (…/secretary/routines/../..)
+    core = install_script.resolve().parent.parent.parent
+    env["SECRETARY_CORE"] = str(core)
     print(f"  Running {install_script}")
+    print(f"  SECRETARY_CORE={core}")
     result = subprocess.run(["bash", str(install_script)], cwd=instance, env=env)
     return result.returncode
 
@@ -414,5 +421,6 @@ def run_setup() -> int:
         _run_verify(instance)
 
     print("\nDone. Smoke test:")
-    print(f"  SECRETARY_INSTANCE={instance} {instance}/scripts/routines/run-routine.sh sec-heartbeat")
+    run_script = paths["run_script"]
+    print(f"  SECRETARY_INSTANCE={instance} {run_script} sec-heartbeat")
     return 0

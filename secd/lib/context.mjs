@@ -8,6 +8,8 @@ import { extractSummary, loadWikiCategory, openActionsFor } from './memory.mjs';
 import { resolveEntity } from './resolver.mjs';
 import { queryObjectives } from './objectives.mjs';
 
+const DEFAULT_ESTILO_VOZ = 'canon/rules/estilo-voz.md';
+
 function readSafe(path) {
   try {
     return existsSync(path) ? readFileSync(path, 'utf8') : '';
@@ -16,9 +18,23 @@ function readSafe(path) {
   }
 }
 
+/**
+ * Resolve voice-rules path from `.secretary.yml` → `paths.estilo_voz`.
+ * Zero-dep YAML: only needs the scalar under `paths:`; falls back to canon default.
+ */
+function resolveEstiloVozRel(instance) {
+  const cfg = readSafe(join(instance, '.secretary.yml'));
+  if (!cfg) return DEFAULT_ESTILO_VOZ;
+  const pathsBlock = cfg.match(/^paths:\s*\n((?:[ \t]+.+\n|\n)*)/m);
+  if (!pathsBlock) return DEFAULT_ESTILO_VOZ;
+  const m = pathsBlock[1].match(/^[ \t]+estilo_voz:\s*(.+?)\s*$/m);
+  if (!m) return DEFAULT_ESTILO_VOZ;
+  return m[1].replace(/^['"]|['"]$/g, '').trim() || DEFAULT_ESTILO_VOZ;
+}
+
 /** Load Álvaro's voice rules (served to the relay so drafts sound like him). */
 export function loadStyleRules(instance) {
-  const text = readSafe(join(instance, 'perfil', 'estilo-voz.md'));
+  const text = readSafe(join(instance, resolveEstiloVozRel(instance)));
   return text.replace(/^---[\s\S]*?---\n/, '').trim();
 }
 

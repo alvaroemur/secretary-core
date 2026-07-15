@@ -8,7 +8,7 @@ import { extractSummary, loadWikiCategory, openActionsFor } from './memory.mjs';
 import { resolveEntity } from './resolver.mjs';
 import { queryObjectives } from './objectives.mjs';
 
-const DEFAULT_ESTILO_VOZ = 'canon/rules/estilo-voz.md';
+const DEFAULT_ESTILO_VOZ = 'canon/rules/session/estilo-voz.md';
 
 function readSafe(path) {
   try {

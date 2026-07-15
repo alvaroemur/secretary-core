@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Install or remove LaunchAgents for Secretary routines based on router config.
+# ProgramArguments point at this package's run-routine.sh (not instance wrappers).
 set -euo pipefail
 
 # shellcheck source=_layout.sh
@@ -14,17 +15,45 @@ if [[ -f "$INSTANCE/.env" ]]; then
   set +a
 fi
 
+# LaunchAgents must invoke *this* package. Prefer env/env-file SECRETARY_CORE only
+# when it contains run-routine.sh; otherwise use the repo that owns this installer.
+_PKG_CORE="$(cd "$ROUTINES_ROOT/../.." && pwd)"
+if [[ -n "${SECRETARY_CORE:-}" && -f "${SECRETARY_CORE}/secretary/routines/run-routine.sh" ]]; then
+  CORE="$(cd "$SECRETARY_CORE" && pwd)"
+  if [[ "$CORE" != "$_PKG_CORE" ]]; then
+    echo "WARN: SECRETARY_CORE=$CORE differs from installer package $_PKG_CORE — using env path." >&2
+  fi
+else
+  if [[ -n "${SECRETARY_CORE:-}" && "$SECRETARY_CORE" != "$_PKG_CORE" ]]; then
+    echo "WARN: SECRETARY_CORE=${SECRETARY_CORE} missing secretary/routines/run-routine.sh — using $_PKG_CORE" >&2
+  fi
+  CORE="$_PKG_CORE"
+fi
+export SECRETARY_CORE="$CORE"
+# Re-bind layout roots to the resolved core (env may have pointed elsewhere).
+export SECRETARY_ROUTINES_ROOT="$CORE/secretary/routines"
+export ROUTINES_ROOT="$SECRETARY_ROUTINES_ROOT"
+export ROUTINES_INVOKE="$ROUTINES_ROOT/invoke"
+export ROUTINES_METRICS="$ROUTINES_ROOT/metrics"
+export ROUTINES_OPS="$ROUTINES_ROOT/ops"
+export ROUTINES_BACKFILL="$ROUTINES_ROOT/backfill"
+
 MANIFEST="$INSTANCE/.cursor/routines/manifest.yaml"
 LAUNCHD_DIR="$HOME/Library/LaunchAgents"
-# Public entrypoints stay on the instance (thin wrappers) so LaunchAgent paths stay stable.
-RUN_SCRIPT="$INSTANCE/scripts/routines/run-routine.sh"
+RUN_SCRIPT="$ROUTINES_ROOT/run-routine.sh"
 LOG_DIR="$("$ROUTINES_ROOT/routines-log-dir.sh")"
+
+if [[ ! -f "$RUN_SCRIPT" ]]; then
+  echo "install-routine-schedule: missing $RUN_SCRIPT" >&2
+  echo "  Set SECRETARY_CORE to a checkout that has secretary/routines/ (e.g. ~/Dev/secretary-core-main)." >&2
+  echo "  Current SECRETARY_CORE=$CORE" >&2
+  exit 127
+fi
 
 # shellcheck source=read-routine-config.sh
 source "$ROUTINES_ROOT/read-routine-config.sh"
 
 chmod +x "$RUN_SCRIPT" \
-  "$INSTANCE/scripts/routines/"*.sh \
   "$ROUTINES_ROOT"/*.sh \
   "$ROUTINES_INVOKE"/* \
   "$ROUTINES_OPS"/* \
@@ -84,9 +113,12 @@ else
   exit 2
 fi
 
+echo "ProgramArguments → $RUN_SCRIPT"
+echo "SECRETARY_CORE=$CORE  SECRETARY_INSTANCE=$INSTANCE"
+
 mkdir -p "$LOG_DIR"
 
-python3 - "$MANIFEST" "$INSTANCE/.secretary.yml" "$LAUNCHD_DIR" "$RUN_SCRIPT" "$LOG_DIR" "$INSTANCE" "$ROUTINES_EXECUTOR" "$ROUTINES_MODEL" "$ROUTINES_API_KEY_ENV" "${API_KEY_VALUE:-}" <<'PY'
+python3 - "$MANIFEST" "$INSTANCE/.secretary.yml" "$LAUNCHD_DIR" "$RUN_SCRIPT" "$LOG_DIR" "$INSTANCE" "$CORE" "$ROUTINES_EXECUTOR" "$ROUTINES_MODEL" "$ROUTINES_API_KEY_ENV" "${API_KEY_VALUE:-}" <<'PY'
 import plistlib
 import re
 import sys
@@ -97,7 +129,19 @@ try:
 except ImportError:
     yaml = None
 
-manifest_path, config_path, launchd_dir, run_script, log_dir, instance, executor, model, api_key_env, api_key_value = sys.argv[1:11]
+(
+    manifest_path,
+    config_path,
+    launchd_dir,
+    run_script,
+    log_dir,
+    instance,
+    core,
+    executor,
+    model,
+    api_key_env,
+    api_key_value,
+) = sys.argv[1:12]
 text = Path(manifest_path).read_text()
 
 disabled_cfg: set[str] = set()
@@ -189,7 +233,7 @@ def plist_for(routine_id: str, cron: str) -> dict:
     sci = intervals[0] if len(intervals) == 1 else intervals
     env = {
         "PATH": "/Users/alvaromur/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-        "SECRETARY_CORE": "/Users/alvaromur/Dev/secretary-core",
+        "SECRETARY_CORE": core,
         "SECRETARY_INSTANCE": instance,
         "SECRETARY_ROUTINES_EXECUTOR": executor,
         "SECRETARY_RUNTIME": runtime_map.get(executor, "cursor"),

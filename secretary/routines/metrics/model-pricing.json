@@ -1,0 +1,42 @@
+{
+  "defaults": {
+    "auto_proxy": "moonshot-v1-128k",
+    "currency": "USD"
+  },
+  "models": {
+    "auto": {
+      "label": "Cursor Auto",
+      "proxy": "moonshot-v1-128k"
+    },
+    "moonshot-v1-128k": {
+      "label": "Moonshot Kimi (proxy Auto)",
+      "input_per_1m": 0.60,
+      "output_per_1m": 2.40,
+      "cache_read_per_1m": 0.15,
+      "cache_write_per_1m": 0.60
+    },
+    "gpt-5.3-codex": {
+      "label": "GPT-5.3 Codex",
+      "input_per_1m": 2.50,
+      "output_per_1m": 10.00,
+      "cache_read_per_1m": 0.25,
+      "cache_write_per_1m": 1.25
+    },
+    "claude-sonnet-4": {
+      "label": "Claude Sonnet 4",
+      "input_per_1m": 3.00,
+      "output_per_1m": 15.00,
+      "cache_read_per_1m": 0.30,
+      "cache_write_per_1m": 3.75
+    },
+    "minimax/minimax-m2.7": {
+      "label": "MiniMax M2.7 (NanoGPT billed)",
+      "input_per_1m": 0.315,
+      "output_per_1m": 1.26,
+      "cache_read_per_1m": 0.1575,
+      "cache_write_per_1m": 0.375,
+      "source": "https://nano-gpt.com/api/models (minimax/minimax-m2.7 pricing; 2026-07-09)",
+      "note": "NanoGPT list = MiniMax PAYG × 1.05. Cache read = $0.1575/M (not MiniMax $0.06). Prefer providerCostUsd from x_nanogpt_pricing when present. MiniMax native: https://platform.minimax.io/docs/guides/pricing-paygo"
+    }
+  }
+}

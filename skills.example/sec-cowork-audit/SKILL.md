@@ -40,7 +40,7 @@ ESQUELETO="$SECRETARY_INSTANCE/templates/esqueleto-proyecto-cowork.md"
 
 | Field | Values |
 |-------|--------|
-| `scope` | `all` (default) \| workspace slug (`Company`, `sideproject`, `studio`) \| project path |
+| `scope` | `all` (default) \| workspace slug (`inspiro`, `ennui`, `studio`) \| project path |
 | `depth` | `shallow` (top-level + proyectos) \| `deep` (full tree, slow) |
 
 ## Loop
@@ -99,5 +99,5 @@ Output table:
 - Physical migration of project folders without owner OK (use `sec-cowork-fit` apply after 🚧).
 - Mass multi-project migration in one shot.
 - Drive mutations / Dev moves.
-- `~/Cowork/CLAUDE.md` edits (spec 003 — deferred until User closes §9 open questions).
+- `~/Cowork/CLAUDE.md` edits (spec 003 — deferred until Álvaro closes §9 open questions).
 - Inventing EDT phases under `03-ejecucion/` (owner decides phase names).

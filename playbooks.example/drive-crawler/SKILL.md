@@ -3,7 +3,7 @@ name: drive-crawler
 description: Indexa archivos del Drive, genera consolidados para wiki-update, y propone mejoras de organización
 ---
 
-Indexa los archivos nuevos o modificados en el Google Drive de User, genera evidencias para que la rutina wiki-update las integre a la wiki personal, y propone mejoras de organización del Drive. El resultado de la corrida se entrega como un **Pull Request** que actúa de reporte.
+Indexa los archivos nuevos o modificados en el Google Drive de Álvaro, genera evidencias para que la rutina wiki-update las integre a la wiki personal, y propone mejoras de organización del Drive. El resultado de la corrida se entrega como un **Pull Request** que actúa de reporte.
 
 ## W. WORKTREE AISLADO (hacer ANTES que nada)
 
@@ -55,24 +55,24 @@ A partir de aquí, **todas las rutas de ESCRITURA cuelgan de `$WT/`** (`$WT/extr
 GDRIVE="$HOME/Library/CloudStorage/GoogleDrive-your.personal.email@gmail.com"
 MY_DRIVE="$GDRIVE/My Drive"
 SHARED="$GDRIVE/Shared drives"
-Company="$SHARED/Company Drive"
+INSPIRO="$SHARED/Inspiro Drive"
 MISIONES="$SHARED/👩🏽‍🚀 MISIONES"
 COMERCIAL="$SHARED/💰 COMERCIAL"
 ```
 
 **Multi-cuenta.** El crawler cubre la cuenta personal (`your.personal.email@gmail.com`) siempre, y la
 corporativa (`your.work.email@company.com`) cuando esté registrada. Para las llamadas a la API de Drive
-de Company, añadir `--account=your.work.email@company.com`. Verificar disponibilidad igual que en `revision-correo`:
+de inspiro, añadir `--account=your.work.email@company.com`. Verificar disponibilidad igual que en `revision-correo`:
 
 ```bash
-Company_ACTIVE=false
+INSPIRO_ACTIVE=false
 if gog drive ls --account=your.work.email@company.com --max 1 --json --no-input 2>/dev/null | grep -q '"id"'; then
-  Company_ACTIVE=true
+  INSPIRO_ACTIVE=true
 fi
 ```
 
-Si `Company_ACTIVE=false`: crawlear solo la cuenta personal y anotar en el reporte:
-"⚠️ `your.work.email@company.com` no registrada — company.com vía Drive local únicamente".
+Si `INSPIRO_ACTIVE=false`: crawlear solo la cuenta personal y anotar en el reporte:
+"⚠️ `your.work.email@company.com` no registrada — inspiro.pe vía Drive local únicamente".
 
 ### Mapa de zonas — política de crawling
 
@@ -83,11 +83,11 @@ El Drive tiene 4 raíces. Cada zona tiene una política: **delta** (crawleada en
 | Zona | Política | Notas |
 |---|---|---|
 | `$MY_DRIVE/🚀 Vida profesional/` | **delta** | ya activa desde mayo 2026 |
-| `$MY_DRIVE/🌱 Personal/✍️ Ensayos/` | **skip** | escritura personal de User — no indexar (indicación 2026-06-08) |
+| `$MY_DRIVE/🌱 Personal/✍️ Ensayos/` | **skip** | escritura personal de Álvaro — no indexar (indicación 2026-06-08) |
 | `$MY_DRIVE/🌱 Personal/💵 Finanzas/ANALISIS INGRESOS.xlsx` | **backfill** | complementa drivesync finanzas |
 | `$MY_DRIVE/📂 Registros/LLM Enriched summaries/` | **backfill** | resúmenes de reuniones sep-oct 2025 (pre-Tactiq) → wiki reuniones |
 | `$MY_DRIVE/📂 Registros/Hedy Transcription/` | **backfill** | 3 transcripciones nov-dic 2025 → wiki reuniones |
-| `$MY_DRIVE/🤖 AI & Data Science/` | **mapa** | repos históricos (axon, ion, neuron, InboxPipe, sideproject-dendrita, ssh-mcp) — no crawlear contenido; solo registrar existencia en estado.md |
+| `$MY_DRIVE/🤖 AI & Data Science/` | **mapa** | repos históricos (axon, ion, neuron, InboxPipe, ennui-dendrita, ssh-mcp) — no crawlear contenido; solo registrar existencia en estado.md |
 | `$MY_DRIVE/Finanzas/` | **mapa** | cubierta por drivesync; no crawlear |
 | `$MY_DRIVE/🌱 Personal/` (resto) | **mapa** | sensible/personal; NO crawlear. Excepción: 💵 Finanzas arriba (Ensayos ya es skip) |
 | `$MY_DRIVE/📘 Aprendizaje/` | **mapa** | archivos PUCP 2008-2011, dinámicas — estático, sin valor wiki activo |
@@ -96,27 +96,27 @@ El Drive tiene 4 raíces. Cada zona tiene una política: **delta** (crawleada en
 
 **Zonas sensibles — skip absoluto (ni metadata):**
 - `$MY_DRIVE/🌱 Personal/Passwords.gsheet`
-- `$MY_DRIVE/user_keys/`
+- `$MY_DRIVE/alvaro_keys/`
 - `$MY_DRIVE/🌱 Personal/🏠 Pichurrias/` (finanzas compartidas personales)
 - `$MY_DRIVE/🤖 AI & Data Science/ssh-mcp/.env` (credenciales)
 - `$MY_DRIVE/🌱 Personal/🐶 Cecilia/` (documentos veterinarios)
 
-#### Company Drive — delta activo
+#### Inspiro Drive — delta activo
 
 | Zona | Política | Notas |
 |---|---|---|
-| `$Company/1 PRODUCTOS/2025*/`, `2026*/` | **delta** | productos activos |
-| `$Company/4 CRECEMOS/CRM Company.gsheet` | **delta** | CRM de Company |
-| `$Company/4 CRECEMOS/Oportunidades.gsheet` | **delta** | pipeline comercial |
-| `$Company/4 CRECEMOS/` (resto) | **delta** | propuestas, testimonios, plantillas |
-| `$Company/5 CO CREAMOS/2025*/`, `2026*/` | **delta** | proyectos activos |
-| `$Company/2 FUNDACIONAL/` | **backfill** | doctrina de Company → wiki org |
-| `$Company/6 HERRAMIENTAS/` | **backfill** | base de conocimiento (best practices, KPIs, procedimientos tipo) |
-| `$Company/5 CO CREAMOS/Z_*` | **mapa** | ~40 proyectos cerrados 2017-2025; solo registrar lista de clientes |
-| `$Company/0 BRANDING/` | **mapa** | assets gráficos, no datos |
-| `$Company/3 ADMINISTRACION/` | **mapa** | contratos, contabilidad — sensible; solo metadata de existencia |
-| `$Company/DEPURADOS/` | **skip** | archivos marcados para eliminar |
-| `$Company/Ordenar/` | **mapa** | pendiente de organizar; revisar una vez en backfill |
+| `$INSPIRO/1 PRODUCTOS/2025*/`, `2026*/` | **delta** | productos activos |
+| `$INSPIRO/4 CRECEMOS/CRM Inspiro.gsheet` | **delta** | CRM de Inspiro |
+| `$INSPIRO/4 CRECEMOS/Oportunidades.gsheet` | **delta** | pipeline comercial |
+| `$INSPIRO/4 CRECEMOS/` (resto) | **delta** | propuestas, testimonios, plantillas |
+| `$INSPIRO/5 CO CREAMOS/2025*/`, `2026*/` | **delta** | proyectos activos |
+| `$INSPIRO/2 FUNDACIONAL/` | **backfill** | doctrina de Inspiro → wiki org |
+| `$INSPIRO/6 HERRAMIENTAS/` | **backfill** | base de conocimiento (best practices, KPIs, procedimientos tipo) |
+| `$INSPIRO/5 CO CREAMOS/Z_*` | **mapa** | ~40 proyectos cerrados 2017-2025; solo registrar lista de clientes |
+| `$INSPIRO/0 BRANDING/` | **mapa** | assets gráficos, no datos |
+| `$INSPIRO/3 ADMINISTRACION/` | **mapa** | contratos, contabilidad — sensible; solo metadata de existencia |
+| `$INSPIRO/DEPURADOS/` | **skip** | archivos marcados para eliminar |
+| `$INSPIRO/Ordenar/` | **mapa** | pendiente de organizar; revisar una vez en backfill |
 
 #### MISIONES (CreativeLab) — backfill histórico
 
@@ -126,7 +126,7 @@ El Drive tiene 4 raíces. Cada zona tiene una política: **delta** (crawleada en
 | `$MISIONES/MISIONES PERU/` | **backfill** | ~17 proyectos peruanos de CreativeLab |
 | `$MISIONES/🦄 CONTROL DE MISIONES/🦄 BAÚL DE MISIONES.gsheet` | **backfill** | tracker maestro de proyectos |
 | `$MISIONES/🦄 CONTROL DE MISIONES/DIRECTRICES/` | **backfill** | doctrina operativa de CreativeLab |
-| `$MISIONES/🛠 RECURSOS/🤖 AUTOMATIZACIONES/` | **backfill** | herramientas que User construyó para CreativeLab |
+| `$MISIONES/🛠 RECURSOS/🤖 AUTOMATIZACIONES/` | **backfill** | herramientas que Álvaro construyó para CreativeLab |
 | `$MISIONES/🚀 EN MARCHA/` | **backfill** | verificar si siguen activos o son residuos del traspaso |
 | `$MISIONES/OTRAS MISIONES/` | **mapa** | proyectos varios sin completar la metadata; lista de clientes |
 | `$MISIONES/🚫 MISIONES EN PAUSA/` | **mapa** | 1 proyecto pausado |
@@ -193,10 +193,10 @@ find "$MY_DRIVE/🚀 Vida profesional" \
      "$MY_DRIVE/🌱 Personal/✍️ Ensayos" \
      -newer /tmp/drive-last-run-marker -type f 2>/dev/null
 
-# Company Drive — zonas delta activas
-find "$Company/1 PRODUCTOS" \
-     "$Company/4 CRECEMOS" \
-     "$Company/5 CO CREAMOS" \
+# Inspiro Drive — zonas delta activas
+find "$INSPIRO/1 PRODUCTOS" \
+     "$INSPIRO/4 CRECEMOS" \
+     "$INSPIRO/5 CO CREAMOS" \
      -not -path "*/Z_*" \
      -newer /tmp/drive-last-run-marker -type f 2>/dev/null
 
@@ -248,14 +248,14 @@ Si es la primera corrida (estado.md sin ninguna corrida previa registrada), hace
 **SKIP completo** (ni metadata):
 - Carpeta `🛡️ Backups antiguos` (id: `1rqkmpsr-9rdVOCn9ZoBxhgvIFGx2PWG-`)
 - Carpeta `Randomness` (id: `0B5MZCWjdw2uaeEVzQk5Zc08zOVk`)
-- Carpeta `Tactiq Transcription` (id: `1TE6Z1uhZo7YrwOnWvp83se3CCXHiCKt9`) — ya cubierta por reuniones-update
+- Carpeta `Tactiq Transcription` (id: `YOUR_TACTIQ_FOLDER_ID`) — ya cubierta por reuniones-update
 - Carpeta `Meet Recordings` (id: `1UoUUTu2Lk49dsya-qeyvxNLjaPWDUs_s`) — videos, no legibles
 - Archivos con título "Untitled document" o "Untitled spreadsheet" — registrar pero no leer
 
-**SKIP de contenido — carpetas que son espejo de WIP local de User (feedback PR #59):**
+**SKIP de contenido — carpetas que son espejo de WIP local de Álvaro (feedback PR #59):**
 
 Algunas carpetas que aparecen en el Drive son en realidad **espejos** de trabajo en curso que
-User mantiene localmente bajo `~/Cowork/` (notas, guiones de mentoría, drafts). Tratarlas
+Álvaro mantiene localmente bajo `~/Cowork/` (notas, guiones de mentoría, drafts). Tratarlas
 como fuentes externas contamina la wiki con borradores. Para estas carpetas: registrar solo
 **metadata** (nombre, tipo, fecha), **NO leer contenido vía MCP**, **NO generar entradas de
 personas/proyectos/organizaciones** en `extractors/drive/memory/`, **NO proponer reorganización** del Drive
@@ -268,7 +268,7 @@ Carpetas conocidas con esta naturaleza (mantener esta lista al día):
 del root del Drive cuyo nombre no esté en el inventario previo, hacer `ls ~/Cowork/` y
 subdirectorios buscando un equivalente por nombre o tema (mentoría, propuestas, drafts).
 Si lo hay → tratar como espejo (solo metadata) y añadir la carpeta a esta lista. La regla
-general: **si el contenido lo está produciendo User mismo, no es fuente — es WIP**.
+general: **si el contenido lo está produciendo Álvaro mismo, no es fuente — es WIP**.
 
 ## 2. LECTURA SELECTIVA (fase contenido — gasto controlado)
 
@@ -278,7 +278,7 @@ Para cada archivo que pasó el filtro y es nuevo/modificado:
 2. Elegir vía de lectura según tipo (filesystem vs. MCP, ver regla de decisión arriba).
 3. Extraer información valiosa:
    - **Sobre personas**: roles, relaciones, datos de contacto
-   - **Sobre organizaciones**: qué hacen, relación con User
+   - **Sobre organizaciones**: qué hacen, relación con Álvaro
    - **Sobre proyectos**: estado, decisiones, deliverables
    - **Datos biográficos**: experiencias, logros, timeline
    - **Documentos financieros/legales**: solo metadata + resumen breve (NO copiar montos ni datos sensibles)
@@ -312,7 +312,7 @@ Formato idéntico al de `extractors/mail/memory/personas.md`:
 ## Nombre Persona
 - fuente: drive — "Título del documento" (YYYY-MM-DD)
 - rol/dato descubierto
-- relación con User (si se detecta)
+- relación con Álvaro (si se detecta)
 ```
 
 ### `extractors/drive/memory/organizaciones.md` (consolidado acumulativo)
@@ -354,8 +354,8 @@ El root del Drive tiene ~343 archivos sueltos. Para cada uno, proponer a qué ca
 - Archivos de consultorías/proyectos → `🚀 Vida profesional/💼 Consultorías y proyectos temporales/`
 - Archivos financieros/contables → `🌱 Personal/💵 Finanzas/`
 - Documentos personales/legales → `🌱 Personal/`
-- Propuestas/presentaciones de Company → `🚀 Vida profesional/🌸 Company/`
-- Archivos de sideproject → `🚀 Vida profesional/🌱 sideproject/`
+- Propuestas/presentaciones de Inspiro → `🚀 Vida profesional/🌸 Inspiro/`
+- Archivos de ennui → `🚀 Vida profesional/🌱 ennui/`
 - CSVs de importación contable → `🌱 Personal/💵 Finanzas/`
 - Fotos/imágenes sueltas → `🌱 Personal/📸 Fotos/`
 
@@ -375,9 +375,9 @@ El root del Drive tiene ~343 archivos sueltos. Para cada uno, proponer a qué ca
 - Archivos muy antiguos que no han sido accedidos en años y están sueltos en root
 - Stubs vacíos, archivos de prueba, exports temporales
 
-**Residuos de uploads y temporales (prioridad alta — feedback de User, PR #27):**
+**Residuos de uploads y temporales (prioridad alta — feedback de Álvaro, PR #27):**
 Muchos archivos sueltos del root NO son documentos a archivar, sino **residuos**: uploads que
-User hizo para importar tablas a Google Sheets, o copias que Drive genera automáticamente al
+Álvaro hizo para importar tablas a Google Sheets, o copias que Drive genera automáticamente al
 compartir. El hecho de estar sueltos en el root es señal de que probablemente son descartables.
 - Patrones típicos de residuo: `import_file_to_*`, `*_export*.csv`, `Combined_*`, `consolidated_*`,
   `M_*.csv` / `Reg_*.csv` (tablas maestras subidas a Sheets), `*.xlsx.csv`, `Copy of *`,
@@ -386,7 +386,7 @@ compartir. El hecho de estar sueltos en el root es señal de que probablemente s
   (un Sheet, una carpeta de proyecto, un consolidado posterior) o si es un **duplicado/temporal**.
   Si lo es → proponerlo directamente en "candidatos a archivar/eliminar", NO en "mover".
 - **Proponer borrar está bien** para estos casos: no hace falta encontrarles una carpeta destino.
-  La rutina sigue sin borrar nada por su cuenta — solo lo propone para que User lo confirme.
+  La rutina sigue sin borrar nada por su cuenta — solo lo propone para que Álvaro lo confirme.
 - Cuando haya duda entre "mover" y "eliminar" para un archivo del root, **inclinarse por proponer
   eliminar** (con una nota de por qué parece residuo), salvo que el contenido sea claramente valioso.
 
@@ -423,7 +423,7 @@ En `$WT/extractors/drive/organizacion.md`, añadir una sección por corrida:
 
 - No analizar todo en una sola corrida. Procesar **~50 archivos sueltos del root por día** (vía filesystem: rápido y sin tokens). En ~7 corridas se cubre todo el root.
 - En corridas posteriores, rotar hacia subcarpetas que parezcan desordenadas.
-- Las propuestas son SOLO propuestas — User las revisa en el PR y decide. La rutina **NUNCA mueve, renombra ni elimina archivos del Drive**.
+- Las propuestas son SOLO propuestas — Álvaro las revisa en el PR y decide. La rutina **NUNCA mueve, renombra ni elimina archivos del Drive**.
 
 ## 5. ACTUALIZACIÓN DE ESTADO
 
@@ -447,7 +447,7 @@ Reescribir con:
 - Documentos financieros con montos específicos (registrar solo metadata)
 - Documentos legales personales (DNI, pasaporte, declaraciones) — solo metadata
 - El archivo "Passwords" (id: `1stGwzZn3Fq3RFor_LoadkXYSErLXyVk4eaGVct33abw`) — **SKIP absoluto**
-- La carpeta `user_keys/` en el root — **SKIP absoluto**
+- La carpeta `alvaro_keys/` en el root — **SKIP absoluto**
 
 Para estos, solo registrar: título, carpeta, tipo, fecha de modificación. Nada de contenido.
 
@@ -503,7 +503,7 @@ git worktree remove "$WT" --force 2>/dev/null || true
 > reciente (tras pasar el gate de comentarios) y cierra los más viejos. Desde 2026-06-06, `wiki-update`
 > **sí consume** `extractors/drive/memory/` como fuente (sección 1.6 de su SKILL): integra personas, orgs,
 > entidades y proyectos descubiertos por este crawler. El merge no ejecuta nada sobre Drive: las
-> propuestas de mover/borrar siguen siendo eso, propuestas que User decide aplicar.
+> propuestas de mover/borrar siguen siendo eso, propuestas que Álvaro decide aplicar.
 
 Si NO hay cambios (nada nuevo en Drive y nada que proponer), no crear PR. Solo limpiar el worktree.
 

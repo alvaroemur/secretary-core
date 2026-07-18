@@ -5,7 +5,7 @@ description: Procesa chats de WhatsApp aprobados (whitelist) 1×/día (19:00), h
 
 # whatsapp-monitor — Orquestador de procesamiento de WhatsApp
 
-Esta rutina captura mensajes de WhatsApp vía Baileys, hace triage de toda la actividad nueva (whitelist + no-whitelist), procesa profundamente sólo los chats aprobados, y reporta a User lo demás para que decida.
+Esta rutina captura mensajes de WhatsApp vía Baileys, hace triage de toda la actividad nueva (whitelist + no-whitelist), procesa profundamente sólo los chats aprobados, y reporta a Álvaro lo demás para que decida.
 
 ## Split core / instance (importante)
 
@@ -62,10 +62,10 @@ Regla de interpretación: donde el documento diga `secretary/extractors/whatsapp
 │   ├── organizaciones.md       ← orgs detectadas
 │   ├── entidades.md            ← temas/proyectos
 │   ├── acciones.md             ← acciones nuevas + updates sobre existentes
-│   ├── _glosario.md            ← ground truth de User (NO se modifica)
+│   ├── _glosario.md            ← ground truth de Álvaro (NO se modifica)
 │   └── _procesados.jsonl       ← bookkeeping: last_processed_ts por chat-slug
 ├── summaries/
-│   └── YYYY-MM-DD-<slug>.md    ← un archivo por chat-período (lectura para User)
+│   └── YYYY-MM-DD-<slug>.md    ← un archivo por chat-período (lectura para Álvaro)
 ├── media/                      ← audios .ogg descargados por fetch
 ├── policy.md                   ← whitelist + bloqueados + reglas
 └── state.md                    ← reporte de la última corrida (incluye triage)
@@ -84,7 +84,7 @@ Regla de interpretación: donde el documento diga `secretary/extractors/whatsapp
 - **Bash, Read, Write, Edit**: archivos locales (siempre rutas absolutas o relativas a `~/.secretary/extractors/whatsapp/`)
 - **Agent tool**: subagentes en paralelo (`subagent_type: general-purpose`)
 
-> Si `fetch.ts` aún no honra `SECRETARY_INSTANCE` (paths atados a `__dirname`), la corrida fallará en silencio: AUTH_DIR resolverá a `secretary-core/extractors/whatsapp/auth/` (vacío). En ese caso reportar en `state.md` y NO intentar parchear `fetch.ts` (vive fuera del contrato de frontera; lo arregla User en el repo del core).
+> Si `fetch.ts` aún no honra `SECRETARY_INSTANCE` (paths atados a `__dirname`), la corrida fallará en silencio: AUTH_DIR resolverá a `secretary-core/extractors/whatsapp/auth/` (vacío). En ese caso reportar en `state.md` y NO intentar parchear `fetch.ts` (vive fuera del contrato de frontera; lo arregla Álvaro en el repo del core).
 
 ## Fases de ejecución
 
@@ -126,7 +126,7 @@ Para cada chat con mensajes nuevos desde `last_processed_ts`:
    - **Señal media** (`triage: actividad_menor`): 1-3 mensajes con contenido textual mínimo (scheduling, "ok", "gracias")
    - **Señal baja** (`triage: ignorable`): solo `[audio]`/`[imagen]`/`[video]`/`[sticker]` sin caption, o solo emojis/reacciones
 4. Identificar **contactos nuevos** (que aparecen por primera vez): primer mensaje propio o pushName nuevo en `contacts.json`.
-5. Identificar **chats reactivados de la whitelist** (>30 días sin actividad y ahora con mensajes): se procesan normal en Fase 3, pero se anotan en el reporte para que User lo note.
+5. Identificar **chats reactivados de la whitelist** (>30 días sin actividad y ahora con mensajes): se procesan normal en Fase 3, pero se anotan en el reporte para que Álvaro lo note.
 
 El triage de chats no-whitelisted se delega a un subagente "triage" único (no a un subagente por chat — sería caro). El subagente triage recibe el listado de chats con mensajes nuevos + las primeras N líneas de cada uno y devuelve la clasificación.
 
@@ -143,7 +143,7 @@ Lanzar subagentes en paralelo (un único mensaje con múltiples Agent tool uses)
 #### Contexto que el orquestador prepara antes de Fase 3 (una sola vez)
 
 - Listar `secretary/knowledge/wiki/articulos/personas/`, `organizaciones/`, `temas/` → 3 listas de slugs existentes
-- Leer `secretary/knowledge/wiki/articulos/user-profile.md` (sólo lectura, contexto de quién es User)
+- Leer `secretary/knowledge/wiki/articulos/alvaro-mur.md` (sólo lectura, contexto de quién es Álvaro)
 - Leer `extractors/whatsapp/memory/_glosario.md` (literal)
 - Leer `extractors/whatsapp/memory/acciones.md` filtrando items con estado abierto
 
@@ -161,7 +161,7 @@ Estos contenidos se incluyen literalmente en el prompt de cada subagente.
 #### Prompt — Subagente proyecto / persona (template)
 
 ```
-Eres un subagente que procesa **un solo chat de WhatsApp** de User Name. Generas:
+Eres un subagente que procesa **un solo chat de WhatsApp** de Álvaro Mur. Generas:
 1. Un archivo de resumen Markdown. El orquestador te pasará la ruta absoluta completa en el campo
    `resumen_path` — úsala tal cual. **Nunca construyas rutas que empiecen con `secretary/`**.
 2. Un JSON con items para que el orquestador los consolide en `memory/`
@@ -211,7 +211,7 @@ Similar al anterior, pero:
 #### Prompt — Subagente triage (template)
 
 ```
-Eres un subagente que clasifica la actividad reciente de chats de WhatsApp NO incluidos en la whitelist de User. NO genera resúmenes profundos ni extrae entidades. Solo clasifica por señal y produce una línea de descripción por chat.
+Eres un subagente que clasifica la actividad reciente de chats de WhatsApp NO incluidos en la whitelist de Álvaro. NO genera resúmenes profundos ni extrae entidades. Solo clasifica por señal y produce una línea de descripción por chat.
 
 NO escribes archivos. Devuelves SÓLO un JSON.
 
@@ -359,7 +359,7 @@ fi
 - Si `gh pr create` falla, no revertir: la rama ya está pusheada; reporta el error.
 - Devuelve al final la **URL del PR**.
 
-## Decisiones que User toma a partir del reporte
+## Decisiones que Álvaro toma a partir del reporte
 
 Cuando lee `state.md`, decide manualmente:
 

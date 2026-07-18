@@ -36,7 +36,7 @@ description: Internal primitive. Scans wiki articles for sec:pending annotation 
       Resolución requerida manualmente.
       -->
       ```
-      Do not integrate conflicting blocks; leave them for User.
+      Do not integrate conflicting blocks; leave them for Álvaro.
 
    d. **Integrate:** rewrite the section prose to naturally incorporate the signal. Rules:
       - Don't duplicate: if the signal is already expressed in the prose, discard the block silently.

@@ -16,13 +16,13 @@ Lee `secretary/knowledge/wiki/README.md` antes de modificar nada para respetar e
 
 ## W0. Mergear PRs pendientes de extractores y de la wiki anterior (ANTES del worktree)
 
-`wiki-update` es el cierre del día y el **auto-merger central** de las rutinas automáticas. Mergea a `main`: (1) los PRs de los extractores que alimentan la wiki (correo / reuniones / whatsapp) **y el PR de wiki de la corrida anterior** (`wiki/auto-*`), para que la evidencia se integre **en esta misma corrida** (sin lag de un día) y los PRs de wiki **no se le acumulen a User**; y (2) los PRs de las rutinas que **no** alimentan la wiki pero igual deben llegar a `main` sin apilarse (housekeeping / job-search / drive). Para estas últimas el merge sólo **sincroniza `main` / limpia el backlog** — no integran nada a la wiki —, pero pasan por el mismo gate de comentarios, así que User conserva la ventana para frenar un cambio con un comentario antes del cierre del día.
+`wiki-update` es el cierre del día y el **auto-merger central** de las rutinas automáticas. Mergea a `main`: (1) los PRs de los extractores que alimentan la wiki (correo / reuniones / whatsapp) **y el PR de wiki de la corrida anterior** (`wiki/auto-*`), para que la evidencia se integre **en esta misma corrida** (sin lag de un día) y los PRs de wiki **no se le acumulen a Álvaro**; y (2) los PRs de las rutinas que **no** alimentan la wiki pero igual deben llegar a `main` sin apilarse (housekeeping / job-search / drive). Para estas últimas el merge sólo **sincroniza `main` / limpia el backlog** — no integran nada a la wiki —, pero pasan por el mismo gate de comentarios, así que Álvaro conserva la ventana para frenar un cambio con un comentario antes del cierre del día.
 
 > **Rutinas que encadenan (job-search, drive).** Ambas mantienen **un único** PR auto abierto que engordan corrida a corrida (reemplazan al anterior). En el caso normal hay 1 abierto y se mergea como cualquier candidato. Si por algún motivo hay **más de uno** abierto del mismo prefijo, mergear **sólo el más reciente** (mayor timestamp en la rama) y **cerrar** los `…/auto-*` más viejos con un comentario (`> 🤖 **wiki-update**` — "superado por #N, cierro para evitar conflicto"). housekeeping NO encadena: cada corrida abre un PR independiente y todos son candidatos (el loop los mergea en orden; si alguno choca, va a `$NO_MERGE` y queda abierto, no es fatal).
 
-**Gate estricto — solo PRs de agentes automáticos.** El único criterio es que la rama matchee EXACTAMENTE el patrón que generan las rutinas: `^(correo|reuniones|whatsapp|wiki|housekeeping|job-search|drive)/auto-[0-9]{8}-[0-9]{4}$`. En W0 nunca existe todavía el PR de wiki de *esta* corrida (se crea recién en el Paso 7.5), así que `wiki/auto-*` sólo matchea el de la corrida anterior. Cualquier otra cosa NO se mergea: PRs que User trabaja a mano (reuniones históricas / backfill, fixes, consolidaciones, PRs de wiki con otro nombre, etc.), o cualquier rama que no calce el patrón. Ante la mínima duda, no mergear.
+**Gate estricto — solo PRs de agentes automáticos.** El único criterio es que la rama matchee EXACTAMENTE el patrón que generan las rutinas: `^(correo|reuniones|whatsapp|wiki|housekeeping|job-search|drive)/auto-[0-9]{8}-[0-9]{4}$`. En W0 nunca existe todavía el PR de wiki de *esta* corrida (se crea recién en el Paso 7.5), así que `wiki/auto-*` sólo matchea el de la corrida anterior. Cualquier otra cosa NO se mergea: PRs que Álvaro trabaja a mano (reuniones históricas / backfill, fixes, consolidaciones, PRs de wiki con otro nombre, etc.), o cualquier rama que no calce el patrón. Ante la mínima duda, no mergear.
 
-**Antes de mergear hay que revisar comentarios sin resolver.** Un PR auto puede tener feedback de User (ej. "renombrá esto", "corregí ese dato"). NO se mergea a ciegas: primero se atiende el comentario; si no se puede atender con seguridad, se deja abierto para User. Mergear pisando un comentario sin resolver pierde su feedback — eso no debe pasar.
+**Antes de mergear hay que revisar comentarios sin resolver.** Un PR auto puede tener feedback de Álvaro (ej. "renombrá esto", "corregí ese dato"). NO se mergea a ciegas: primero se atiende el comentario; si no se puede atender con seguridad, se deja abierto para Álvaro. Mergear pisando un comentario sin resolver pierde su feedback — eso no debe pasar.
 
 **Paso 1 — listar candidatos** (ramas auto; nada manual matchea el patrón):
 
@@ -55,7 +55,7 @@ Clasifica el PR:
 **Aprendizaje 2026-07-15 — overlapping `reuniones/auto-*`:** si mergeás varios PRs de reuniones el mismo día, el árbol conflictivo puede **truncar bloques `acc-*` a mitad de línea** y empalmar campos Alma↔ERP (p.ej. `acc-20260715-001` con título Alma pero `contexto:` de erp-clab). Tras resolver markers, **re-validá** los `## acc-YYYYMMDD-*` nuevos contra el **primer commit del PR** (`gh pr view N --json commits` → `git show <oid>:extractors/meetings/memory/acciones.md`) y reemplazá bloques corruptos antes de integrar a la wiki. No confíes sólo en el resultado del merge-file heurístico.
 
 
-**Regla de oro:** ante la mínima duda sobre qué pide un comentario, **no mergear** — dejarlo en `$NEEDS_REVIEW` para User. Es preferible que un PR espere a que se aplique mal un cambio.
+**Regla de oro:** ante la mínima duda sobre qué pide un comentario, **no mergear** — dejarlo en `$NEEDS_REVIEW` para Álvaro. Es preferible que un PR espere a que se aplique mal un cambio.
 
 Guarda `$MERGED`, `$NO_MERGE` y `$NEEDS_REVIEW` para el reporte (Paso 7). Si un PR queda sin mergear, su evidencia simplemente no se integra esta corrida; no es un error fatal.
 
@@ -67,21 +67,21 @@ Todos los comentarios que wiki-update deje en GitHub (respuestas a feedback, con
 > 🤖 **wiki-update**
 ```
 
-Esto permite distinguir respuestas del agente de comentarios de User. La firma va en **todos** los comentarios, sin excepción.
+Esto permite distinguir respuestas del agente de comentarios de Álvaro. La firma va en **todos** los comentarios, sin excepción.
 
 ### Regla de respuesta obligatoria
 
 Cada comentario detectado en un PR (sea review thread o comentario general) **debe recibir respuesta en GitHub**, haya sido atendido o no. Opciones:
 
 - Atendido → responder con qué se hizo y en qué commit.
-- No atendible esta corrida (ambiguo, requiere criterio) → responder explicando por qué queda para User.
+- No atendible esta corrida (ambiguo, requiere criterio) → responder explicando por qué queda para Álvaro.
 - Ya obsoleto o no aplica → responder indicando por qué se considera resuelto.
 
-Nunca dejar un comentario sin respuesta. Si User ve un comentario sin reply del agente, es un bug.
+Nunca dejar un comentario sin respuesta. Si Álvaro ve un comentario sin reply del agente, es un bug.
 
 ### Paso 2.5 — Revisar comentarios en PRs auto ya mergeados/cerrados (últimos 7 días)
 
-**Por qué.** User puede mergear un PR él mismo y luego dejar un comentario de feedback. Ese feedback se pierde si solo miramos PRs abiertos. Este paso barre PRs auto recientes que ya se cerraron para capturar ese feedback.
+**Por qué.** Álvaro puede mergear un PR él mismo y luego dejar un comentario de feedback. Ese feedback se pierde si solo miramos PRs abiertos. Este paso barre PRs auto recientes que ya se cerraron para capturar ese feedback.
 
 ```bash
 # PRs auto mergeados/cerrados en los últimos 7 días (no abiertos, esos ya se cubrieron en Paso 1-2):
@@ -104,7 +104,7 @@ Para cada `$N` en `$RECENT_CLOSED`:
 
 **Paso 3 — Mapa de procedencia de los items de memory (para un reporte honesto)**
 
-**Por qué.** En el Paso 1 integras el **estado consolidado** de `*/memory/` (todo item presente = pendiente de integrar), no sólo lo que aportaron los PRs auto de esta corrida. Eso es deseado: si User dejó trabajo real en `main` por fuera del pipeline (un commit/wave manual, un backfill, una consolidación a mano), igual debe integrarse. **Pero el reporte no debe atribuir ese trabajo a los PRs auto de la corrida.** Hay que distinguir "item nuevo de un extractor de hoy" de "item que ya estaba en `main` por otra vía". (Caso real: las 10 acciones de Nativas `acc-20260520-*` venían del commit manual `697071f` "wave may-2026"; el PR de reuniones de esa corrida integró **0 acciones** y aun así el reporte las reclamó como propias.)
+**Por qué.** En el Paso 1 integras el **estado consolidado** de `*/memory/` (todo item presente = pendiente de integrar), no sólo lo que aportaron los PRs auto de esta corrida. Eso es deseado: si Álvaro dejó trabajo real en `main` por fuera del pipeline (un commit/wave manual, un backfill, una consolidación a mano), igual debe integrarse. **Pero el reporte no debe atribuir ese trabajo a los PRs auto de la corrida.** Hay que distinguir "item nuevo de un extractor de hoy" de "item que ya estaba en `main` por otra vía". (Caso real: las 10 acciones de Nativas `acc-20260520-*` venían del commit manual `697071f` "wave may-2026"; el PR de reuniones de esa corrida integró **0 acciones** y aun así el reporte las reclamó como propias.)
 
 Tras el merge (Paso 2), construí el mapa. `gh pr diff` funciona aunque el PR ya esté mergeado y la rama borrada:
 
@@ -143,7 +143,7 @@ echo "WT=$WT  BRANCH=$BRANCH"
 
 **Mapa de rutas:** donde el documento dice `secretary/...`, interprétalo como `$WT/...`. Todas las escrituras —artículos en `$WT/knowledge/wiki/`, la limpieza de consolidados integrados en `$WT/{mail,meetings,whatsapp}/memory/`, y el marcado de items de `$WT/extractors/drive/memory/` como `pendiente_wiki: false` (no se borran, ver sección 1.6)— van al worktree. Lees los consolidados de las fuentes desde `$WT/...`: como el worktree parte de `origin/main` **tras el merge del Paso W0**, ves la evidencia de los extractores que se acaba de mergear (sin lag). Lo único que no ves es lo de PRs que W0 no pudo mergear (conflicto/checks).
 
-> Modelo: **PR + deploy inmediato.** El HTML se publica a Cloudflare en esta misma corrida (Paso 6.5) reflejando el contenido de este worktree, y además se abre un PR (Paso 7.5) como reporte legible y para sincronizar `main`. **No hace falta que User lo mergee a mano**: la siguiente corrida lo absorbe automáticamente en su Paso W0 (`wiki/auto-*`). Igual puede mergearlo antes si quiere cerrar el ciclo de inmediato.
+> Modelo: **PR + deploy inmediato.** El HTML se publica a Cloudflare en esta misma corrida (Paso 6.5) reflejando el contenido de este worktree, y además se abre un PR (Paso 7.5) como reporte legible y para sincronizar `main`. **No hace falta que Álvaro lo mergee a mano**: la siguiente corrida lo absorbe automáticamente en su Paso W0 (`wiki/auto-*`). Igual puede mergearlo antes si quiere cerrar el ciclo de inmediato.
 
 ## Paso W.5 — Integrar anotaciones pendientes (`sec-sys-integrate`)
 
@@ -162,7 +162,7 @@ Invoca el skill `sec-sys-integrate` con el worktree como raíz. El skill:
 3. Elimina el bloque una vez integrado (o lo marca `sec:conflict` si hay contradicción).
 4. Registra los cambios en `$WT/knowledge/wiki/memory/indice.md`.
 
-Si no hay bloques pending, este paso no produce ningún cambio (es idempotente). Si el skill reporta `sec:conflict` en algún artículo, inclúyelo en la sección "Dudas para User" del reporte (Paso 7).
+Si no hay bloques pending, este paso no produce ningún cambio (es idempotente). Si el skill reporta `sec:conflict` en algún artículo, inclúyelo en la sección "Dudas para Álvaro" del reporte (Paso 7).
 
 **No continúes hacia el Paso 0 si `sec-sys-integrate` falla** — los artículos quedarían en estado inconsistente.
 
@@ -252,7 +252,7 @@ Estructura esperada (a medida que la app evolucione, los archivos pueden ampliar
 #### Acciones — manejo especial
 
 Cada item con encabezado `## acc-YYYYMMDD-NNN` (sin sufijo) es una acción nueva. Integrarla a la wiki así:
-- Si `responsable` matchea con [[User-mur]] (User Name o variantes) → añadirla a la sección *Acciones abiertas* en `articulos/user-profile.md`.
+- Si `responsable` matchea con [[alvaro-mur]] (Álvaro Mur o variantes) → añadirla a la sección *Acciones abiertas* en `articulos/alvaro-mur.md`.
 - Si responsable es otra persona con artículo en wiki → añadirla a sección *Acciones pendientes* en su artículo de `articulos/personas/`.
 - Cualquiera que sea el responsable, también añadir un cross-link desde el artículo del tema/proyecto referenciado en `contexto`. Sección *Acciones abiertas* del tema.
 - Formato sugerido para una acción en wiki: `- **acc-YYYYMMDD-NNN** — <accion> · responsable: [[wikilink]] · deadline: YYYY-MM-DD · origen: [resumen](path)`
@@ -268,7 +268,7 @@ Mapeo, idéntico a correo:
 - Personas → `articulos/personas/<slug>.md`.
 - Organizaciones → `articulos/organizaciones/<slug>.md`.
 - Temas/proyectos recurrentes → `articulos/temas/<slug>.md`.
-- Cada reunión nueva en `reuniones.md` → línea en *Actividad reciente* de `user-profile.md` con fecha + título + participantes (wikilinks).
+- Cada reunión nueva en `reuniones.md` → línea en *Actividad reciente* de `alvaro-mur.md` con fecha + título + participantes (wikilinks).
 
 Cada entrada en `fuentes:` para datos provenientes de reuniones:
 ```yaml
@@ -286,14 +286,14 @@ Si la memoria cita un meeting-id concreto, usar `ref: reuniones:<meeting-id>`.
 Usar los MCP tools `list_calendars` y `list_events` disponibles. Obtener eventos de los últimos 14 días y próximos 30.
 
 > ⚠️ **Barre TODOS los calendarios, no solo el primary.** `list_events` sin `calendarId` se salta los
-> compartidos — incluido el de **Company** (`your.work.email@company.com`, donde viven las reuniones de Norte
-> Compartido / Company 3.0). Tras `list_calendars`, itera `list_events` por cada calendario relevante
+> compartidos — incluido el de **Inspiro** (`your.work.email@company.com`, donde viven las reuniones de Norte
+> Compartido / Inspiro 3.0). Tras `list_calendars`, itera `list_events` por cada calendario relevante
 > (mínimo `your.personal.email@gmail.com` y `your.work.email@company.com`). El MCP de la cuenta personal ya alcanza el
-> de Company como owner — no hace falta cambiar de cuenta.
+> de Inspiro como owner — no hace falta cambiar de cuenta.
 
 - Participantes recurrentes → artículos en `personas/`.
 - Títulos recurrentes → temas o proyectos en `temas/` / `organizaciones/`.
-- En `user-profile.md`, sección *Actividad reciente*: eventos destacados.
+- En `alvaro-mur.md`, sección *Actividad reciente*: eventos destacados.
 
 Fuente: `tipo: calendario, ref: <event-id>`.
 
@@ -303,7 +303,7 @@ Sólo si el usuario explícitamente lo habilita (por defecto la app de correo ya
 
 ### 1.5 Drive — carpetas/archivos registrados
 
-User irá proporcionando links/paths de Drive. Manténlos en un archivo de registro:
+Álvaro irá proporcionando links/paths de Drive. Manténlos en un archivo de registro:
 
 `secretary/knowledge/wiki/memory/fuentes-drive.md` — formato:
 ```markdown
@@ -360,7 +360,7 @@ Si el item cita un id de documento concreto (`id: 1ABC...`), usar `ref: drive:<i
 
 ### 1.7 WhatsApp — captura atendida vía Axon (`secretary/extractors/whatsapp/`)
 
-**Actualización 2026-07-02 (Feature 007 pivote local-first, ver `_diseño/specs/007-axon-secretary-relay/`):** el extractor `whatsapp-monitor` (Baileys, headless) está **jubilado** — `auth/` ausente desde ~2026-05-20. La fuente actual es **Axon** (extensión Chrome que User usa para leer WhatsApp Web): cuando lee un chat, hace `POST /capture` contra el daemon local `secd`, que escribe en los mismos archivos consolidados que usaba Baileys. La estructura del archivo no cambió; lo que cambió es **quién escribe** y **qué tan sintetizado llega el contenido** (ver más abajo).
+**Actualización 2026-07-02 (Feature 007 pivote local-first, ver `_diseño/specs/007-axon-secretary-relay/`):** el extractor `whatsapp-monitor` (Baileys, headless) está **jubilado** — `auth/` ausente desde ~2026-05-20. La fuente actual es **Axon** (extensión Chrome que Álvaro usa para leer WhatsApp Web): cuando lee un chat, hace `POST /capture` contra el daemon local `secd`, que escribe en los mismos archivos consolidados que usaba Baileys. La estructura del archivo no cambió; lo que cambió es **quién escribe** y **qué tan sintetizado llega el contenido** (ver más abajo).
 
 **Archivos a consumir:**
 
@@ -378,7 +378,7 @@ Si el item cita un id de documento concreto (`id: 1ABC...`), usar `ref: drive:<i
 4. `categoria: radar` → no debería aparecer en capturas nuevas de Axon (ese modo era de la rutina Baileys retirada, monitoreo pasivo sin lectura atendida); si aparece un item legado con esta categoría, trátalo como *señal de baja prioridad* — una línea corta en el artículo si aporta algo, o flip directo a `false` si es ruido.
 5. Si `temas:` ya trae un wikilink (`[[personas/slug]]` u `[[organizaciones/slug]]`) — lo escribe `secd` solo cuando el chat resolvió a una entidad *ya existente* en la wiki, nunca como forward-ref — úsalo para confirmar el artículo destino sin tener que re-resolver el nombre.
 6. Tras integrar (o decidir que no aporta nada), **flipea `pendiente_wiki: true → false`** con comentario inline (`# integrado YYYY-MM-DD (wiki-update)` o `# sin novedad, YYYY-MM-DD`). No borres el bloque — mismo ledger append-only que el resto.
-7. Cada chat nuevo relevante en `chats.md` → línea en *Actividad reciente* de `user-profile.md` o del artículo de la persona/tema, igual que reuniones (1.2 §Mapeo, último punto).
+7. Cada chat nuevo relevante en `chats.md` → línea en *Actividad reciente* de `alvaro-mur.md` o del artículo de la persona/tema, igual que reuniones (1.2 §Mapeo, último punto).
 
 **Formato `fuentes:` para datos de whatsapp:**
 ```yaml
@@ -389,11 +389,11 @@ Si el item cita un id de documento concreto (`id: 1ABC...`), usar `ref: drive:<i
 
 **`acciones.md` — manejo idéntico a reuniones** (ver 1.2 §Acciones — manejo especial): responsable → *Acciones abiertas* de su artículo; cross-link al tema/proyecto en `contexto`; `[update]` para cambios de estado; flip-to-false tras integrar. La única diferencia es `origen:` apunta a `extractors/whatsapp/summaries/<archivo>.md` en vez de un resumen de reunión — y, como con chats.md, ese origen es transcripción cruda: si el `contexto` de la acción no basta para redactarla en el artículo, léelo antes de integrar.
 
-**Estado:** el módulo ya no corre por schedule (ver `contract.yaml`: `freshness.sla` marcado *event-driven*, `health: paused` porque no hay rutina programada que auditar) — puede haber cero items nuevos en corridas donde User no usó Axon. Sáltalo sin fallar si `chats.md`/`acciones.md` no tienen items con `pendiente_wiki: true`.
+**Estado:** el módulo ya no corre por schedule (ver `contract.yaml`: `freshness.sla` marcado *event-driven*, `health: paused` porque no hay rutina programada que auditar) — puede haber cero items nuevos en corridas donde Álvaro no usó Axon. Sáltalo sin fallar si `chats.md`/`acciones.md` no tienen items con `pendiente_wiki: true`.
 
 ## Paso 2 — Consolidar el artículo principal
 
-Tras procesar todas las fuentes, actualizar `articulos/user-profile.md`:
+Tras procesar todas las fuentes, actualizar `articulos/alvaro-mur.md`:
 
 - *Actividad reciente*: últimas ~15 entradas ordenadas por fecha descendente.
 - *Red de contactos*: enlace a cada persona creada/actualizada en esta corrida.
@@ -413,7 +413,7 @@ Chequeos a ejecutar:
 
 1. **Consistencia `titulo` ↔ `Nombre`/`Apellido` ↔ `_index.md`.**
    - Si el infobox tiene `Nombre` + `Apellido` separados, `titulo` debe ser `Nombre Apellido` completo. Si en el `_index.md` de la categoría aparece con nombre completo pero el `titulo` del archivo está incompleto, actualizar `titulo`. Caso real: `personas/arturo.md` tenía `titulo: Arturo` mientras `_index.md` lo listaba como "Arturo González del Valle".
-   - No inventar apellidos: si el `_index.md` también está en corto, dejar como está y reportarlo al final para que User lo provea.
+   - No inventar apellidos: si el `_index.md` también está en corto, dejar como está y reportarlo al final para que Álvaro lo provea.
 
 2. **Enlaces rotos (`[[slug]]`).** Se delega en el validator de CI, que es la fuente de verdad (también lo corre GitHub Actions en cada PR). Ver Paso 3.7 para el procedimiento auto-mejorable; aquí basta con saber que el validator agrupa por target y reporta:
    - **FAIL** — targets nuevos con ≥2 referencias rotas (acción obligatoria esta corrida).
@@ -421,9 +421,9 @@ Chequeos a ejecutar:
    - **WARN** — targets con 1 sola ref (tolerados como deuda transitoria/typo; no actuar salvo que sean evidentemente arreglables).
    - **INFO de obsoletos** — slugs listados en known_broken que ya no aparecen rotos: removerlos del archivo.
 
-3. **Categoría incorrecta.** Detectar artículos con `tipo: persona` cuyo contenido describe una organización (o viceversa). Ejemplo en el repo actual: `personas/norsac.md` es realmente una organización cliente de Company. **No mover archivos automáticamente** (rompe wikilinks en cadena); reportarlo al final para que User decida.
+3. **Categoría incorrecta.** Detectar artículos con `tipo: persona` cuyo contenido describe una organización (o viceversa). Ejemplo en el repo actual: `personas/norsac.md` es realmente una organización cliente de Inspiro. **No mover archivos automáticamente** (rompe wikilinks en cadena); reportarlo al final para que Álvaro decida.
 
-4. **Campos `[por rellenar]` acumulados.** Grep por `[por rellenar]` en el infobox de todos los artículos y reportar cuántos campos siguen sin poblar por artículo. Útil para que User vea qué hay que enriquecer manualmente o con nuevas fuentes.
+4. **Campos `[por rellenar]` acumulados.** Grep por `[por rellenar]` en el infobox de todos los artículos y reportar cuántos campos siguen sin poblar por artículo. Útil para que Álvaro vea qué hay que enriquecer manualmente o con nuevas fuentes.
 
 5. **Frontmatter mal formado.** Verificar que todos los artículos tengan `titulo`, `tipo`, `ultima_actualizacion` (YYYY-MM-DD) y `categorias` como lista. Si falta algo, reportar.
 
@@ -459,7 +459,7 @@ Para cada target `T` en `FAIL` (todos) y los top 3 de `GRANDFATHERED` por nº de
 2. **¿Es una entidad real pero todavía no hay material suficiente para un artículo?**  
    → registrarla como `pendiente_wiki: true` en el `*/memory/entidades.md` del módulo que más la cita (reuniones / whatsapp / correo). El validator la deja de marcar al detectar el forward-ref. Si estaba en `known_broken`, remover la línea.
 
-3. **¿Es un slug mal formado, typo compartido entre dos resúmenes, o un wikilink que el transcriptor inventó (p.ej. `[[acc-20260511 detracciones]]` con espacio, `[[User-mur\]]` con bracket escapado)?**  
+3. **¿Es un slug mal formado, typo compartido entre dos resúmenes, o un wikilink que el transcriptor inventó (p.ej. `[[acc-20260511 detracciones]]` con espacio, `[[alvaro-mur\]]` con bracket escapado)?**  
    → corregir el slug en los resúmenes que lo emiten (el validator imprime la ruta:línea de cada ref). Si era una sola ref es WARN, pero si son varias suele ser el extractor emitiendo mal — corregir y, si hace falta, dejar nota en el módulo origen (whatsapp/reuniones-update) para que ajuste su plantilla.
 
 4. **¿Es una referencia a una acción (`[[acc-…]]`) o a un resumen (`[[extractors/meetings/summaries/…]]`)?**  
@@ -487,7 +487,7 @@ Debe salir con `OK` o `OK con deuda`. Si todavía hay `FAIL`, no continúes haci
 La wiki no sólo agrega *contenido* (personas, orgs, temas) sino que **funciona también como tablero de navegación** hacia el procesamiento de cada submódulo de `secretary/`. Cada submódulo activo (`mail/`, `meetings/`, `loops/job-search/`, etc., además de la integración de calendario y drive) tiene un artículo bajo `articulos/modulos/` que actúa como índice de:
 
 - ruta del módulo en disco
-- archivos de memoria/reportes que produce (con su path absoluto, para que User pueda hacer click/abrirlos desde el HTML)
+- archivos de memoria/reportes que produce (con su path absoluto, para que Álvaro pueda hacer click/abrirlos desde el HTML)
 - estado del módulo (activo, en desarrollo, archivado)
 - última sincronización contra la wiki
 - enlaces a los artículos derivados (personas/orgs/temas) que ese módulo alimenta
@@ -502,7 +502,7 @@ Convenciones:
 
 El **calendario** y **drive**, aunque no son carpetas en `secretary/`, también tienen su artículo bajo `modulos/` (calendario referencia el MCP y la cuenta usada; drive referencia `secretary/knowledge/wiki/memory/fuentes-drive.md`).
 
-Si un módulo nuevo aparece en `secretary/` y no está documentado aquí, **no lo proceses como fuente de datos** (regla del Paso 0/Paso 1) pero **sí crea su artículo en `modulos/`** con `Estado: candidata, pendiente de confirmación` para que User lo vea desde la wiki.
+Si un módulo nuevo aparece en `secretary/` y no está documentado aquí, **no lo proceses como fuente de datos** (regla del Paso 0/Paso 1) pero **sí crea su artículo en `modulos/`** con `Estado: candidata, pendiente de confirmación` para que Álvaro lo vea desde la wiki.
 
 ## Paso 5 — Registrar cambios
 
@@ -541,8 +541,8 @@ El script entra a `wiki/output`, hace `git add -A` + commit + push, e inicializa
 
 ## Paso 7 — Reporte final (cuerpo del PR)
 
-Este reporte (resumen + "Dudas para User") se escribe a un archivo temporal en Markdown y se pasa como **cuerpo del PR** (Paso 7.5). Contenido:
-- **PRs auto mergeados en W0** (`$MERGED`; marca cuáles llevaron "comentarios aplicados"), los que quedaron sin mergear por conflicto/checks (`$NO_MERGE`), y los que **tienen comentarios sin resolver que requieren a User** (`$NEEDS_REVIEW`, con qué pide cada uno) — todos a revisar a mano.
+Este reporte (resumen + "Dudas para Álvaro") se escribe a un archivo temporal en Markdown y se pasa como **cuerpo del PR** (Paso 7.5). Contenido:
+- **PRs auto mergeados en W0** (`$MERGED`; marca cuáles llevaron "comentarios aplicados"), los que quedaron sin mergear por conflicto/checks (`$NO_MERGE`), y los que **tienen comentarios sin resolver que requieren a Álvaro** (`$NEEDS_REVIEW`, con qué pide cada uno) — todos a revisar a mano.
 - Artículos creados, actualizados, sin cambios.
 - **Items integrados, separados por procedencia** (acciones, personas, orgs, temas), usando los contadores del Paso 1:
   - **De extractores de esta corrida**: cuántos por fuente, citando el `PR#N` que los aportó.
@@ -553,16 +553,16 @@ Este reporte (resumen + "Dudas para User") se escribe a un archivo temporal en M
 - Confirmación del deploy (Paso 6.5): si se publicó HTML nuevo o quedó idéntico.
 - Dudas resueltas esta corrida y backlog vigente (Paso 7.4).
 
-### Dudas para User (acumuladas — ver Paso 7.4)
+### Dudas para Álvaro (acumuladas — ver Paso 7.4)
 
-Las dudas no se reportan sólo "de esta corrida": se mantienen en un **archivo persistente** `$WT/knowledge/wiki/memory/dudas-pendientes.md` que se arrastra entre corridas (Paso 7.4). El reporte/PR incluye la **lista completa vigente** (arrastradas + nuevas), no sólo las de hoy, para que ninguna duda se pierda si User no la resuelve en una corrida.
+Las dudas no se reportan sólo "de esta corrida": se mantienen en un **archivo persistente** `$WT/knowledge/wiki/memory/dudas-pendientes.md` que se arrastra entre corridas (Paso 7.4). El reporte/PR incluye la **lista completa vigente** (arrastradas + nuevas), no sólo las de hoy, para que ninguna duda se pierda si Álvaro no la resuelve en una corrida.
 
 Qué cuenta como duda (mismo criterio de siempre):
 
 1. **Items con `pendiente_wiki: false` por gate** (temas nuevos que requieren validación): slug, resumen de una línea, y qué decisión se espera (¿crear artículo propio o absorber en otro?).
 2. **Items con `# duda:`** en los consolidados: copiar la duda textual y la fuente.
 3. **Inconsistencias del tidy-up que requieren juicio** (recategorizar, rebautizar, datos ambiguos): describir el problema y las opciones.
-4. **Personas/entidades mencionadas en reuniones pero no creadas** (los `<!-- No crear artículo aún -->` del consolidado de personas): listar nombres y contexto mínimo para que User diga si merecen artículo.
+4. **Personas/entidades mencionadas en reuniones pero no creadas** (los `<!-- No crear artículo aún -->` del consolidado de personas): listar nombres y contexto mínimo para que Álvaro diga si merecen artículo.
 
 ## Paso 7.4 — Mantener `dudas-pendientes.md` (backlog que se acumula)
 
@@ -575,10 +575,10 @@ Archivo: `$WT/knowledge/wiki/memory/dudas-pendientes.md` (versionado, entra al P
 Procedimiento cada corrida:
 
 1. **Leer** el archivo (si no existe, créalo con un encabezado `# Dudas pendientes` y nada más).
-2. **Resolver/depurar**: para cada duda ya listada, verificar si esta corrida la resolvió o si dejó de aplicar (la entidad ya se creó, el dato ya está en wiki, User la decidió). Si está resuelta, **quitarla** y anotar una línea en el reporte ("resueltas esta corrida: …").
+2. **Resolver/depurar**: para cada duda ya listada, verificar si esta corrida la resolvió o si dejó de aplicar (la entidad ya se creó, el dato ya está en wiki, Álvaro la decidió). Si está resuelta, **quitarla** y anotar una línea en el reporte ("resueltas esta corrida: …").
 3. **Agregar** las dudas nuevas detectadas en esta corrida (criterios 1-4 de arriba), con su fecha de detección y fuente. No duplicar una que ya esté listada (mergear si hay contexto nuevo).
 4. **Conservar** las que siguen sin resolver, intactas (no reescribir su fecha de detección original).
-5. El bloque "### Dudas para User" del reporte/PR = **el contenido completo y vigente** de este archivo tras los pasos 2-4. Si quedó vacío, escribir "Ninguna pendiente.".
+5. El bloque "### Dudas para Álvaro" del reporte/PR = **el contenido completo y vigente** de este archivo tras los pasos 2-4. Si quedó vacío, escribir "Ninguna pendiente.".
 
 ## Paso 7.5 — Cierre: Commit + Pull Request (este PR es el reporte)
 
@@ -627,7 +627,7 @@ Qué tipo de ediciones hacer tras cada corrida:
 - **Heurísticas de deduplicación** que funcionaron (o fallaron) en esta corrida.
 - **Errores comunes** que debes recordar no repetir — añádelos a "Qué NO hacer".
 - **Atajos**: comandos o consultas que aceleraron el trabajo.
-- **Nuevas fuentes**: si User te indica durante la corrida una fuente que quiere activar, añade su subsección completa en el Paso 1 (ruta, estructura, mapeo, principios, formato de `fuentes:`).
+- **Nuevas fuentes**: si Álvaro te indica durante la corrida una fuente que quiere activar, añade su subsección completa en el Paso 1 (ruta, estructura, mapeo, principios, formato de `fuentes:`).
 
 Reglas al editarse:
 
@@ -638,9 +638,9 @@ Reglas al editarse:
 5. **No inventes reglas especulativas**: sólo codifica aprendizajes observados en esta corrida o anteriores. Si tienes una idea no validada, déjala como comentario HTML (`<!-- idea: ... -->`) dentro de la subsección, no como regla activa.
 6. **No modifiques** el bloque de frontmatter YAML (`name`, `description`) sin que un cambio de alcance lo justifique.
 
-Fuentes históricas / de referencia (sistemas que User ha mencionado pero **no están activos** como fuente del skill) se registran en `secretary/knowledge/wiki/memory/fuentes-historicas.md`, no aquí. Si User decide activar alguna, se traslada su descripción al Paso 1 de este archivo.
+Fuentes históricas / de referencia (sistemas que Álvaro ha mencionado pero **no están activos** como fuente del skill) se registran en `secretary/knowledge/wiki/memory/fuentes-historicas.md`, no aquí. Si Álvaro decide activar alguna, se traslada su descripción al Paso 1 de este archivo.
 
-Si durante una corrida descubres una carpeta o sistema que **parece una fuente nueva** no listada aquí y User no lo ha mencionado, **no la proceses**: regístrala en `fuentes-historicas.md` con una nota "candidata, pendiente de confirmación" y reporta el hallazgo al final.
+Si durante una corrida descubres una carpeta o sistema que **parece una fuente nueva** no listada aquí y Álvaro no lo ha mencionado, **no la proceses**: regístrala en `fuentes-historicas.md` con una nota "candidata, pendiente de confirmación" y reporta el hallazgo al final.
 
 ## Qué NO hacer
 
@@ -651,4 +651,4 @@ Si durante una corrida descubres una carpeta o sistema que **parece una fuente n
 - **Forward-refs de wikilinks van SOLO en `*/memory/entidades.md`** (heading = slug, o campo `slug_existente: categoria/slug`), nunca en `personas.md`/`organizaciones.md`. El validator (`load_pending`) sólo lee `entidades.md`; marcar `pendiente_wiki: true` en un item de `personas.md` **no exime** el wikilink y CI falla igual. Aprendizaje 2026-06-12: `[[personas/jose-zuniga]]` referenciado en ≥2 artículos seguía rojo hasta registrarlo como bloque con `slug_existente: personas/jose-zuniga` en `extractors/meetings/memory/entidades.md`.
 - **Nunca escribas `[[algo]]` literal dentro de comentarios o notas en archivos de `*/memory/`** (ni en notas inline de `pendiente_wiki: false  # …`). El validator parsea CUALQUIER `[[…]]` del repo como wikilink y lo cuenta como roto. Aprendizaje 2026-06-12: una nota que decía "el crawler no debería emitir `[[project_*]]/[[wiki_*]]`" creó 3 wikilinks rotos y volvió roja la CI. Describe los slugs con prefijos en texto plano (`project-…`, `wiki-…`), sin dobles corchetes.
 - **No flipees a `false` un item de `extractors/drive/memory/entidades.md` cuyo slug el crawler emite como wikilink en sus memos** (`project_*`, `wiki_*`): esos `[[…]]` viven en `extractors/drive/memory/*.md` y el `pendiente_wiki: true` es lo único que los exime. Flipearlos rompe CI. Déjalos `true` y reporta que el arreglo va en el crawler. Aprendizaje 2026-06-12.
-- **Si delegas la integración a sub-agentes (útil cuando hay muchos items): nunca dejes el path del worktree sin sustituir en el prompt.** Pasa el `$WT` absoluto ya expandido (no un placeholder tipo `WTPATH_PLACEHOLDER`), y dile a cada sub-agente explícitamente "todos tus paths empiezan con `<$WT absoluto>`; NO escribas en `~/.secretary` ni en ningún path que no empiece con esa raíz". Aprendizaje 2026-06-11: con el placeholder sin sustituir, un sub-agente resolvió la raíz como el repo principal y escribió 5 archivos en `~/.secretary` en vez del worktree; hubo que recuperarlos al worktree y revertir el working tree principal. Partición de archivos sin solape entre agentes (cada artículo lo posee 1 solo agente; `_index.md`, `user-profile.md` y los `*/memory/` los maneja el orquestador) sigue siendo la regla para evitar conflictos de escritura.
+- **Si delegas la integración a sub-agentes (útil cuando hay muchos items): nunca dejes el path del worktree sin sustituir en el prompt.** Pasa el `$WT` absoluto ya expandido (no un placeholder tipo `WTPATH_PLACEHOLDER`), y dile a cada sub-agente explícitamente "todos tus paths empiezan con `<$WT absoluto>`; NO escribas en `~/.secretary` ni en ningún path que no empiece con esa raíz". Aprendizaje 2026-06-11: con el placeholder sin sustituir, un sub-agente resolvió la raíz como el repo principal y escribió 5 archivos en `~/.secretary` en vez del worktree; hubo que recuperarlos al worktree y revertir el working tree principal. Partición de archivos sin solape entre agentes (cada artículo lo posee 1 solo agente; `_index.md`, `alvaro-mur.md` y los `*/memory/` los maneja el orquestador) sigue siendo la regla para evitar conflictos de escritura.

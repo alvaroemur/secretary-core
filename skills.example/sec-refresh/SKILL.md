@@ -77,7 +77,7 @@ if [ -z "$BRIEF_REPO" ]; then
   BRIEF_REPO=$(gh -R "$SECRETARY_INSTANCE" repo view --json nameWithOwner -q .nameWithOwner)
 fi
 PERSONAL_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.personal // empty')
-WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.Company // .accounts.work // empty')
+WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.inspiro // .accounts.work // empty')
 HARNESS_TASKS="${SECRETARY_SCHEDULED_TASKS:-$HOME/.claude/scheduled-tasks}"
 ```
 
@@ -135,21 +135,21 @@ else
 fi
 
 # Dual-scheduler checklist (spec 016) — detect both schedulers armed for the same routine.
-launchctl list 2>/dev/null | grep 'com.username.secretary.routine\.' || echo "no LaunchAgents loaded"
+launchctl list 2>/dev/null | grep 'com.alvaromur.secretary.routine\.' || echo "no LaunchAgents loaded"
 ```
 
 Cross-check against Claude Code's own scheduler in-session (not shell-visible): call
 `mcp__scheduled-tasks__list_scheduled_tasks` and compare its routine ids against the
-`com.username.secretary.routine.<id>` LaunchAgents just listed.
+`com.alvaromur.secretary.routine.<id>` LaunchAgents just listed.
 
-- `ROUTINES_EXEC=claude-scheduled` **and** any `com.username.secretary.routine.*` LaunchAgent is
+- `ROUTINES_EXEC=claude-scheduled` **and** any `com.alvaromur.secretary.routine.*` LaunchAgent is
   loaded → 🚨 duplicate scheduler (LaunchAgents should have been removed by
   `install-routine-schedule.sh`; the local `run-routine.sh` will still fire it).
 - `ROUTINES_EXEC` is `api-cron`/`cursor-cron` **and** `list_scheduled_tasks` returns an *enabled*
   Claude Code entry for a routine id that also has a loaded LaunchAgent → 🚨 duplicate scheduler
   (both routers will fire the same playbook, double PRs + double billing).
 - Mismatch between `ROUTINES_EXEC` and which LaunchAgents are actually loaded (e.g. executor says
-  `api-cron` but no `com.username.secretary.routine.*` is loaded) → ⚠️ stale install, re-run
+  `api-cron` but no `com.alvaromur.secretary.routine.*` is loaded) → ⚠️ stale install, re-run
   `install-routine-schedule.sh`.
 - No overlap found → ✅.
 

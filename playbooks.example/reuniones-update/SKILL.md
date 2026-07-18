@@ -25,7 +25,7 @@ CFG=$(secretary config show)
 export SECRETARY_INSTANCE="${SECRETARY_INSTANCE:-$(echo "$CFG" | jq -r .instance)}"
 TIMEZONE=$(echo "$CFG" | jq -r '.timezone // "UTC"')
 PERSONAL_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.personal // empty')
-WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.Company // .accounts.work // empty')
+WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.inspiro // .accounts.work // empty')
 MEETINGS_MEMORY="$(secretary config path meetings.memory)"
 ```
 
@@ -93,7 +93,7 @@ $WT/extractors/meetings/
 
 - **Google Drive**: MCP tools `search_files`, `read_file_content`, `get_file_metadata` (prefer `gog`
   CLI for listing and file ops when cheaper).
-- **Calendar**: MCP `list_events` to enrich metadata. ⚠️ For Company / Partner Company meetings
+- **Calendar**: MCP `list_events` to enrich metadata. ⚠️ For Inspiro / Norte Compartido meetings
   (Arturo, Jorge), also scan the shared work calendar (`WORK_ACCOUNT`): `list_events` without
   `calendarId` only reads primary and will miss them. First `list_calendars`, then iterate relevant
   calendars (include `WORK_ACCOUNT`, reachable as owner from the personal account). See
@@ -140,7 +140,7 @@ $WT/extractors/meetings/
      discard (moved to `descartadas/` in Phase 4).
 3. Group remaining files by `group_key = (YYYY-MM-DD from title, normalized_title)`.
    Normalization: lowercase, no accents, normalized spaces/separators. Example:
-   "2026-05-06 Luna / User" → `2026-05-06|luna/User`.
+   "2026-05-06 Luna / Álvaro" → `2026-05-06|luna/alvaro`.
 4. Within each group, sub-group by `createdTime` proximity: files whose `createdTime` are <90 minutes
    apart belong to the same session (reconnect / multi-device continuations). Gap >90min → separate
    sessions processed independently even with same title.
@@ -182,7 +182,7 @@ Agent calls.
   `$WT/knowledge/wiki/articulos/organizaciones/_index.md`,
   `$WT/knowledge/wiki/articulos/temas/_index.md` (read-only).
 - Read the owner's persona article from `$WT/knowledge/wiki/articulos/personas/` (resolve slug from
-  `_index.md` or instance wiki; this instance: `user-profile.md`).
+  `_index.md` or instance wiki; this instance: `alvaro-mur.md`).
 - Read `$MEETINGS_MEMORY/acciones.md` filtering open-state items.
 - Read `$MEETINGS_MEMORY/_glosario.md` — **critical ground truth**. Clarifications wiki does not
   yet capture. Any person/org/relationship encoded there overrides subagent inference: if transcript
@@ -247,7 +247,7 @@ starting with a bare module prefix** — use only the absolute `resumen_path` pr
 {contenido_temas_index}
 
 ### Owner persona article
-{contenido_User_mur}
+{contenido_alvaro_mur}
 
 ## Current open actions (check if any close/update in this meeting)
 {contenido_acciones_abiertas}
@@ -334,7 +334,7 @@ ultima_actualizacion: YYYY-MM-DD
      owns events; "attend X" is not an action (but "close proposal in meeting on the 16" is a
      *compromiso*).
    - `dueño`: `mía` (owner) · `compartida` · `tercero`.
-   - `workspace`: `sideproject · Company · personal · secretary · dev`.
+   - `workspace`: `ennui · inspiro · personal · secretary · dev`.
    - `proyecto`: project slug (normalize `contexto`).
    - `estado`: starts `abierta`. **Anti-backfill (hard rule):** if `deadline` already passed vs.
      meeting date (historical action from old transcript), do NOT create `abierta` — create
@@ -366,7 +366,7 @@ ultima_actualizacion: YYYY-MM-DD
     {"slug": "erp-clab", "ya_en_wiki": true, "contexto": "...", "pendiente_wiki": true}
   ],
   "nuevas_acciones": [
-    {"draft_id": "DRAFT-1", "titulo": "...", "accion": "...", "tipo": "compromiso", "dueño": "mía", "responsable": "...", "workspace": "sideproject", "proyecto": "erp-clab", "deadline": "YYYY-MM-DD o null", "estado": "abierta", "contexto_wikilinks": ["temas/erp-clab"]}
+    {"draft_id": "DRAFT-1", "titulo": "...", "accion": "...", "tipo": "compromiso", "dueño": "mía", "responsable": "...", "workspace": "ennui", "proyecto": "erp-clab", "deadline": "YYYY-MM-DD o null", "estado": "abierta", "contexto_wikilinks": ["temas/erp-clab"]}
   ],
   "updates_acciones": [
     {"acc_id": "acc-20260506-001", "estado_nuevo": "hecha", "evidencia": "quote o paráfrasis del transcript", "evidencia_cierre": "manual:reunion", "deadline_nuevo": null, "responsable_nuevo": null}

@@ -46,7 +46,7 @@ TIMEZONE=$(echo "$CFG" | jq -r '.timezone // "UTC"')
    FROM=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d 'yesterday' +%Y-%m-%d)
    TO=$(date -v+2d +%Y-%m-%d 2>/dev/null || date -d '+2 days' +%Y-%m-%d)
    PERSONAL=$(echo "$CFG" | jq -r '.accounts.personal // empty')
-   WORK=$(echo "$CFG" | jq -r '.accounts.Company // .accounts.work // empty')
+   WORK=$(echo "$CFG" | jq -r '.accounts.inspiro // .accounts.work // empty')
    [ -n "$PERSONAL" ] && gog calendar events --account="$PERSONAL" --from "$FROM" --to "$TO" --plain
    # Repeat per work account if registered in gog
    ```
@@ -74,8 +74,8 @@ Fixed structure for briefing/pulse consumption:
 ## Match acc↔git
 | acc-id | title | repo | ref | state | evidence | match | note |
 |---|---|---|---|---|---|---|---|
-| acc-... | <action from acciones.md, ~80 chars> | cowork-sideproject | PR #N open | 🔄 in-progress | extractors/meetings/memory/acciones.md + gh pr view | 🔗 linked | ... |
-| acc-... | <action> | cowork-sideproject | — | ○ open | extractors/meetings/memory/acciones.md | 📋 loose-acc | no branch/PR |
+| acc-... | <action from acciones.md, ~80 chars> | cowork-ennui | PR #N open | 🔄 in-progress | extractors/meetings/memory/acciones.md + gh pr view | 🔗 linked | ... |
+| acc-... | <action> | cowork-ennui | — | ○ open | extractors/meetings/memory/acciones.md | 📋 loose-acc | no branch/PR |
 | — | <PR title> | secretary-core | PR #N open | — | gh pr list (secretary-core) | 🌿 loose-git | no acc-id |
 
 **Legend:** match — 🔗 linked · 📋 loose-acc · 🌿 loose-git · · informational · state — ○ open · 🔄 in-progress · ✅ done · ⏳ stale

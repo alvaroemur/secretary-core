@@ -65,10 +65,10 @@ git -C "$SECRETARY_INSTANCE" show origin/main:operational/sistemas-ordenamiento.
    not missed.
 7. **Select anchor** → among candidates, pick the **most topically relevant** conversation — not the
    most recent by default. Report the choice explicitly: source, date, and why it fits the material.
-   If User prefers another candidate, he can correct before sending.
+   If Álvaro prefers another candidate, he can correct before sending.
 8. Compose 1–2 drafts for `channel`: **cold open** and, if an anchor exists, **continuation**.
    Match the natural register of the relationship.
-9. Return drafts plus the anchor report. **No memory writes** — `sec-write` only if User later
+9. Return drafts plus the anchor report. **No memory writes** — `sec-write` only if Álvaro later
    confirms the message was sent (outside this pipeline).
 
 ### Unmerged scan (anchor search)

@@ -52,6 +52,7 @@ modules_app = typer.Typer(help="Module contracts and health (spec 015).")
 contract_app = typer.Typer(help="Read or update module contract.yaml.")
 dream_app = typer.Typer(help="sec-dream deterministic collection (spec 020).")
 portal_app = typer.Typer(help="Operator portal (spec 019).")
+core_app = typer.Typer(help="Engine maintenance ops (public/private example export).")
 app.add_typer(config_app, name="config")
 app.add_typer(wiki_app, name="wiki")
 app.add_typer(acc_app, name="acc")
@@ -59,6 +60,7 @@ app.add_typer(routines_app, name="routines")
 app.add_typer(modules_app, name="modules")
 app.add_typer(dream_app, name="dream")
 app.add_typer(portal_app, name="portal")
+app.add_typer(core_app, name="core")
 modules_app.add_typer(contract_app, name="contract")
 
 
@@ -400,6 +402,36 @@ def dream_collect(
     from secretary.dream import run_collect
 
     raise typer.Exit(run_collect(write_collect=write_collect))
+
+
+@core_app.command("export-examples")
+def core_export_examples(
+    check: Annotated[
+        bool,
+        typer.Option(
+            "--check",
+            help="No escribir: regenerar en temporal y comparar con los *.example commiteados (CI/pre-commit).",
+        ),
+    ] = False,
+) -> None:
+    """Regenerar playbooks.example/ y skills.example/ desde los dirs privados aplicando el mapa de anonimización."""
+    from secretary.export_examples import export_examples
+
+    try:
+        rc, messages = export_examples(check=check)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]secretary core export-examples:[/red] {exc}", stderr=True)
+        raise typer.Exit(1) from exc
+    for line in messages:
+        style = "green" if line.strip().endswith("al día.") or "regenerado" in line else ""
+        console.print(f"[{style}]{line}[/{style}]" if style else line)
+    if check and rc != 0:
+        console.print(
+            "[red]Drift:[/red] los *.example no coinciden con la fuente. "
+            "Corré `secretary core export-examples` y commiteá.",
+            stderr=True,
+        )
+    raise typer.Exit(rc)
 
 
 @modules_app.command("list")

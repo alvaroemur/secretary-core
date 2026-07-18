@@ -24,7 +24,7 @@ TIMEZONE=$(echo "$CFG" | jq -r '.timezone // "UTC"')
 TODAY=$(TZ="$TIMEZONE" date '+%Y-%m-%d')
 BRIEF_REPO=$(echo "$CFG" | jq -r '.brief.repo // empty')
 PERSONAL_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.personal // empty')
-WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.Company // .accounts.work // empty')
+WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.inspiro // .accounts.work // empty')
 if [ -z "$BRIEF_REPO" ]; then
   BRIEF_REPO=$(gh -R "$SECRETARY_INSTANCE" repo view --json nameWithOwner -q .nameWithOwner)
 fi
@@ -32,7 +32,7 @@ fi
 
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `TACTIQ_ROOT` | `1TE6Z1uhZo7YrwOnWvp83se3CCXHiCKt9` | Tactiq Drive folder (instance-specific — move to `.secretary.yml` phase 3) |
+| `TACTIQ_ROOT` | `YOUR_TACTIQ_FOLDER_ID` | Tactiq Drive folder (instance-specific — move to `.secretary.yml` phase 3) |
 | `ACC` | `$PERSONAL_ACCOUNT` | Tactiq uses personal Drive |
 | `REPO` | `$SECRETARY_INSTANCE` | Local instance checkout |
 | `ROUTINE_REPO` | `$BRIEF_REPO` | GitHub repo for reuniones PRs |

@@ -400,6 +400,7 @@ PAGE_TEMPLATE = """<!doctype html>
   {toc}
   <div class="body">{body}</div>
   {fuentes}
+  {relacionados}
   <footer class="page-footer">
     <div>Última actualización: {ultima}</div>
     <div>Categoría: {categoria}</div>
@@ -427,7 +428,7 @@ COMMENTS_API = os.environ.get("WIKI_COMMENTS_API", "")
 COMMENTS_SECRET = os.environ.get("WIKI_COMMENTS_SECRET", "")
 
 
-def render_page(art: Articulo, by_slug: dict[str, Articulo], index_json: str) -> str:
+def render_page(art: Articulo, by_slug: dict[str, Articulo], index_json: str, relacionados_html: str = "") -> str:
     resolver = make_resolver(art, by_slug)
     body_html, headings = render_markdown(art.body, resolver)
     art.html_body = body_html
@@ -448,6 +449,7 @@ def render_page(art: Articulo, by_slug: dict[str, Articulo], index_json: str) ->
         toc=render_toc(headings),
         body=body_html,
         fuentes=render_fuentes(art.meta),
+        relacionados=relacionados_html,
         ultima=html.escape(str(art.meta.get("ultima_actualizacion", "—"))),
         categoria=html.escape(art.categoria),
         index_json=index_json,
@@ -936,6 +938,7 @@ def render_dashboard(arts: list[Articulo], by_slug: dict[str, Articulo], index_j
         toc="",
         body=body,
         fuentes="",
+        relacionados="",
         ultima=today.isoformat(),
         categoria="portada",
         index_json=index_json,
@@ -1003,6 +1006,80 @@ def build_search_index(arts: list[Articulo]) -> str:
 # Main
 # -----------------------------------------------------------------------------
 
+def compute_relations(arts: list[Articulo], by_slug: dict[str, Articulo]) -> dict[str, str]:
+    from collections import Counter
+    from itertools import combinations
+    
+    outlinks: dict[str, set[str]] = {}
+    inlinks: dict[str, set[str]] = {a.slug: set() for a in arts}
+    
+    for a in arts:
+        targets = set()
+        for m in WIKILINK.finditer(a.body):
+            tgt = m.group(1).strip()
+            if tgt and tgt != a.slug and tgt in by_slug:
+                targets.add(tgt)
+        outlinks[a.slug] = targets
+
+    backlinks = Counter()
+    for src, tgts in outlinks.items():
+        for t in tgts:
+            backlinks[t] += 1
+            if t in inlinks:
+                inlinks[t].add(src)
+                
+    EXCLUDE_HUBS = {
+        a.slug for a in arts
+        if a.meta.get("type") == "profile" or a.meta.get("tipo") == "profile" or a.categoria == "perfil"
+    }
+    # Fallback/Backward compatibility for default names
+    EXCLUDE_HUBS.update({"personas/alvaro-mur", "personas/user-profile", "personas/user-name"})
+    cooc = Counter()
+    for src, tgts in outlinks.items():
+        clean = sorted(
+            t for t in tgts
+            if t not in EXCLUDE_HUBS and not t.split("/")[-1].startswith("_index")
+        )
+        for t1, t2 in combinations(clean, 2):
+            cooc[(t1, t2)] += 1
+            
+    related_html_by_slug = {}
+    for a in arts:
+        bl = sorted(inlinks[a.slug], key=lambda x: backlinks[x], reverse=True)[:5]
+        
+        my_cooc = {}
+        for (t1, t2), count in cooc.items():
+            if t1 == a.slug:
+                my_cooc[t2] = count
+            elif t2 == a.slug:
+                my_cooc[t1] = count
+        
+        valid_cooc = {k: v for k, v in my_cooc.items() if v >= 2}
+        co = sorted(valid_cooc.keys(), key=lambda x: valid_cooc[x], reverse=True)[:5]
+        
+        if not bl and not co:
+            related_html_by_slug[a.slug] = ""
+            continue
+            
+        resolver = make_resolver(a, by_slug)
+        html_parts = ['<section class="relacionados"><h2 id="relacionados">Relacionados</h2>']
+        if bl:
+            html_parts.append('<h3>Mencionan este artículo</h3><ul>')
+            for t in bl:
+                html_parts.append(f'<li>{resolver(t, None)}</li>')
+            html_parts.append('</ul>')
+        if co:
+            html_parts.append('<h3>Aparecen frecuentemente juntos</h3><ul>')
+            for t in co:
+                html_parts.append(f'<li>{resolver(t, None)} <span class="cooc-count">(×{valid_cooc[t]})</span></li>')
+            html_parts.append('</ul>')
+        html_parts.append('</section>')
+        
+        related_html_by_slug[a.slug] = "".join(html_parts)
+        
+    return related_html_by_slug
+
+
 def main() -> int:
     if OUTPUT.exists():
         for child in OUTPUT.iterdir():
@@ -1023,9 +1100,11 @@ def main() -> int:
     arts = load_articulos()
     by_slug = {a.slug: a for a in arts}
     index_json = build_search_index(arts)
+    
+    relations = compute_relations(arts, by_slug)
 
     for a in arts:
-        page = render_page(a, by_slug, index_json)
+        page = render_page(a, by_slug, index_json, relations.get(a.slug, ""))
         a.output_path.parent.mkdir(parents=True, exist_ok=True)
         a.output_path.write_text(page, encoding="utf-8")
 

@@ -76,3 +76,16 @@ def run_wiki_build() -> int:
             cwd=str(build_py.parent),
         )
         return result.returncode
+
+
+def run_wiki_serve(port: int = 8123) -> int:
+    """Invoke wiki/serve.py to serve the generated wiki."""
+    serve_py = core_root() / "wiki" / "serve.py"
+    if not serve_py.is_file():
+        raise FileNotFoundError(f"No existe {serve_py}")
+
+    result = subprocess.run(
+        [sys.executable, str(serve_py), str(port)],
+        cwd=str(serve_py.parent),
+    )
+    return result.returncode

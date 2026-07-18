@@ -65,6 +65,7 @@ _uninstall_launchd() {
 import plistlib
 import re
 import sys
+import getpass
 from pathlib import Path
 
 manifest_path, launchd_dir = sys.argv[1:3]
@@ -75,9 +76,10 @@ for line in text.splitlines():
     if m:
         ids.append(m.group(1))
 
+username = getpass.getuser()
 launchd = Path(launchd_dir)
 for rid in ids:
-    label = f"com.alvaromur.secretary.routine.{rid}"
+    label = f"com.{username}.secretary.routine.{rid}"
     plist = launchd / f"{label}.plist"
     if plist.exists():
         plist.unlink()
@@ -122,6 +124,7 @@ python3 - "$MANIFEST" "$INSTANCE/.secretary.yml" "$LAUNCHD_DIR" "$RUN_SCRIPT" "$
 import plistlib
 import re
 import sys
+import getpass
 from pathlib import Path
 
 try:
@@ -229,10 +232,11 @@ def parse_cron(cron: str) -> list[dict]:
 
 
 def plist_for(routine_id: str, cron: str) -> dict:
+    username = getpass.getuser()
     intervals = parse_cron(cron)
     sci = intervals[0] if len(intervals) == 1 else intervals
     env = {
-        "PATH": "/Users/alvaromur/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        "PATH": f"{Path.home()}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
         "SECRETARY_CORE": core,
         "SECRETARY_INSTANCE": instance,
         "SECRETARY_ROUTINES_EXECUTOR": executor,
@@ -246,7 +250,7 @@ def plist_for(routine_id: str, cron: str) -> dict:
         else:
             env[api_key_env] = ""
     return {
-        "Label": f"com.alvaromur.secretary.routine.{routine_id}",
+        "Label": f"com.{username}.secretary.routine.{routine_id}",
         "ProgramArguments": [run_script, routine_id],
         "WorkingDirectory": instance,
         "EnvironmentVariables": env,
@@ -259,11 +263,12 @@ def plist_for(routine_id: str, cron: str) -> dict:
 launchd = Path(launchd_dir)
 launchd.mkdir(parents=True, exist_ok=True)
 
+username = getpass.getuser()
 installed = []
 for r in routines:
     rid = r["id"]
     cron = r.get("cron")
-    plist_path = launchd / f"com.alvaromur.secretary.routine.{rid}.plist"
+    plist_path = launchd / f"com.{username}.secretary.routine.{rid}.plist"
     if rid in disabled_cfg or r.get("enabled") is False:
         if plist_path.exists():
             plist_path.unlink()
@@ -281,8 +286,8 @@ for r in routines:
 
 print(f"\n{len(installed)} plists written. Load with:")
 for rid in installed:
-    label = f"com.alvaromur.secretary.routine.{rid}"
-    print(f"  launchctl bootout gui/$(id -u) {label} 2>/dev/null; launchctl bootstrap gui/$(id -u) {launchd}/com.alvaromur.secretary.routine.{rid}.plist")
+    label = f"com.{username}.secretary.routine.{rid}"
+    print(f"  launchctl bootout gui/$(id -u) {label} 2>/dev/null; launchctl bootstrap gui/$(id -u) {launchd}/com.{username}.secretary.routine.{rid}.plist")
 PY
 
 echo "Done. Reload changed agents with launchctl bootstrap (see above)."

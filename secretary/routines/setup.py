@@ -249,8 +249,10 @@ def _reload_launchagents(
         return
     uid = os.getuid()
     domain = f"gui/{uid}"
+    import getpass
+    username = getpass.getuser()
     for rid in routine_ids:
-        label = f"com.alvaromur.secretary.routine.{rid}"
+        label = f"com.{username}.secretary.routine.{rid}"
         plist = launchd_dir / f"{label}.plist"
         if not plist.is_file():
             print(f"  skip {rid}: no plist")
@@ -367,6 +369,44 @@ def _mcp_note(executor: str) -> None:
         print("  to avoid duplicate PRs while using local LaunchAgents.")
 
 
+def _sync_playbooks_and_skills() -> None:
+    import shutil
+    print("\n  Syncing playbooks and skills to host (~/.claude/)...")
+    core_dir = Path(__file__).resolve().parent.parent.parent
+    
+    # Sync Playbooks
+    src_pb = core_dir / "playbooks"
+    if not src_pb.is_dir():
+        src_pb = core_dir / "playbooks.example"
+        
+    dst_pb = Path.home() / ".claude" / "scheduled-tasks"
+    if src_pb.is_dir():
+        dst_pb.mkdir(parents=True, exist_ok=True)
+        for item in src_pb.iterdir():
+            if item.is_dir():
+                target = dst_pb / item.name
+                if target.exists():
+                    shutil.rmtree(target)
+                shutil.copytree(item, target)
+        print(f"  ✓ Synced {src_pb.name} -> {dst_pb}")
+
+    # Sync Skills
+    src_sk = core_dir / "skills"
+    if not src_sk.is_dir():
+        src_sk = core_dir / "skills.example"
+        
+    dst_sk = Path.home() / ".claude" / "skills"
+    if src_sk.is_dir():
+        dst_sk.mkdir(parents=True, exist_ok=True)
+        for item in src_sk.iterdir():
+            if item.is_dir():
+                target = dst_sk / item.name
+                if target.exists():
+                    shutil.rmtree(target)
+                shutil.copytree(item, target)
+        print(f"  ✓ Synced {src_sk.name} -> {dst_sk}")
+
+
 def run_setup() -> int:
     """Run the interactive routines setup wizard."""
     paths = _paths()
@@ -399,6 +439,9 @@ def run_setup() -> int:
 
     _merge_write_config(config_path, state)
     _ensure_env_example(paths["env_example"])
+
+    if _prompt_yes_no("\nSync playbooks and skills to ~/.claude/?", default=True):
+        _sync_playbooks_and_skills()
 
     rc = _run_installer(paths["install_script"], instance)
     if rc != 0:

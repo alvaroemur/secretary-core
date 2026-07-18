@@ -1,24 +1,24 @@
 # secretary
 
-An AI-powered personal assistant that processes your email, WhatsApp, meetings, and Google Drive — then consolidates everything into a personal wiki. Runs autonomously via scheduled routines that report back through Pull Requests.
+An AI-powered personal assistant framework that processes your email, WhatsApp, meetings, and Google Drive — then consolidates everything into a personal wiki. Runs autonomously via scheduled routines that report back through Pull Requests.
 
-**This repo is the engine.** Your private data (policies, contacts, wiki articles, chat history) lives in a separate instance repository that you control.
+**This repo is the engine.** Your private data (policies, contacts, wiki articles, chat history) lives in a separate private instance repository that you control.
 
 ## Quick start — paste this into your AI coding agent
 
-Copy the prompt below into [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Cursor, Windsurf, Codex, or any AI coding assistant that can run shell commands and edit files:
+Copy the prompt below into [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Cursor, Windsurf, or any AI coding assistant that can run shell commands and edit files:
 
 ```
-Clone https://github.com/alvaroemur/secretary-core and help me set it up
+Clone https://github.com/yourusername/secretary-core and help me set it up
 as my personal assistant. Read the README.md thoroughly first — it explains
 the architecture, the core/instance split, and how routines work.
 
 Then walk me through:
 1. Creating my instance repo (private, holds my data)
 2. Picking which channels to activate (email, WhatsApp, meetings, Drive)
-3. Adapting the routine templates in routines/ for my setup
-4. Setting up the wiki and running the first build
-5. Scheduling the routines to run daily
+3. Adapting the routine templates in playbooks.example/ for my setup
+4. Setting up the wiki and running the first build using the secretary CLI
+5. Scheduling the routines to run daily using LaunchAgents or your scheduler
 
 Ask me questions as you go — I'll tell you which email tool I use,
 which chats matter, what my Drive looks like, and what language I prefer.
@@ -49,23 +49,20 @@ That's it. The agent will read the docs, ask you the right questions, and config
 ## Architecture
 
 ```
-secretary-core/          ← this repo (engine, public)
-├── architecture/        # System diagrams (Mermaid DFD + flowcharts)
-├── mail/                # Email policy + settings templates
-├── whatsapp/            # WhatsApp engine (Baileys) + policy template
-├── meetings/            # Meeting transcript processing
-├── wiki/                # Static-site generator (Python, zero deps)
-│   ├── build/           #   article → HTML builder
-│   ├── assets/          #   CSS + JS for the viewer
-│   ├── serve.py         #   local dev server
-│   └── worker/          #   Cloudflare Pages worker (optional)
-├── routines/            # Routine templates (the scheduled AI agents)
-│   ├── mail-review.md
-│   ├── wiki-sync.md
-│   ├── meetings-processor.md
-│   ├── whatsapp-monitor.md
-│   └── drive-crawler.md
-└── README.md
+secretary-core/            ← this repo (engine, public)
+├── architecture/          # System diagrams (Mermaid DFD + flowcharts)
+├── cli/                   # CLI documentation and scripts
+├── mail/                  # Email settings templates
+├── whatsapp/              # WhatsApp engine (Baileys) + policy template
+├── wiki/                  # Static-site generator (Python, zero deps)
+│   ├── build/             #   article → HTML builder
+│   ├── assets/            #   CSS + JS for the viewer
+│   └── serve.py           #   local dev server
+├── secretary/             # Main Python CLI engine (status, validate, recall)
+│   └── routines/          #   Routines engine logic, LaunchAgents setup wizard
+├── secd/                  # Local daemon server (bridge to Axon browser extension)
+├── playbooks.example/     # Anonymized templates for scheduled routine prompts
+└── skills.example/        # Anonymized templates for agentic assistant skills
 ```
 
 Open `architecture/index.html` via a local server to browse the system diagrams interactively.
@@ -106,65 +103,40 @@ export SECRETARY_CORE=~/Dev/secretary-core
 export SECRETARY_INSTANCE=~/path/to/my-secretary
 ```
 
+## CLI (`secretary`) & Daemon (`secd`)
+
+The engine provides a python-based CLI tool and a local daemon:
+
+- **CLI (`secretary`)**: Offers atomic, scriptable, non-LLM operations. Commands include:
+  - `secretary config` — Instance config and path resolution.
+  - `secretary status` — Persist progress on today's briefing.
+  - `secretary validate` — Run instance CI validators.
+  - `secretary recall` — Deterministic memory search.
+  - `secretary wiki build` — Safe legacy-to-instance wiki builds.
+  - `secretary routines setup` — Interactive wizard to schedule LaunchAgents.
+- **Daemon (`secd`)**: A loopback-only Node.js HTTP server. It serves as a bridge to browser extensions (like Axon), exposing context cards, objectives, modules, and accepting signals back into Secretary.
+
 ## Routines
 
-Each file in `routines/` is a complete, self-contained prompt for an AI agent that runs on a schedule. They are designed for [Claude Code scheduled tasks](https://docs.anthropic.com/en/docs/claude-code) but work with any AI coding agent that can:
-
-- Read and write files
-- Run shell commands (git, CLI tools)
-- Call APIs (Gmail, Google Drive, Calendar)
-- Spawn sub-agents for parallel work
-
-### The five routines
+Each folder in `playbooks.example/` contains structured prompts/instructions for scheduled tasks. They are designed for [Claude Code scheduled tasks](https://docs.anthropic.com/en/docs/claude-code) or cron schedules:
 
 | Routine | Schedule | What it does |
 |---------|----------|-------------|
-| **mail-review** | Daily AM | Summarizes email, creates draft replies, cleans inbox, tracks follow-ups |
-| **meetings-processor** | Daily PM | Processes new meeting transcriptions, extracts actions and entities |
+| **revision-correo** | Daily AM | Summarizes email, creates draft replies, cleans inbox, tracks follow-ups |
+| **reuniones-update** | Daily PM | Processes new meeting transcriptions, extracts actions and entities |
 | **whatsapp-monitor** | Daily PM | Processes approved chats, triages the rest, surfaces candidates |
 | **drive-crawler** | Daily PM | Indexes new/modified files, proposes Drive organization improvements |
-| **wiki-sync** | Daily late PM | Merges extractor PRs, integrates all evidence into wiki, rebuilds HTML |
+| **wiki-update** | Daily late PM | Merges extractor PRs, integrates all evidence into wiki, rebuilds HTML |
 
 ### How routines report
 
 Every routine works in an **isolated git worktree** (never touches your working copy), commits its changes, and opens a **Pull Request** that serves as both the report and the version-controlled diff. You read the PR on GitHub, review what the agent did, and merge.
 
-### Routine conventions
-
-All routines follow the same patterns:
-
-- **Worktree isolation** — creates a temporary branch from `origin/main`, works there, opens PR
-- **Policy files** — each channel has a `policy.md` that the user maintains (classification rules, whitelists, blocked senders)
-- **Estado (state) files** — rolling state that carries context between runs
-- **Memory consolidation** — evidence is written to `memory/` files (personas.md, organizaciones.md, acciones.md) that wiki-sync consumes
-- **Anti-hallucination gates** — new entities default to `pending_wiki: false` until the user confirms; no guessing surnames or inventing data
-- **Append-only evidence** — extractors only add to memory files; wiki-sync is the only one that cleans up after integration
-
 ## Wiki
 
 The wiki is a static site generator with zero external dependencies (Python standard library only). It turns Markdown articles with YAML frontmatter into a browsable HTML dashboard with search, categories, and wikilinks.
 
-Article format:
-```markdown
----
-title: Article Title
-type: person           # person | organization | topic | profile
-infobox:
-  Field: Value
-categories: [people]
-last_updated: 2025-01-15
-sources:
-  - type: email
-    ref: <message-id>
-  - type: meeting
-    ref: <drive-id>
----
-
-## Section
-Content with [[wikilinks]] to other articles.
-```
-
-Build: `SECRETARY_DATA="$SECRETARY_INSTANCE" python3 wiki/build/build.py`
+Build via CLI: `secretary wiki build`
 
 ## Prerequisites
 
@@ -179,8 +151,6 @@ The routines are modular — activate only the channels you use:
 | **Wiki** | Python 3.8+ (standard library only) |
 | **Calendar** | Google Calendar API access (for meeting enrichment) |
 
-For Claude Code scheduled tasks, you also need the [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated.
-
 ## Language
 
 The engine and all templates are in **English**. Your instance (policies, wiki articles, routine prompts) can be in any language — just tell the AI agent your preference during setup and it will adapt everything.
@@ -189,25 +159,16 @@ The engine and all templates are in **English**. Your instance (policies, wiki a
 
 If you prefer to set things up yourself instead of using the AI prompt above:
 
-1. **Fork/clone this repo** as your engine
-2. **Create your instance repo** (private) following the structure above
+1. **Fork/clone this repo** as your engine.
+2. **Create your instance repo** (private) following the structure above.
 3. **Copy and adapt** the template files:
    - `mail/policy.example.md` → `your-instance/mail/policy.md`
    - `mail/settings.example.md` → `your-instance/mail/settings.md`
    - `whatsapp/policy.example.md` → `your-instance/whatsapp/policy.md`
-4. **Adapt routine templates** from `routines/` — replace placeholders with your paths, tools, and preferences
-5. **Create your first wiki article** about yourself in `wiki/articulos/your-name.md`
-6. **Run the wiki build** to verify: `SECRETARY_DATA="$INSTANCE" python3 wiki/build/build.py`
-7. **Schedule the routines** in your AI coding agent
-
-## Contributing
-
-This is a personal-assistant framework that grew out of real daily use. Contributions welcome — especially:
-
-- New channel integrations (Slack, Telegram, Notion, etc.)
-- Routine improvements and new patterns
-- Wiki builder enhancements
-- Documentation and examples
+4. **Copy routine templates** from `playbooks.example/` into your local `playbooks/` folder and adapt them (replace placeholders with your paths, tools, and preferences).
+5. **Create your first wiki article** about yourself in `wiki/articulos/your-name.md`.
+6. **Run the wiki build** via the CLI: `SECRETARY_INSTANCE="$INSTANCE" secretary wiki build`
+7. **Schedule the routines** using the setup wizard: `secretary routines setup`
 
 ## License
 

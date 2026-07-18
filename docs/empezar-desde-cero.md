@@ -1,6 +1,6 @@
 # 👋 Hola — ¿quieres probar esto del asistente con IA?
 
-¡Hola, soy Álvaro! Te comparto esto porque a mí me está funcionando bien — pero quiero ser honesto: hay tantas soluciones como personas inteligentes en el mundo, y al final usar IA se trata de personalizarla a *tus* necesidades. Lo que me sirve a mí puede no ser tu estilo, y eso está perfecto.
+¡Hola, soy User! Te comparto esto porque a mí me está funcionando bien — pero quiero ser honesto: hay tantas soluciones como personas inteligentes en el mundo, y al final usar IA se trata de personalizarla a *tus* necesidades. Lo que me sirve a mí puede no ser tu estilo, y eso está perfecto.
 
 Dicho esto, si has escuchado sobre "agentes de IA" pero no tienes muy claro qué son ni cómo empezar — este repo ("repositorio", básicamente una carpeta con código) es un **kit de inicio rápido**. Lo agarras, le apuntas tu herramienta de IA, y ella solita se configura para hacer un montón de cosas por ti: leer tu correo, hacer seguimiento a tus reuniones, organizar tu Drive y armar una wiki personal. 🤖✨
 
@@ -45,7 +45,7 @@ Solo tres cosas:
 3. Abre el chat de la IA: presiona **Cmd+L** (Mac) o **Ctrl+L** (Windows)
 4. Pega este mensaje:
 
-> Clona https://github.com/alvaroemur/secretary-core y ayúdame a configurarlo como mi asistente personal. Lee el README.md primero, luego guíame paso a paso para crear mi instancia, elegir qué canales activar y programar las rutinas. Hazme preguntas sobre la marcha.
+> Clona https://github.com/yourusername/secretary-core y ayúdame a configurarlo como mi asistente personal. Lee el README.md primero, luego guíame paso a paso para crear mi instancia, elegir qué canales activar y programar las rutinas. Hazme preguntas sobre la marcha.
 
 Eso es todo. La IA se encarga de descargar el proyecto, leerlo, y guiarte paso a paso. Te va a preguntar cosas como "¿cuál es tu correo?" y "¿qué chats de WhatsApp quieres rastrear?" — solo responde con naturalidad. 💬
 
@@ -97,7 +97,7 @@ Sí. Todo se queda en tu computadora y en tu repositorio privado de GitHub. Este
 ¡Sí! El motor está en inglés, pero durante la configuración la IA te pregunta tu idioma preferido y adapta todo — tus políticas, wiki, prompts, reportes — a español (o al idioma que quieras).
 
 **¿Qué hago si me trabo?** 🆘
-Deja un mensaje en [GitHub Issues](https://github.com/alvaroemur/secretary-core/issues) describiendo qué pasó. Incluye qué herramienta usas y qué ves en pantalla. Alguien te ayudará.
+Deja un mensaje en [GitHub Issues](https://github.com/yourusername/secretary-core/issues) describiendo qué pasó. Incluye qué herramienta usas y qué ves en pantalla. Alguien te ayudará.
 
 **¿Puedo empezar de a poco?** 🐣
 Claro que sí. Puedes activar solo el correo y nada más. O solo WhatsApp. Vas agregando canales cuando quieras — el sistema es modular.

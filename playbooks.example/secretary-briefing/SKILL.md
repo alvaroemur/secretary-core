@@ -23,9 +23,9 @@ DOW=$(TZ="$TIMEZONE" date '+%A')
 BRIEF_REPO=$(echo "$CFG" | jq -r '.brief.repo // empty')
 BRIEF_LABEL=$(echo "$CFG" | jq -r '.brief.label // "tipo:informe-diario"')
 PERSONAL_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.personal // empty')
-WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.Company // .accounts.work // empty')
+WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.inspiro // .accounts.work // empty')
 BRIEF_REFRESH_ISSUE="${BRIEF_REFRESH_ISSUE:-}"
-export BRIEF_ASSIGNEE="${BRIEF_ASSIGNEE:-yourusername}"   # owner login — see table below
+export BRIEF_ASSIGNEE="${BRIEF_ASSIGNEE:-alvaroemur}"   # owner login — see table below
 
 if [ -z "$BRIEF_REPO" ]; then
   BRIEF_REPO=$(gh -R "$SECRETARY_INSTANCE" repo view --json nameWithOwner -q .nameWithOwner)
@@ -192,10 +192,10 @@ not auto-dispatch. Details in instance `CLAUDE.md` § dispatch.
 
 ---
 
-## Phase 3 — Open `para-User` issues
+## Phase 3 — Open `para-alvaro` issues
 
 ```bash
-gh issue list --repo "$BRIEF_REPO" --label "para-User" --state open \
+gh issue list --repo "$BRIEF_REPO" --label "para-alvaro" --state open \
   --json number,title,createdAt,url
 ```
 

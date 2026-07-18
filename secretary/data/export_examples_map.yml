@@ -1,0 +1,76 @@
+# export_examples_map.yml — anonymization map for `secretary core export-examples`
+#
+# SINGLE SOURCE OF TRUTH for turning the real, private `playbooks/` and `skills/`
+# (gitignored, contain the owner's real data) into the committed, public,
+# sanitized `playbooks.example/` and `skills.example/`.
+#
+# The exporter applies `redact` rules — IN ORDER — to every TEXT file it copies.
+# The CI leak-guard (`scripts/ci/check_no_leaks.py`) scans git-tracked files for
+# these same `redact` patterns and fails if any survives, using `preserve` as an
+# allowlist of strings that are public and must NOT be flagged.
+#
+# POLICY (decided by the owner):
+#   - REDACT genuinely sensitive data → placeholder.
+#   - PRESERVE public, non-sensitive strings (the owner's name, the shared engine
+#     repo everyone clones) — NEVER touch them.
+#
+# DESIGN NOTES:
+#   - Prefer literal `pattern:` replacements; they are unambiguous and order-safe.
+#   - Use `regex:` only where a literal cannot express the target (phones/tokens);
+#     each regex is documented.
+#   - NEVER use a blanket `alvaroemur` → `yourusername` rule: it would corrupt the
+#     public engine repo `alvaroemur/secretary-core`. Redact rules are SPECIFIC
+#     full literals (e.g. `alvaroemur/cowork-secretary`), never the bare username.
+#   - Order matters: more specific rules (e.g. the Drive mount path that embeds an
+#     email) come BEFORE the bare-email rule so the specific replacement wins.
+
+redact:
+  # --- Google Drive local mount paths (run BEFORE the bare-email rule) -----------
+  - pattern: "GoogleDrive-alvaro.e.mur@gmail.com"
+    replacement: "GoogleDrive-your.personal.email@gmail.com"
+    note: >-
+      macOS CloudStorage mount for the owner's personal Drive. Redacted before the
+      bare-email rule so the full mount-path literal is replaced as one unit.
+
+  # --- Owner emails ---------------------------------------------------------------
+  - pattern: "alvaro.e.mur@gmail.com"
+    replacement: "your.personal.email@gmail.com"
+    note: "Owner's personal Gmail (also the personal Workspace account)."
+  - pattern: "alvaro@inspiro.pe"
+    replacement: "your.work.email@company.com"
+    note: "Owner's corporate (Inspiro) Workspace email."
+
+  # --- Private instance / deploy repos --------------------------------------------
+  # These are instance-specific repos, NOT the shared engine. Map them to a generic
+  # `yourusername/...` owner so forks can flip them. The engine repo
+  # `alvaroemur/secretary-core` is PRESERVED below.
+  - pattern: "alvaroemur/cowork-secretary"
+    replacement: "yourusername/cowork-secretary"
+    note: "Private INSTANCE repo (the owner's data). NOT the public engine."
+  - pattern: "alvaroemur/wiki"
+    replacement: "yourusername/wiki"
+    note: "Owner's personal wiki deploy repo (instance-specific). Flip if you fork."
+  - pattern: "alvaroemur/axon"
+    replacement: "yourusername/axon"
+    note: >-
+      Owner instance-specific repo. Added proactively per policy (no current
+      occurrences in the sources); flip to your own owner if you fork.
+
+  # --- Google Drive folder ids ----------------------------------------------------
+  - pattern: "1TE6Z1uhZo7YrwOnWvp83se3CCXHiCKt9"
+    replacement: "YOUR_TACTIQ_FOLDER_ID"
+    note: "Private Google Drive folder id — root of the Tactiq meeting transcripts."
+
+  # --- Phone numbers (regex) ------------------------------------------------------
+  - regex: '\+51[\s.\-]?\d{3}[\s.\-]?\d{3}[\s.\-]?\d{3}'
+    replacement: "+00 000 000 000"
+    note: >-
+      Peruvian (+51) mobile numbers in the 9-digit national format, tolerating
+      space/dot/dash separators. Conservative on purpose — will not match arbitrary
+      numeric strings. Add more country-specific rules here as needed.
+
+# preserve: public, non-sensitive strings. The leak-guard treats these as an
+# allowlist and will NOT flag a `redact` hit that falls entirely inside one of them.
+preserve:
+  - "alvaroemur/secretary-core"  # PUBLIC engine repo — everyone clones it. Keep.
+  - "Álvaro"                     # Owner's name. Public; shows real-world usage. Keep.

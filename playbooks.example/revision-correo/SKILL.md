@@ -23,7 +23,7 @@ DOW=$(TZ="$TIMEZONE" date '+%A')
 BRIEF_REPO=$(echo "$CFG" | jq -r '.brief.repo // empty')
 BRIEF_LABEL=$(echo "$CFG" | jq -r '.brief.label // "tipo:informe-diario"')
 PERSONAL_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.personal // empty')
-WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.Company // .accounts.work // empty')
+WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.inspiro // .accounts.work // empty')
 
 if [ -z "$BRIEF_REPO" ]; then
   BRIEF_REPO=$(gh -R "$SECRETARY_INSTANCE" repo view --json nameWithOwner -q .nameWithOwner)

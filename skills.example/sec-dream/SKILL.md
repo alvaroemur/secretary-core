@@ -208,10 +208,10 @@ ${SIG_FOOT}"
 |--------|--------|
 | Meeting | Latest CLab/Juliana transcript or summary in meetings memory |
 | Mail | Stale Gmail draft thread on contract terms |
-| Repo | Scattered term drafts in Cowork sideproject without integration |
+| Repo | Scattered term drafts in Cowork ennui without integration |
 
 **Dream job:** cross Jul 1 meeting terms → synthesize unified contract terms doc or mail draft →
-open/update PR **merge-ready** in `cowork-sideproject` → `next_session`: `sec-drone` surface PR →
+open/update PR **merge-ready** in `cowork-ennui` → `next_session`: `sec-drone` surface PR →
 `sec-merge` tier-low if owner confirms.
 
 ### Phase 4 — Report
@@ -249,14 +249,14 @@ Never edit owner `knowledge/objectives/` body autonomously.
 Header: `🌙 **sec-dream — <lane or skipped>** · <date>`
 
 ```markdown
-🌙 **sec-dream — sideproject / CLab terms** · 2026-07-03
+🌙 **sec-dream — ennui / CLab terms** · 2026-07-03
 
 **Job** · merge_ready · `job-20260703-clab-terms`
 
 | | Field | Value |
 |---|---|---|
-| 🧵 | Lane | sideproject |
-| 📎 | PR | [cowork-sideproject#42](https://github.com/…/pull/42) · babysit green |
+| 🧵 | Lane | ennui |
+| 📎 | PR | [cowork-ennui#42](https://github.com/…/pull/42) · babysit green |
 | ✉️ | Mail | draft hint — reply thread CLab (not sent) |
 | 🔄 | Consolidation | 2 wiki annotations integrated (input) |
 

@@ -19,7 +19,7 @@ Doctrine: `rules/skills-contract.md`
 CFG=$(secretary config show)
 export SECRETARY_INSTANCE="${SECRETARY_INSTANCE:-$(echo "$CFG" | jq -r .instance)}"
 PERSONAL_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.personal // empty')
-WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.Company // .accounts.work // empty')
+WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.inspiro // .accounts.work // empty')
 ```
 
 ## Guardrails
@@ -58,7 +58,7 @@ Skills vs policies: `operational/skills-vs-operational.md`.
 | Field | Values |
 |-------|--------|
 | `intent` | `read` \| `search` \| `thread` \| `draft` |
-| `account` | `personal` \| `Company` → resolve from `.accounts` |
+| `account` | `personal` \| `inspiro` → resolve from `.accounts` |
 | `query` | Gmail search (e.g. `from:contact newer_than:3d`) |
 | `thread_id` | For `thread` / `draft` |
 | `to` / `cc` / `bcc` | Lists for `draft` |
@@ -180,7 +180,7 @@ Decision summary (detail in settings file):
 
 ## Report
 
-Header: `📬 **Mail — <intent>** · account <personal|Company>`. Compact table or list (from, subject,
+Header: `📬 **Mail — <intent>** · account <personal|inspiro>`. Compact table or list (from, subject,
 age, action). For drafts: copy-ready body + note it lives in Gmail Drafts, not sent. Include **MD
 mirror path** if persisted. Line: **Typos corrected:** … or **No typos detected.**
 

@@ -5,7 +5,7 @@ description: Revisión diaria de higiene del ecosistema — CLAUDE.md reviews, m
 
 # housekeeping — Mantenimiento diario del ecosistema de repos
 
-Rutina que corre 1×/día (06:00 Lima) y revisa el estado de higiene de todos los repos y workspaces de User. Aplica cambios seguros automáticamente y reporta todo lo que requiere decisión humana como PR en `~/.secretary`.
+Rutina que corre 1×/día (06:00 Lima) y revisa el estado de higiene de todos los repos y workspaces de Álvaro. Aplica cambios seguros automáticamente y reporta todo lo que requiere decisión humana como PR en `~/.secretary`.
 
 ## Repos a revisar
 
@@ -16,9 +16,9 @@ REPOS=(
     "$HOME/Dev/doc2struct/doc2struct-go"
     "$HOME/Dev/doc2struct/aliantza-compras-python"
     "$HOME/Dev/doc2struct/doc2struct_eval"
-    "$HOME/Dev/Company-agents-web"
-    "$HOME/Dev/sideproject-agents/sideproject-agents-core"
-    "$HOME/Dev/sideproject-agents/ruta-web"
+    "$HOME/Dev/inspiro-agents-web"
+    "$HOME/Dev/ennui-agents/ennui-agents-core"
+    "$HOME/Dev/ennui-agents/ruta-web"
     "$HOME/Dev/secretary-core"
     "$HOME/Dev/clab-erp"
     "$HOME/Dev/workwatch"
@@ -26,8 +26,8 @@ REPOS=(
 
     # Workspaces de gestión (Cowork/)
     "$HOME/.secretary"
-    "$HOME/Cowork/Company"
-    "$HOME/Cowork/sideproject"
+    "$HOME/Cowork/inspiro"
+    "$HOME/Cowork/ennui"
 )
 ```
 
@@ -98,14 +98,14 @@ Para cada review:
 2. **Si dice "Sin cambios necesarios"** → **antes de borrar**, registrar una línea de auditoría (archivo[s] de CLAUDE.md revisado[s] + veredicto + razón en ≤1 frase) para incluirla en el reporte (ver Fase 5, sección "CLAUDE.md — reviews sin cambios"). Luego borrar el archivo y continuar. El review en sí es scratch efímero; lo que debe persistir es el rastro de *que se revisó X y se decidió no tocar*, porque `~/.claude/reviews/` no está bajo git y un conteo agregado no responde "¿se revisó esto o nunca se miró?".
 3. **Si propone cambios**, evaluar cada propuesta:
    - **Cambios seguros** (agregar convención nueva, actualizar estructura documentada, corregir info obsoleta): **aplicar directamente** al CLAUDE.md correspondiente. Estos son cambios de documentación, no de código.
-   - **Cambios que requieren juicio** (eliminar una convención, cambiar una regla de negocio, reorganizar secciones): **no aplicar**, reportar para User.
+   - **Cambios que requieren juicio** (eliminar una convención, cambiar una regla de negocio, reorganizar secciones): **no aplicar**, reportar para Álvaro.
 4. **Borrar el archivo de review** tras procesarlo (aplicado o reportado).
 
 **Regla de oro**: ante la duda, no aplicar — reportar. Es preferible que un cambio espere a que se aplique mal.
 
 ## Fase 3 — Consolidar memorias
 
-Leer `~/.claude/projects/-Users-username-Cowork/memory/MEMORY.md` y todos los archivos `.md` referenciados.
+Leer `~/.claude/projects/-Users-alvaromur-Cowork/memory/MEMORY.md` y todos los archivos `.md` referenciados.
 
 Chequeos:
 1. **Memorias duplicadas**: ¿hay dos archivos que dicen esencialmente lo mismo? → mergear en uno, borrar el otro, actualizar MEMORY.md.
@@ -149,7 +149,7 @@ Sección **🔄 Reconciliación acciones (007)** con tablas:
 - **Proponer cerrar** (acc-id, evidencia path)
 - **Conflicto** (acc-id, fuente A vs fuente B — para heartbeat/briefing)
 
-User o una sesión de `reuniones-update` / `sec-status` / **`sec-acc-fold`** (post-merge en
+Álvaro o una sesión de `reuniones-update` / `sec-status` / **`sec-acc-fold`** (post-merge en
 `sec-merge`) aplica los cierres. Housekeeping solo propone.
 
 ## Fase 3.6 — Issues de backlog vs specs (rules/issues-relacionados.md)
@@ -175,15 +175,15 @@ flaggear como candidato a revisión (no cerrar automáticamente — housekeeping
 
 ### Salida en reporte (Fase 5)
 
-Sección **📎 Issues vs specs (backstop 3.6)**: tabla `issue | spec referenciado | último update issue | último cambio spec | acción sugerida`. User o la sesión que retome el tema decide (comentar/cerrar/dejar así), igual que en 3.5.
+Sección **📎 Issues vs specs (backstop 3.6)**: tabla `issue | spec referenciado | último update issue | último cambio spec | acción sugerida`. Álvaro o la sesión que retome el tema decide (comentar/cerrar/dejar así), igual que en 3.5.
 
 ## Fase 4 — Acciones seguras de organización
 
 ### 4.1 Archivos sin commitear en repos de gestión
 
-Para `.secretary`, `Cowork/Company`, `Cowork/sideproject`:
+Para `.secretary`, `Cowork/inspiro`, `Cowork/ennui`:
 - Si hay archivos dirty que son claramente output de una routine (en `memory/`, `summaries/`, etc.) y la routine debería haberlos commiteado: **reportar como anomalía** (la routine falló en su cierre).
-- Si hay archivos dirty que parecen trabajo manual de User (borradores, notas): **no tocar**, solo listar.
+- Si hay archivos dirty que parecen trabajo manual de Álvaro (borradores, notas): **no tocar**, solo listar.
 
 ### 4.2 Ramas huérfanas
 
@@ -239,7 +239,7 @@ Reportar los nuevos en la sección correspondiente de Fase 5. Si encuentras feed
 
 ## Fase 5 — Reporte como PR
 
-El reporte sigue el **contrato de output expresivo** de User
+El reporte sigue el **contrato de output expresivo** de Álvaro
 (`~/.secretary/rules/sec-output.md`): cabecera con emoji+label, **lead con lo
 urgente primero**, flags de estado de set cerrado, campos marcados. No es un volcado de tablas:
 se abre con lo que requiere decisión tuya y recién después el detalle escaneable.
@@ -259,7 +259,7 @@ Escribir el reporte a `/tmp/pr-housekeeping.md` con esta estructura:
 
 ## 🔴 Atención primero
 
-Lo que requiere decisión o acción tuya, ordenado por urgencia — esto es lo primero que User
+Lo que requiere decisión o acción tuya, ordenado por urgencia — esto es lo primero que Álvaro
 lee; el resto del reporte es detalle de respaldo. Cada ítem: flag + qué + → acción sugerida.
 Si no hay nada, una sola línea: `🟢 Nada urgente — todo en verde.`
 
@@ -291,7 +291,7 @@ Feedback humano en PRs (sobre todo cerrados/mergeados) que se pierde de vista. E
 
 ## CLAUDE.md — cambios aplicados
 
-- `~/Dev/Company-agents/CLAUDE.md` — agregada sección de estructura de directorios
+- `~/Dev/inspiro-agents/CLAUDE.md` — agregada sección de estructura de directorios
 - ...
 
 ## CLAUDE.md — cambios que requieren decisión
@@ -346,7 +346,7 @@ Candidatos detectados en Fase 3.6 — spec cambió después del último update d
 - `secretary/extractors/mail/memory/2026-05-20.md` — dirty pero debería estar en un PR
 
 ### Trabajo manual (no tocar)
-- `Company/clientes/mi-fondo/borrador.md`
+- `inspiro/clientes/mi-fondo/borrador.md`
 
 ## Ramas candidatas a limpieza
 
@@ -401,8 +401,8 @@ cd "$REPO" && git worktree remove "$WT" --force
 ## Qué NO hacer
 
 - No commitear archivos en repos ajenos a secretary — los cambios a CLAUDE.md se hacen directamente en cada repo (son su propia rama `main`, documentación safe).
-- No borrar ramas sin confirmación explícita de User.
+- No borrar ramas sin confirmación explícita de Álvaro.
 - No mergear PRs automáticamente en esta routine (eso lo hace wiki-update en su W0).
 - No modificar código, solo documentación (CLAUDE.md, .gitignore, memorias).
-- No tocar archivos que parezcan trabajo en progreso de User.
+- No tocar archivos que parezcan trabajo en progreso de Álvaro.
 - No inventar contenido para CLAUDE.md — solo aplicar lo que los reviews proponen, o reportar la ausencia.

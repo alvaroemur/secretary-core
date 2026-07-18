@@ -9,7 +9,7 @@ Read instance context from `SECRETARY_INSTANCE/CLAUDE.md` before starting.
 
 # dispatch-executor — autonomous dispatch hand (M3, label mode)
 
-**Mission:** execute work User (or the briefing) marked with label `dispatch:execute`, and leave
+**Mission:** execute work Álvaro (or the briefing) marked with label `dispatch:execute`, and leave
 a PR ready for review in the target repo. Design: `_diseño/arquitectura/m3-dispatch.mmd`. First
 secretary actor that **executes** work instead of only reporting.
 
@@ -17,10 +17,10 @@ secretary actor that **executes** work instead of only reporting.
 
 1. **Label is consent.** Only act on issues with `dispatch:execute`. Never self-assign work.
 2. **Repo allowlist.** Only repos in `.secretary.yml` → `dispatch.executor.repos` (a LIST — may
-   include sideproject, Company, secretary-core, doc2struct, cowork-secretary, etc.). Repos outside the
+   include ennui, inspiro, secretary-core, doc2struct, cowork-secretary, etc.). Repos outside the
    list are ignored even with the label. **If key missing or empty → no repos enabled → exit clean.**
    Never guess repos.
-3. **Never merge, never touch `main`.** Always new branch + PR `Closes #N`. Merge is User's review (H2).
+3. **Never merge, never touch `main`.** Always new branch + PR `Closes #N`. Merge is Álvaro's review (H2).
 4. **Doubt blocks, does not guess.** If brief is ambiguous/incomplete, or task is destructive
    (migrations, mass deletes, secrets, third-party sends, `git push --force`, money moves) → DO NOT
    execute: comment what's missing, set `dispatch:blocked`, move on.
@@ -30,7 +30,7 @@ secretary actor that **executes** work instead of only reporting.
 
 ## Label lifecycle (avoid double execution)
 
-- `dispatch:execute` (User or briefing) → you claim to `dispatch:running` → on PR open
+- `dispatch:execute` (Álvaro or briefing) → you claim to `dispatch:running` → on PR open
   `dispatch:done` (comment link) → on fail/ambiguous/risk `dispatch:blocked` (comment why).
 - Create missing labels: `gh label create dispatch:execute --color 0e8a16` (and `:running 1d76db`,
   `:done 5319e7`, `:blocked b60205`) on each enabled repo.
@@ -76,18 +76,18 @@ g) **Close loop:** swap `dispatch:running`→`dispatch:done`. Comment issue with
 ### Step 2 — Block / fail
 
 If brief ambiguous, task risky, or execution fails: clean worktree, swap to `dispatch:blocked`,
-comment (signed) what's missing and what User decision unblocks — one clear question. Continue;
+comment (signed) what's missing and what Álvaro decision unblocks — one clear question. Continue;
 never leave a block hanging the run.
 
 ### Step 3 — Run summary
 
-Short summary: executed (→ PR), blocked (→ what's missing), skipped. Highlight what needs User decision.
+Short summary: executed (→ PR), blocked (→ what's missing), skipped. Highlight what needs Álvaro decision.
 
 ## What you do NOT do
 
-- Do not create the issue or brief (mode B / briefing / User manual). Only consume marked issues.
+- Do not create the issue or brief (mode B / briefing / Álvaro manual). Only consume marked issues.
   Issue without clear HANDOVER → blocked, no guessing.
-- Do not merge or close issues manually (`Closes #N` closes on User's merge).
+- Do not merge or close issues manually (`Closes #N` closes on Álvaro's merge).
 - Do not write to secretary `*/memory/` or wiki; output lives in target repo (PR + comments).
 - Do not run without allowlist. Disabled repo = invisible.
 

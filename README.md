@@ -9,7 +9,7 @@ An AI-powered personal assistant framework that processes your email, WhatsApp, 
 Copy the prompt below into [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Cursor, Windsurf, or any AI coding assistant that can run shell commands and edit files:
 
 ```
-Clone https://github.com/yourusername/secretary-core and help me set it up
+Clone https://github.com/alvaroemur/secretary-core and help me set it up
 as my personal assistant. Read the README.md thoroughly first — it explains
 the architecture, the core/instance split, and how routines work.
 

@@ -53,7 +53,7 @@ secretary validate wikilinks
 secretary wiki build               # stages legacy layout → build.py → engine wiki/output
 
 secretary recall <query>           # deterministic search (table)
-secretary recall alvaro --format json
+secretary recall john --format json
 
 secretary fresh mail                 # Paso 0 fresh-first (tabla)
 secretary fresh meeting --format json

@@ -1,6 +1,6 @@
 # 👋 Hey — so you want to try this AI assistant thing?
 
-Hey, it's Álvaro! I'm sharing this with you because it's been genuinely useful for me — but I want to be upfront: there are as many solutions as there are smart people in the world, and ultimately using AI is about personalizing it to *your* needs. What works for me might not be your style, and that's totally fine.
+Hey, it's User! I'm sharing this with you because it's been genuinely useful for me — but I want to be upfront: there are as many solutions as there are smart people in the world, and ultimately using AI is about personalizing it to *your* needs. What works for me might not be your style, and that's totally fine.
 
 That said, if you've heard about "AI agents" but don't really know what they are or how to start — this repo ("repository", basically a folder with code) is a **quick-start kit**. You grab it, point your AI tool at it, and it configures itself to do a bunch of things for you, like reading your email, tracking your meetings, organizing your Drive, and building a personal wiki. 🤖✨
 
@@ -45,7 +45,7 @@ Just three things:
 3. Open the AI chat: press **Cmd+L** (Mac) or **Ctrl+L** (Windows)
 4. Paste this message:
 
-> Clone https://github.com/alvaroemur/secretary-core and help me set it up as my personal assistant. Read the README.md first, then walk me through creating my instance, picking channels, and scheduling the routines. Ask me questions as you go.
+> Clone https://github.com/yourusername/secretary-core and help me set it up as my personal assistant. Read the README.md first, then walk me through creating my instance, picking channels, and scheduling the routines. Ask me questions as you go.
 
 That's it. The AI takes care of downloading the project, reading it, and walking you through setup step by step. It'll ask you things like "what's your email?" and "which WhatsApp chats do you want to track?" — just answer naturally. 💬
 
@@ -97,7 +97,7 @@ Yes. Everything stays on your computer and in your private GitHub repository. Th
 Yes! The engine is in English, but during setup the AI will ask your preference and adapt everything — your policies, wiki, prompts, reports — to your language.
 
 **What if I get stuck?** 🆘
-Drop a message in [GitHub Issues](https://github.com/alvaroemur/secretary-core/issues) describing what happened. Include what tool you're using and what you see on screen. Someone will help.
+Drop a message in [GitHub Issues](https://github.com/yourusername/secretary-core/issues) describing what happened. Include what tool you're using and what you see on screen. Someone will help.
 
 **What if I want to start small?** 🐣
 Totally fine. You can activate just email and nothing else. Or just WhatsApp. Add more channels whenever you're ready — the system is modular.

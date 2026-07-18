@@ -17,7 +17,7 @@ CORE="${SECRETARY_CORE:-$HOME/Dev/secretary-core}"
 # SCRIPT_DIR retired — use ROUTINES_* from _layout.sh
 RUN_SCRIPT="$ROUTINES_ROOT/run-routine.sh"
 SCOUT="$ROUTINES_OPS/reuniones-scout.sh"
-REPO="${SECRETARY_REPO:-alvaroemur/cowork-secretary}"
+REPO="${SECRETARY_REPO:-yourusername/cowork-secretary}"
 STATE_DIR="$INSTANCE/extractors/meetings/memory"
 STATE_FILE="$STATE_DIR/_scheduler_seen.json"
 TZ_NAME="${TZ:-America/Lima}"

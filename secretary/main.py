@@ -16,7 +16,7 @@ from rich.table import Table
 
 from secretary import __version__
 from secretary.acc import fold_action
-from secretary.build_root import run_wiki_build
+from secretary.build_root import run_wiki_build, run_wiki_serve
 from secretary.config import all_resolved_paths, config_show_dict, resolve_path_key
 from secretary.fresh import (
     MODULE_ALIASES,
@@ -120,6 +120,13 @@ def config_path(
     console.print(str(path))
 
 
+@app.command("menu")
+def menu_cmd() -> None:
+    """Launch the interactive guided menu."""
+    from secretary.tui import run_menu
+    run_menu()
+
+
 @app.command("paths")
 def paths_list() -> None:
     """List all configured extractor/wiki paths (resolved)."""
@@ -175,6 +182,17 @@ def wiki_build() -> None:
     """Build wiki HTML via engine build.py (staged instance layout)."""
     try:
         rc = run_wiki_build()
+    except FileNotFoundError as exc:
+        console.print(f"[red]Error:[/red] {exc}", stderr=True)
+        raise typer.Exit(1) from exc
+    raise typer.Exit(rc)
+
+
+@wiki_app.command("serve")
+def wiki_serve(port: int = typer.Option(8123, help="Port to serve the wiki on")) -> None:
+    """Serve the generated wiki HTML."""
+    try:
+        rc = run_wiki_serve(port)
     except FileNotFoundError as exc:
         console.print(f"[red]Error:[/red] {exc}", stderr=True)
         raise typer.Exit(1) from exc

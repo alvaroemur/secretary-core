@@ -36,7 +36,7 @@ export function loadObjectives(instance) {
         parent: fm.parent && fm.parent !== '—' ? fm.parent : null,
         entidad: fm.entidad && fm.entidad !== '—' ? fm.entidad : null,
         estado: fm.estado || 'sugerido',
-        origen: fm.origen || 'alvaro',
+        origen: fm.origen || 'user',
         ambito: fm.ambito || '',
         descripcion: bodyM ? bodyM[1].trim() : '',
         path,

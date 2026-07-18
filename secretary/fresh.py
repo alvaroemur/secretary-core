@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 from secretary.config import instance_root, load_config, resolve_path_key
 
 TZ = ZoneInfo("America/Lima")
-DEFAULT_REPO = "alvaroemur/cowork-secretary"
+DEFAULT_REPO = "yourusername/cowork-secretary"
 TACTIQ_ROOT = "1TE6Z1uhZo7YrwOnWvp83se3CCXHiCKt9"
 
 MODULE_ALIASES = {"reuniones": "meeting"}
@@ -101,7 +101,7 @@ def _gh_repo() -> str:
 
 def _personal_account() -> str:
     accounts = load_config().get("accounts") or {}
-    return accounts.get("personal", "alvaro.e.mur@gmail.com")
+    return accounts.get("personal", "your.personal.email@gmail.com")
 
 
 def git_fetch() -> None:

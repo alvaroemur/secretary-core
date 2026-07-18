@@ -10,7 +10,7 @@ from pathlib import Path
 
 from secretary.config import load_config
 
-DEFAULT_BRIEF_REPO = "alvaroemur/cowork-secretary"
+DEFAULT_BRIEF_REPO = "yourusername/cowork-secretary"
 DEFAULT_BRIEF_LABEL = "tipo:informe-diario"
 
 

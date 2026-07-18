@@ -7,7 +7,8 @@
     "login": "tsx login.ts",
     "fetch": "tsx fetch.ts",
     "link": "tsx link.ts",
-    "scan": "tsx scan.ts"
+    "scan": "tsx scan.ts",
+    "transcribe": "tsx transcribe.ts"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "7.0.0-rc.9",

@@ -1,7 +1,7 @@
 # secd — Secretary local daemon
 
 A tiny loopback-only HTTP server that exposes Secretary's context to a browser
-extension ([Axon](https://github.com/alvaroemur/axon)) while you read a WhatsApp
+extension ([Axon](https://github.com/yourusername/axon)) while you read a WhatsApp
 conversation, and accepts signals back into Secretary. It is the bridge defined
 in **Feature 007 — Axon × Secretary** (RFC in the instance repo at
 `_design/specs/007-axon-secretary-relay/spec.md`).

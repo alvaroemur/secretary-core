@@ -6,6 +6,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+.venv/
+venv/
 *.tmp
 *.swp
 .vite/
@@ -13,6 +15,9 @@ dist/
 build/output/
 wiki/articulos/
 wiki/output/
+playbooks/
+skills/
+
 
 # WhatsApp session credentials & personal data — NEVER commit (public repo)
 whatsapp/auth/

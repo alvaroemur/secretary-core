@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
-"""CI leak-guard: fail if any sensitive `redact` pattern survives in tracked files.
+"""CI leak-guard: fail if PII / sensitive literals leak into git-tracked files.
 
-Reads the anonymization map (``secretary/data/export_examples_map.yml``) — the same
-source of truth the exporter uses — and scans every git-TRACKED text file for the
-``redact`` patterns/regexes. If a sensitive literal or match is found in committed
-content, the guard exits non-zero and prints where.
+Detection is designed to work on a FRESH CLONE (CI), with no access to the private
+secrets file:
 
-`preserve` acts as an allowlist: a `redact` hit that falls entirely inside a preserved
-public string (e.g. the shared engine repo `alvaroemur/secretary-core`) is ignored.
+- GENERIC `detect` regexes from the committed public map
+  (``secretary/data/export_examples_map.yml``): any email, Google-Drive-style folder
+  id, and phone number. These catch accidental PII without needing the real values.
+- The `preserve` allowlist from the same map: public strings and the placeholder
+  values redaction produces (e.g. `alvaroemur/secretary-core`, `Álvaro`,
+  `your.personal.email@gmail.com`). A `detect` hit that sits inside a preserved
+  string is ignored.
 
-Excluded from the scan:
-  - the map file itself (it legitimately contains the literals, as the redact source);
-  - this guard script.
+When the PRIVATE secrets file (``export_examples_secrets.yml``, gitignored) IS
+present locally, the guard ALSO scans for those exact literals for precision.
+
+Skipped: the public map, the committed template, this script, dependency lock files
+(machine-generated hashes, not PII), and binary/unreadable files.
 
 Run: ``python scripts/ci/check_no_leaks.py`` (exit 0 = clean).
 """
@@ -28,15 +33,36 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MAP_REL = "secretary/data/export_examples_map.yml"
+TEMPLATE_REL = "export_examples_secrets.example.yml"
+SECRETS_REL = "export_examples_secrets.yml"
 SELF_REL = "scripts/ci/check_no_leaks.py"
 
-# Files that legitimately hold the raw literals and must be exempt from the scan.
-EXEMPT = {MAP_REL, SELF_REL}
+# Files exempt from scanning: they legitimately hold literals/patterns, or are
+# machine-generated dependency manifests full of hash-like tokens.
+EXEMPT_FILES = {MAP_REL, TEMPLATE_REL, SECRETS_REL, SELF_REL}
+LOCKFILE_NAMES = {
+    "uv.lock",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "poetry.lock",
+    "Cargo.lock",
+    "composer.lock",
+    "Gemfile.lock",
+}
 
 
-def _load_rules() -> tuple[list[dict[str, Any]], list[str]]:
-    data = yaml.safe_load((REPO_ROOT / MAP_REL).read_text(encoding="utf-8")) or {}
-    return (data.get("redact") or []), [str(x) for x in (data.get("preserve") or [])]
+def _load_map() -> dict[str, Any]:
+    return yaml.safe_load((REPO_ROOT / MAP_REL).read_text(encoding="utf-8")) or {}
+
+
+def _load_secret_literals() -> list[str]:
+    """Exact `pattern` literals from the private secrets file (empty if absent)."""
+    path = REPO_ROOT / SECRETS_REL
+    if not path.is_file():
+        return []
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return [r["pattern"] for r in (data.get("redact") or []) if r.get("pattern")]
 
 
 def _tracked_files() -> list[str]:
@@ -47,7 +73,14 @@ def _tracked_files() -> list[str]:
         text=True,
         check=True,
     ).stdout
-    return [line for line in out.splitlines() if line and line not in EXEMPT]
+    files = []
+    for line in out.splitlines():
+        if not line or line in EXEMPT_FILES:
+            continue
+        if Path(line).name in LOCKFILE_NAMES:
+            continue
+        files.append(line)
+    return files
 
 
 def _read_text(path: Path) -> str | None:
@@ -57,23 +90,8 @@ def _read_text(path: Path) -> str | None:
         return None  # binary or unreadable — skip
 
 
-def _match_spans(rule: dict[str, Any], line: str) -> list[tuple[int, int, str]]:
-    """Return (start, end, matched_text) for every hit of a rule on a line."""
-    spans: list[tuple[int, int, str]] = []
-    if rule.get("regex"):
-        for m in re.finditer(rule["regex"], line):
-            spans.append((m.start(), m.end(), m.group(0)))
-    elif rule.get("pattern"):
-        pat = rule["pattern"]
-        start = line.find(pat)
-        while start != -1:
-            spans.append((start, start + len(pat), pat))
-            start = line.find(pat, start + 1)
-    return spans
-
-
 def _inside_preserved(line: str, start: int, end: int, preserve: list[str]) -> bool:
-    """True if the [start,end) span sits entirely inside a preserved literal."""
+    """True if [start,end) sits entirely inside an occurrence of a preserved string."""
     for keep in preserve:
         idx = line.find(keep)
         while idx != -1:
@@ -84,32 +102,47 @@ def _inside_preserved(line: str, start: int, end: int, preserve: list[str]) -> b
 
 
 def main() -> int:
-    redact, preserve = _load_rules()
-    leaks: list[str] = []
+    data = _load_map()
+    preserve = [str(x) for x in (data.get("preserve") or [])]
+    detectors: list[tuple[str, re.Pattern[str]]] = [
+        (d.get("regex", ""), re.compile(d["regex"]))
+        for d in (data.get("detect") or [])
+        if d.get("regex")
+    ]
+    secret_literals = _load_secret_literals()
 
+    leaks: list[str] = []
     for rel in _tracked_files():
         text = _read_text(REPO_ROOT / rel)
         if text is None:
             continue
         for lineno, line in enumerate(text.splitlines(), start=1):
-            for rule in redact:
-                label = rule.get("pattern") or rule.get("regex")
-                for start, end, matched in _match_spans(rule, line):
-                    if _inside_preserved(line, start, end, preserve):
+            # Generic detectors (work without the private file).
+            for label, pat in detectors:
+                for m in pat.finditer(line):
+                    if _inside_preserved(line, m.start(), m.end(), preserve):
                         continue
-                    leaks.append(f"{rel}:{lineno}: `{matched}` (regla: {label})")
+                    leaks.append(f"{rel}:{lineno}: `{m.group(0)}` (detect: {label})")
+            # Exact private literals (only when the secrets file is present).
+            for lit in secret_literals:
+                start = line.find(lit)
+                while start != -1:
+                    if not _inside_preserved(line, start, start + len(lit), preserve):
+                        leaks.append(f"{rel}:{lineno}: `{lit}` (literal privado)")
+                    start = line.find(lit, start + 1)
 
+    mode = "con archivo privado" if secret_literals else "solo regex genéricas (CI)"
     if leaks:
-        print("LEAK GUARD: se encontraron literales sensibles en archivos trackeados:\n")
+        print(f"LEAK GUARD [{mode}]: literales sensibles en archivos trackeados:\n")
         for leak in leaks:
             print(f"  {leak}")
         print(
-            f"\n{len(leaks)} hallazgo(s). Redactá con el mapa "
-            f"({MAP_REL}) o agregá a `preserve` si es público."
+            f"\n{len(leaks)} hallazgo(s). Redactá vía el mapa/secrets de "
+            "export-examples, o agregá a `preserve` si es público."
         )
         return 1
 
-    print("LEAK GUARD: OK — sin literales sensibles en archivos trackeados.")
+    print(f"LEAK GUARD [{mode}]: OK — sin literales sensibles en archivos trackeados.")
     return 0
 
 

@@ -223,9 +223,9 @@ inicial) se hace el barrido inicial. Nunca asumir "primera corrida" por reflejo.
 
 Si es la primera corrida (estado.md sin ninguna corrida previa registrada), hacer un barrido inicial más amplio:
 - Arrancar por las carpetas de alto valor:
-  - `🚀 Vida profesional` (id: `0B5MZCWjdw2uaZXVhX3lBTnc5RjQ`) — proyectos, perfil, consultorías, contratos
-  - `🌱 Personal` (id: `0B5MZCWjdw2uaa21hODJzQTZjeU0`) — finanzas, ensayos, documentos
-  - `📂 Registros` (id: `10xeQmpeV9B1wMMHaJ8m459-AEg9lxbNV`) — Obsidian, registros
+  - `🚀 Vida profesional` (id: `YOUR_DRIVE_FOLDER_ID`) — proyectos, perfil, consultorías, contratos
+  - `🌱 Personal` (id: `YOUR_DRIVE_FOLDER_ID`) — finanzas, ensayos, documentos
+  - `📂 Registros` (id: `YOUR_DRIVE_FOLDER_ID`) — Obsidian, registros
 - Luego archivos sueltos en root que sean docs/sheets/presentations
 - En la primera corrida, procesar por **lotes** para no explotar tokens: empezar por los más recientes (últimos 6 meses), luego ir hacia atrás en corridas sucesivas.
 
@@ -246,10 +246,10 @@ Si es la primera corrida (estado.md sin ninguna corrida previa registrada), hace
 - `application/vnd.google-apps.folder` — solo como estructura
 
 **SKIP completo** (ni metadata):
-- Carpeta `🛡️ Backups antiguos` (id: `1rqkmpsr-9rdVOCn9ZoBxhgvIFGx2PWG-`)
-- Carpeta `Randomness` (id: `0B5MZCWjdw2uaeEVzQk5Zc08zOVk`)
+- Carpeta `🛡️ Backups antiguos` (id: `YOUR_DRIVE_FOLDER_ID`)
+- Carpeta `Randomness` (id: `YOUR_DRIVE_FOLDER_ID`)
 - Carpeta `Tactiq Transcription` (id: `YOUR_TACTIQ_FOLDER_ID`) — ya cubierta por reuniones-update
-- Carpeta `Meet Recordings` (id: `1UoUUTu2Lk49dsya-qeyvxNLjaPWDUs_s`) — videos, no legibles
+- Carpeta `Meet Recordings` (id: `YOUR_DRIVE_FOLDER_ID`) — videos, no legibles
 - Archivos con título "Untitled document" o "Untitled spreadsheet" — registrar pero no leer
 
 **SKIP de contenido — carpetas que son espejo de WIP local de Álvaro (feedback PR #59):**
@@ -446,7 +446,7 @@ Reescribir con:
 - Archivos con "password", "contraseña", "credential", "token", "key" en el título
 - Documentos financieros con montos específicos (registrar solo metadata)
 - Documentos legales personales (DNI, pasaporte, declaraciones) — solo metadata
-- El archivo "Passwords" (id: `1stGwzZn3Fq3RFor_LoadkXYSErLXyVk4eaGVct33abw`) — **SKIP absoluto**
+- El archivo "Passwords" (id: `YOUR_DRIVE_FOLDER_ID`) — **SKIP absoluto**
 - La carpeta `alvaro_keys/` en el root — **SKIP absoluto**
 
 Para estos, solo registrar: título, carpeta, tipo, fecha de modificación. Nada de contenido.

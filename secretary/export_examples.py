@@ -6,10 +6,18 @@ The engine keeps a public/private split:
 - ``playbooks.example/`` and ``skills.example/`` are committed, sanitized copies.
 
 This module deterministically regenerates the ``*.example`` dirs by copying every
-file from the real dir and applying the redaction map
-(``secretary/data/export_examples_map.yml``) to text files. Because it wipes and
-rebuilds the target dirs, drift between the real sources and the examples is
-impossible: the examples are always a pure function of (sources + map).
+file from the real dir and applying the redaction rules to text files. Because it
+wipes and rebuilds the target dirs, drift between the real sources and the examples
+is impossible: the examples are always a pure function of (sources + rules).
+
+Redaction rules come from TWO files, merged:
+
+- ``secretary/data/export_examples_map.yml`` — committed, PUBLIC. Only non-sensitive
+  rules (e.g. a generic phone regex) plus the `preserve` allowlist and `detect`
+  patterns for the leak-guard.
+- ``export_examples_secrets.yml`` — gitignored, PRIVATE. The real sensitive literals
+  (owner emails, private repo slugs, Drive folder ids). Absent on fresh clones / CI,
+  in which case the exporter warns and applies only the public rules.
 
 It NEVER touches ``docs/``, ``README.md``, or any other root doc — those are
 hand-authored prose.
@@ -17,10 +25,11 @@ hand-authored prose.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +44,15 @@ EXPORT_PAIRS: tuple[tuple[str, str], ...] = (
 )
 
 MAP_PATH = Path(__file__).resolve().parent / "data" / "export_examples_map.yml"
+SECRETS_FILENAME = "export_examples_secrets.yml"
+
+
+def secrets_path() -> Path:
+    """Private secrets file: `SECRETARY_EXPORT_SECRETS` env, else repo root."""
+    env = os.environ.get("SECRETARY_EXPORT_SECRETS")
+    if env:
+        return Path(env).expanduser()
+    return core_root() / SECRETS_FILENAME
 
 
 @dataclass(frozen=True)
@@ -51,10 +69,10 @@ class RedactRule:
         return text.replace(self.pattern, self.replacement)
 
 
-@dataclass(frozen=True)
+@dataclass
 class RedactionMap:
-    redact: list[RedactRule]
-    preserve: list[str]
+    redact: list[RedactRule] = field(default_factory=list)
+    preserve: list[str] = field(default_factory=list)
 
     def apply(self, text: str) -> str:
         for rule in self.redact:
@@ -62,14 +80,9 @@ class RedactionMap:
         return text
 
 
-def load_map(path: Path | None = None) -> RedactionMap:
-    """Parse the YAML redaction map into typed rules."""
-    src = path or MAP_PATH
-    if not src.is_file():
-        raise FileNotFoundError(f"No existe el mapa de anonimización: {src}")
-    data: dict[str, Any] = yaml.safe_load(src.read_text(encoding="utf-8")) or {}
+def _parse_rules(entries: Any) -> list[RedactRule]:
     rules: list[RedactRule] = []
-    for entry in data.get("redact") or []:
+    for entry in entries or []:
         if "replacement" not in entry:
             raise ValueError(f"Regla sin `replacement`: {entry!r}")
         if not (entry.get("pattern") or entry.get("regex")):
@@ -82,8 +95,39 @@ def load_map(path: Path | None = None) -> RedactionMap:
                 regex=entry.get("regex"),
             )
         )
-    preserve = [str(x) for x in (data.get("preserve") or [])]
-    return RedactionMap(redact=rules, preserve=preserve)
+    return rules
+
+
+def load_map(path: Path | None = None) -> RedactionMap:
+    """Parse the PUBLIC map (non-sensitive redact rules + preserve allowlist)."""
+    src = path or MAP_PATH
+    if not src.is_file():
+        raise FileNotFoundError(f"No existe el mapa público: {src}")
+    data: dict[str, Any] = yaml.safe_load(src.read_text(encoding="utf-8")) or {}
+    return RedactionMap(
+        redact=_parse_rules(data.get("redact")),
+        preserve=[str(x) for x in (data.get("preserve") or [])],
+    )
+
+
+def load_secrets(path: Path | None = None) -> list[RedactRule]:
+    """Parse the PRIVATE secrets file's redact rules. Empty if absent."""
+    src = path or secrets_path()
+    if not src.is_file():
+        return []
+    data: dict[str, Any] = yaml.safe_load(src.read_text(encoding="utf-8")) or {}
+    return _parse_rules(data.get("redact"))
+
+
+def build_redaction() -> tuple[RedactionMap, bool]:
+    """Merge private (first) + public redact rules. Returns (map, secrets_present)."""
+    public = load_map()
+    private = load_secrets()
+    merged = RedactionMap(
+        redact=private + public.redact,  # private literals win; public phone regex last
+        preserve=public.preserve,
+    )
+    return merged, bool(private)
 
 
 def _is_binary(path: Path) -> bool:
@@ -142,8 +186,17 @@ def export_examples(*, check: bool = False) -> tuple[int, list[str]]:
     in check mode, on any drift.
     """
     root = core_root()
-    redaction = load_map()
+    redaction, secrets_present = build_redaction()
     messages: list[str] = []
+
+    if not secrets_present:
+        messages.append(
+            f"⚠️  ADVERTENCIA: no se encontró {secrets_path()} — "
+            "se aplican SOLO las reglas públicas (regex genéricas). "
+            "Las redacciones de literales sensibles (emails, ids de Drive, repos "
+            "privados) NO se aplicarán. Copiá export_examples_secrets.example.yml "
+            "a export_examples_secrets.yml con tus valores reales."
+        )
 
     missing = [src for src, _ in EXPORT_PAIRS if not (root / src).is_dir()]
     if missing:

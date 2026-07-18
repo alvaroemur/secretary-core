@@ -83,8 +83,8 @@ The engine keeps a public/private split: `playbooks/` and `skills/` are gitignor
 `secretary core export-examples` regenerates the `.example` dirs deterministically:
 
 - Wipes and rebuilds `playbooks.example/` from `playbooks/` and `skills.example/` from
-  `skills/`, so drift is impossible (examples = a pure function of sources + map).
-- Applies the anonymization map to every **text** file (binaries copied verbatim).
+  `skills/`, so drift is impossible (examples = a pure function of sources + rules).
+- Applies the redaction rules to every **text** file (binaries copied verbatim).
 - Never touches `docs/`, `README.md`, `CLAUDE.md`, `AGENTS.md`, or `CONTRIBUTING.md`
   (hand-authored prose).
 - If a real source dir is missing it **stops** (exit 2) instead of writing garbage — so
@@ -93,12 +93,36 @@ The engine keeps a public/private split: `playbooks/` and `skills/` are gitignor
   exiting non-zero on any difference. Use it as a pre-commit gate after editing the real
   playbooks/skills.
 
-The substitution map is the single source of truth: `secretary/data/export_examples_map.yml`
-(commented `redact:` + `preserve:` sections). Edit it — not the code — to change policy.
+### Public map vs private secrets (no sensitive literals in the repo)
 
-The CI **leak-guard** `scripts/ci/check_no_leaks.py` scans git-tracked files for the map's
-`redact` patterns and fails if any sensitive literal survives (allowlisting `preserve`).
-It runs in `.github/workflows/ci.yml` on every push/PR.
+The redaction config is **split** so the public repo never contains real sensitive
+literals:
+
+| File | Committed? | Holds |
+|------|-----------|-------|
+| `secretary/data/export_examples_map.yml` | ✅ public | `detect:` (generic PII regexes for the guard), `redact:` (only non-sensitive rules, e.g. a generic phone regex), and the `preserve:` allowlist (`Álvaro`, `alvaroemur/secretary-core`, and the placeholder values). |
+| `export_examples_secrets.yml` | ❌ **gitignored** | the REAL literals → placeholders (owner emails, the private instance repo slug + other instance-specific repo slugs, Drive mount path, Tactiq + other Drive folder ids). |
+| `export_examples_secrets.example.yml` | ✅ public | template (placeholders only) documenting the private-file schema. |
+
+Set up the private file once (per clone):
+
+```bash
+cp export_examples_secrets.example.yml export_examples_secrets.yml
+# edit export_examples_secrets.yml with your real values (it is in .gitignore)
+```
+
+The exporter merges **private rules first, then public rules**. If the private file is
+absent (fresh clone / CI), it still runs the public rules but prints a clear **WARNING**
+that sensitive redactions were skipped — so you never silently ship un-redacted examples.
+
+### CI leak-guard
+
+`scripts/ci/check_no_leaks.py` scans git-tracked files and fails on leaked PII. It works
+**without** the private file by using the map's generic `detect:` regexes (any email,
+Google-Drive-style folder id, phone) plus the `preserve:` allowlist to avoid flagging the
+public placeholders. When the private file **is** present locally it also scans for those
+exact literals for precision. It skips the public map, the template, itself, dependency
+lock files, and binaries. Runs in `.github/workflows/ci.yml` on every push/PR.
 
 ## Routines setup
 

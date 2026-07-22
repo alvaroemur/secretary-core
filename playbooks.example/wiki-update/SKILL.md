@@ -494,15 +494,123 @@ La wiki no sólo agrega *contenido* (personas, orgs, temas) sino que **funciona 
 
 Convenciones:
 
-- Categoría: `modulos`. Slug: nombre del submódulo (`correo`, `reuniones`, `calendario`, `drive`, `job-search`).
+- Categoría: `modulos`. Slug: nombre del submódulo (`correo`, `reuniones`, `calendario`, `drive`, `job-search`) o del agente de infraestructura (`wiki-update`, `sec-heartbeat`, `dispatch`, `housekeeping`).
 - `tipo: modulo`.
 - Sección obligatoria *Reportes y memorias*: lista con cada archivo relevante del módulo (path absoluto + breve descripción). Mantén esta lista regenerada cada corrida — si aparecen archivos nuevos en `memory/` o equivalente, agrégalos; si desaparecieron, márcalos como inactivos en lugar de borrarlos.
-- Sección *Última sincronización*: fecha de la corrida más reciente que leyó este módulo + resumen 1-línea.
+- Sección *Historial de ejecución y métricas* — auto-inyectada, ver Paso 4.2.
+- Sección *Ramas y PRs* — auto-inyectada, ver Paso 4.3.
+- Sección *Última sincronización con la wiki* — auto-inyectada, ver Paso 4.4. Reemplaza al llenado a mano que tenían `correo.md`/`reuniones.md` desde 2026-05; a partir de esta corrida las tres secciones se generan igual **para todos** los artículos de módulo (lectores e infraestructura), no sólo esos dos.
 - Mantén `articulos/modulos/_index.md` como portal: tabla con módulo, estado, última sincronización, enlace.
 
-El **calendario** y **drive**, aunque no son carpetas en `secretary/`, también tienen su artículo bajo `modulos/` (calendario referencia el MCP y la cuenta usada; drive referencia `secretary/knowledge/wiki/memory/fuentes-drive.md`).
+El **calendario** y **drive**, aunque no son carpetas en `secretary/`, también tienen su artículo bajo `modulos/` (calendario referencia el MCP y la cuenta usada; drive referencia `secretary/knowledge/wiki/memory/fuentes-drive.md`). Calendario no tiene rutina propia (lo corre `wiki-update` directo vía MCP) — sus secciones 4.2/4.3 se marcan `N/A` (ver mapeo abajo).
 
 Si un módulo nuevo aparece en `secretary/` y no está documentado aquí, **no lo proceses como fuente de datos** (regla del Paso 0/Paso 1) pero **sí crea su artículo en `modulos/`** con `Estado: candidata, pendiente de confirmación` para que Álvaro lo vea desde la wiki.
+
+### Paso 4.1 — Mapeo módulo → rutina(s) / rama / repo
+
+Antes de leer métricas o ramas necesitas saber, por cada artículo de `modulos/`, qué `routine_id` lo alimenta (para `latest-*.meta.json` y `metrics.jsonl`) y qué prefijo de rama/repo usar para PRs. La fuente de verdad del `routine_id` es el campo `routine:` de `extractors/<módulo>/contract.yaml` o `loops/<módulo>/contract.yaml` cuando ese archivo existe (Paso 0/015-module-contract); para los agentes de infraestructura (sin contract.yaml) usa esta tabla fija:
+
+| Artículo (`modulos/<slug>`) | `routine_id` (metrics/latest) | Prefijo de rama | Repo de PRs |
+|---|---|---|---|
+| `correo` | `revision-correo` (contract.yaml) | `correo/auto-` | instancia (`$OWNER/$NAME`) |
+| `reuniones` | `reuniones-update` (contract.yaml); también `reuniones-scheduler` (poller mecánico, sin PR propio) | `reuniones/auto-` | instancia (`$OWNER/$NAME`) |
+| `drive` | `drive-crawler` (contract.yaml) | `drive/auto-` | instancia (`$OWNER/$NAME`) |
+| `whatsapp` | `whatsapp-monitor` (contract.yaml) — **pausado**, ver nota abajo | `whatsapp/auto-` | instancia (`$OWNER/$NAME`) |
+| `job-search` | `job-search-crawler` (contract.yaml) | `loops/job-search/auto-` | instancia (`$OWNER/$NAME`) |
+| `calendario` | — (sin rutina propia, corre inline en wiki-update vía MCP) | N/A | N/A |
+| `wiki-update` | `wiki-update` | `wiki/auto-` | instancia (`$OWNER/$NAME`) |
+| `sec-heartbeat` | `sec-heartbeat` | N/A (main-only, nunca abre PR — ver su propio artículo) | — |
+| `housekeeping` | `housekeeping` (contract.yaml si existe) + `tidy-up` (poller mecánico) | `housekeeping/auto-` | instancia (`$OWNER/$NAME`) |
+| `dispatch` | `dispatch-executor` | sin prefijo fijo — cada PR vive en el repo destino del issue `dispatch:execute`, rama la que ese repo use | allowlist de `dispatch.executor.repos` en `$REPO/.secretary.yml` (lista `{repo, path}`) |
+
+**whatsapp — nota:** el `contract.yaml` documenta la rutina retirada (`whatsapp-monitor`, Baileys, sin `auth/` desde ~2026-05-20); la captura actual es event-driven vía Axon→`secd` y no genera `latest-whatsapp-monitor.meta.json` nuevo. Si no hay meta reciente (`mtime` > 30 días o inexistente), la sección 4.2 debe decir explícitamente "sin corridas programadas — captura event-driven vía Axon" en vez de reportar datos viejos como si fueran actuales.
+
+Si `contract.yaml` no existe para un módulo lector y la tabla tampoco lo cubre, no inventes un `routine_id`: deja las secciones 4.2/4.3 con "routine_id no determinado — revisar mapeo en Paso 4.1 de este SKILL" y repórtalo al final (Paso 7).
+
+### Paso 4.2 — Historial de ejecución y métricas (última corrida + acumulado mensual)
+
+**Importante:** `subsystem/routines/latest/` y `subsystem/routines/metrics/metrics.jsonl` están en `.gitignore` (bookkeeping local, no versionado) — no existen en `$WT` (que parte de `origin/main`). Léelos siempre de `$REPO` (la instancia principal, `~/.secretary`), nunca del worktree.
+
+**Última corrida** — por cada `routine_id` de la tabla 4.1:
+
+```bash
+META="$REPO/subsystem/routines/latest/latest-<routine_id>.meta.json"
+[ -f "$META" ] && jq '{status, started_at, ended_at, duration_ms, cost: .cost.estimated_usd, trigger, exit_code}' "$META" || echo "sin latest-*.meta.json aún"
+```
+
+**Acumulado mensual** — filtra `metrics.jsonl` por `routine_id` y por el mes en curso (`YYYY-MM`, según la fecha fijada en Paso 0):
+
+```bash
+MES="2026-07"  # usar la variable de fecha del Paso 0, no hardcodear
+jq -s --arg rid "<routine_id>" --arg mes "$MES" '
+  [.[] | select(.routine_id == $rid and (.started_at // "" | startswith($mes)))] as $runs |
+  {
+    ejecuciones: ($runs | length),
+    exitosas: ([$runs[] | select(.status == "success")] | length),
+    costo_usd: ([$runs[].cost.estimated_usd] | add // 0 | (. * 1000 | round / 1000)),
+    duracion_prom_ms: (if ($runs | length) > 0 then ([$runs[].duration_ms] | add / length | round) else null end)
+  }' "$REPO/subsystem/routines/metrics/metrics.jsonl"
+```
+
+Con ambos resultados, escribe/actualiza la sección del artículo:
+
+```markdown
+## Historial de ejecución y métricas
+
+<!-- auto:metrics -->
+**Última corrida** (YYYY-MM-DD HH:MM): `status` · duración `Xs` · costo estimado `$X.XX` · trigger `launchd|manual|cron`.
+
+**Acumulado de MES 2026**: N ejecuciones, N exitosas (X% éxito), costo total estimado $X.XX, duración promedio Xs.
+```
+
+Si no hay `latest-*.meta.json` ni entradas en `metrics.jsonl` para ese `routine_id` (rutina nueva o pausada), escribe "Sin corridas registradas todavía" (o la nota de whatsapp del Paso 4.1) — nunca inventes cifras.
+
+### Paso 4.3 — Ramas y PRs activos
+
+Para los módulos con prefijo de rama definido en la tabla 4.1 (repo de la instancia, mismo `$OWNER`/`$NAME` calculados en W0):
+
+```bash
+PREFIJO="correo/auto-"   # de la tabla 4.1
+gh pr list --repo "$OWNER/$NAME" --state open --json number,headRefName,createdAt \
+  --jq --arg p "$PREFIJO" '[.[] | select(.headRefName | startswith($p))]'
+gh pr list --repo "$OWNER/$NAME" --state merged --json number,headRefName,mergedAt --limit 5 \
+  --jq --arg p "$PREFIJO" '[.[] | select(.headRefName | startswith($p))] | sort_by(.mergedAt) | reverse | .[0]'
+```
+
+Para **dispatch** (sin prefijo fijo, multi-repo): recorre `dispatch.executor.repos` de `$REPO/.secretary.yml` y por cada `repo` cuenta issues abiertos con label `dispatch:execute` + PRs abiertos que referencien `Closes #` de esos issues:
+
+```bash
+for R in $(yq -r '.dispatch.executor.repos[].repo' "$REPO/.secretary.yml"); do
+  echo "== $R =="
+  gh issue list --repo "$R" --label dispatch:execute --state open --json number,title
+  gh pr list --repo "$R" --state open --json number,title,headRefName --search "Closes in:body"
+done
+```
+
+Para **calendario** y **sec-heartbeat** (sin PRs, ver tabla 4.1): la sección se escribe como una línea fija, sin ejecutar `gh` — "N/A — módulo sin PRs propios (ver Paso 4.1)".
+
+Escribe/actualiza la sección:
+
+```markdown
+## Ramas y PRs
+
+<!-- auto:branches -->
+**Abiertos**: PR #N (`rama`, abierto YYYY-MM-DD) — o "ninguno".
+**Último mergeado**: PR #N (`rama`, mergeado YYYY-MM-DD) — o "sin mergeados registrados".
+```
+
+### Paso 4.4 — Última sincronización con la wiki
+
+Cierra las tres secciones con la línea de sincronización de **esta** corrida (formato ya usado en `correo.md`/`reuniones.md`, ahora aplicado a todos los artículos de `modulos/`):
+
+```markdown
+## Última sincronización con la wiki
+
+<!-- auto:sync -->
+YYYY-MM-DD — PR #N (wiki) mergeado/abierto esta corrida. <resumen 1 línea: items integrados de este módulo, o "sin ítems nuevos">.
+```
+
+Antepón la línea nueva a las anteriores (no las borres — es el mismo historial append-only que ya llevaban `correo.md`/`reuniones.md`); si el archivo crece demasiado, es aceptable truncar entradas de más de ~6 meses a un resumen de una línea por mes, nunca borrar sin dejar rastro.
 
 ## Paso 5 — Registrar cambios
 

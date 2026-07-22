@@ -342,6 +342,22 @@ def dream_collect(
     raise typer.Exit(run_collect(write_collect=write_collect))
 
 
+@dream_app.command("emit-metrics")
+def dream_emit_metrics(
+    since: Annotated[
+        Optional[str],
+        typer.Option("--since", help="Fecha ISO (Lima) desde la que buscar la sesión — default hoy."),
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Reportar sin escribir el ledger.")
+    ] = False,
+) -> None:
+    """Append this sec-dream run to metrics.jsonl (issue #24) via el backfill de sesiones Claude."""
+    from secretary.dream import run_emit_metrics
+
+    raise typer.Exit(run_emit_metrics(since=since, dry_run=dry_run))
+
+
 @modules_app.command("list")
 def modules_list(
     out_fmt: OutputFormat = typer.Option(

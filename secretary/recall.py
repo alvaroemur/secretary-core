@@ -79,37 +79,36 @@ def _kind_for(path: Path, roots: dict[str, Path]) -> str:
 
 
 def _iter_search_files() -> list[Path]:
-    files: list[Path] = []
+    files: set[Path] = set()
     inst = instance_root()
     cfg = load_config()
     resolved = all_resolved_paths(cfg)
 
     wiki = resolved.get("wiki.articles")
     if wiki and wiki.is_dir():
-        files.extend(wiki.rglob("*.md"))
+        files.update(wiki.rglob("*.md"))
 
     for key, root in resolved.items():
         if not key.endswith(".memory") or not root.is_dir():
             continue
         for p in root.rglob("*"):
             if p.is_file() and p.suffix in {".md", ".txt"}:
-                files.append(p)
+                files.add(p)
 
     hb = resolved.get("operations.heartbeat")
     if hb and hb.is_dir():
         latest = hb / "latest.md"
         if latest.is_file():
-            files.append(latest)
+            files.add(latest)
         for p in sorted(hb.glob("*.md"), reverse=True)[:3]:
-            if p.name != "latest.md" and p not in files:
-                files.append(p)
+            if p.name != "latest.md":
+                files.add(p)
 
     # acciones.md often lives beside memory/
     for acc in inst.glob("extractores/*/memory/acciones.md"):
-        if acc not in files:
-            files.append(acc)
+        files.add(acc)
 
-    return files
+    return list(files)
 
 
 def search(query: str, limit: int = MAX_RESULTS) -> list[RecallHit]:
@@ -152,23 +151,21 @@ def search(query: str, limit: int = MAX_RESULTS) -> list[RecallHit]:
     return hits[:limit]
 
 
-def format_table(hits: list[RecallHit]) -> str:
-    from rich.console import Console
+def format_table(hits: list[RecallHit]):
     from rich.table import Table
+    from rich.markup import escape
 
-    table = Table(show_header=True, header_style="bold")
-    table.add_column("score", justify="right", width=6)
-    table.add_column("kind", width=10)
-    table.add_column("source")
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("score", justify="right", width=6, style="dim")
+    table.add_column("kind", width=12, style="magenta")
+    table.add_column("source", style="green")
     table.add_column("snippet")
 
     for h in hits:
-        table.add_row(str(h.score), h.kind, h.source, h.snippet.replace("\n", " ")[:120])
+        raw_snippet = h.snippet.replace("\n", " ")[:140]
+        table.add_row(str(h.score), h.kind, h.source, escape(raw_snippet))
 
-    console = Console()
-    with console.capture() as capture:
-        console.print(table)
-    return capture.get()
+    return table
 
 
 def format_json(hits: list[RecallHit]) -> str:

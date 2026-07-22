@@ -46,7 +46,7 @@ PORTAL_DIR = INSTANCE_ROOT / "scripts" / "portal"
 SKIP_ROUTINES = {"sec-heartbeat", "reuniones-scheduler"}
 ISSUE_ONLY_ROUTINES = {"secretary-briefing"}
 
-DEFAULT_REPO = "alvaroemur/cowork-secretary"
+DEFAULT_REPO = "yourusername/cowork-secretary"
 
 
 def _load_aggregate_module():

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -15,8 +16,10 @@ from zoneinfo import ZoneInfo
 from secretary.config import instance_root, load_config, resolve_path_key
 
 TZ = ZoneInfo("America/Lima")
-DEFAULT_REPO = "alvaroemur/cowork-secretary"
-TACTIQ_ROOT = "1TE6Z1uhZo7YrwOnWvp83se3CCXHiCKt9"
+DEFAULT_REPO = "yourusername/cowork-secretary"
+# Public engine must not hardcode a private Drive folder id. The real value is
+# instance-specific and resolved at runtime by `_tactiq_root()` (see below).
+TACTIQ_ROOT_PLACEHOLDER = "YOUR_TACTIQ_FOLDER_ID"
 
 MODULE_ALIASES = {"reuniones": "meeting"}
 
@@ -101,7 +104,26 @@ def _gh_repo() -> str:
 
 def _personal_account() -> str:
     accounts = load_config().get("accounts") or {}
-    return accounts.get("personal", "alvaro.e.mur@gmail.com")
+    return accounts.get("personal", "your.personal.email@gmail.com")
+
+
+def _tactiq_root() -> str:
+    """Resolve the Tactiq Drive root id from the instance (never hardcoded here).
+
+    Order: instance meetings layout (`_drive_layout.json` → `tactiq_root_id`), then
+    the `SECRETARY_TACTIQ_ROOT` env var, else a public placeholder. Mirrors the
+    placeholder+resolver convention used by `_gh_repo` / `_personal_account`.
+    """
+    try:
+        layout = resolve_path_key("meetings.memory") / "_drive_layout.json"
+        if layout.is_file():
+            data = json.loads(layout.read_text(encoding="utf-8"))
+            rid = data.get("tactiq_root_id")
+            if rid:
+                return str(rid)
+    except (KeyError, OSError, json.JSONDecodeError):
+        pass
+    return os.environ.get("SECRETARY_TACTIQ_ROOT", TACTIQ_ROOT_PLACEHOLDER)
 
 
 def git_fetch() -> None:
@@ -292,7 +314,8 @@ def _mail_fuente_viva() -> dict[str, Any]:
 
 
 def _meeting_fuente_viva() -> dict[str, Any]:
-    out: dict[str, Any] = {"gog_available": _gog_available(), "tactiq_root": TACTIQ_ROOT}
+    tactiq_root = _tactiq_root()
+    out: dict[str, Any] = {"gog_available": _gog_available(), "tactiq_root": tactiq_root}
     proc = git_show_main(_procesados_jsonl("meeting"))
     if proc:
         for line in reversed(proc.splitlines()):
@@ -315,7 +338,7 @@ def _meeting_fuente_viva() -> dict[str, Any]:
             "gog",
             "drive",
             "ls",
-            f"--parent={TACTIQ_ROOT}",
+            f"--parent={tactiq_root}",
             "--json",
             "--account",
             acc,

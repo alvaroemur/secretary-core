@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # deploy-output.sh — publica el HTML generado (wiki/output) al repo que Cloudflare
-# Pages despliega (alvaroemur/wiki). ÚNICO punto de push a ese remote: está permitido
+# Pages despliega (yourusername/wiki). ÚNICO punto de push a ese remote: está permitido
 # de forma exacta en ~/.claude/settings.json para que el deploy de la wiki no promptee
 # ni lo frene el clasificador de auto-mode. No amplía permisos a otros repos.
 #
@@ -13,7 +13,7 @@ cd "$OUT"
 
 if [ ! -d .git ]; then
   git init -q
-  git remote add origin git@github.com:alvaroemur/wiki.git
+  git remote add origin git@github.com:yourusername/wiki.git
 fi
 
 git add -A

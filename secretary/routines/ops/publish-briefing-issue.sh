@@ -9,7 +9,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_layout.sh"
 BODY_FILE="${1:?usage: publish-briefing-issue.sh <body-file> [date] [dow]}"
 TODAY="${2:-$(date '+%Y-%m-%d')}"
 DOW="${3:-$(date '+%A')}"
-REPO=alvaroemur/cowork-secretary
+REPO="${SECRETARY_REPO:-yourusername/cowork-secretary}"
 
 MARK=$(~/.claude/scripts/sec-signature.sh secretary-briefing --mark)
 FOOT=$(~/.claude/scripts/sec-signature.sh secretary-briefing --footer)
@@ -21,7 +21,7 @@ NEW=$(gh issue create \
   --repo "$REPO" \
   --title "📋 Briefing — $TODAY ($DOW)" \
   --label "tipo:informe-diario" \
-  --assignee alvaroemur \
+  --assignee "${BRIEF_ASSIGNEE:-yourusername}" \
   --body "$BODY")
 
 NEW_NUM=$(echo "$NEW" | grep -oE '[0-9]+$')

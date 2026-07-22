@@ -1,0 +1,67 @@
+# export_examples_map.yml — PUBLIC anonymization config for `secretary core export-examples`
+#
+# This file is COMMITTED and public. It holds ONLY non-sensitive content:
+#   - `detect:`   generic patterns the CI leak-guard uses to catch PII (emails,
+#                 Drive-style ids, phones) WITHOUT needing the real literals.
+#   - `redact:`   substitution rules whose *pattern is itself non-sensitive*
+#                 (e.g. a generic phone regex). Applied by the exporter.
+#   - `preserve:` allowlist of public strings that must survive and must NOT be
+#                 flagged by `detect` (the owner's name, the shared engine repo,
+#                 and the placeholder values the redactions produce).
+#
+# The REAL sensitive literals (owner emails, private repo slugs, Drive folder ids,
+# the Drive mount path, phone numbers) live in a SEPARATE, gitignored file so they
+# never enter the public repo:
+#
+#   export_examples_secrets.yml            (gitignored — the owner's real values)
+#   export_examples_secrets.example.yml    (committed template — placeholders only)
+#
+# The exporter merges (private redact rules) + (public redact rules) and applies
+# them. If the private file is absent (fresh clone / CI), the exporter still runs
+# the public rules but prints a WARNING that sensitive redactions were skipped.
+#
+# DESIGN NOTES:
+#   - NEVER add a real sensitive literal here — put it in the private secrets file.
+#   - NEVER use a blanket `alvaroemur` → `yourusername` rule anywhere: it would
+#     corrupt the public engine repo `alvaroemur/secretary-core`. Redact rules are
+#     SPECIFIC full literals (in the private file), never the bare username.
+
+# detect: generic regexes for the leak-guard. Each should catch a CLASS of PII so
+# CI protects the repo even on a fresh clone without the private literals.
+detect:
+  - regex: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+    note: "Any email address. Public placeholder/example addresses are allowlisted below."
+  - regex: '\b(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*[0-9])[01][A-Za-z0-9_-]{25,}\b'
+    note: >-
+      Google Drive / Tactiq-style folder id: starts with 0 or 1, length >= 26,
+      mixed upper+lower+digit. Excludes hex hashes (no uppercase) and UUIDs
+      (no uppercase). Lock files are skipped by the guard to avoid base64 hits.
+  - regex: '\+\d{2,3}[\s.\-]?\d{3}[\s.\-]?\d{3}[\s.\-]?\d{3}'
+    note: "International phone numbers (e.g. +51 9-digit). Placeholder is allowlisted."
+
+# redact: rules whose pattern is non-sensitive, safe to commit. Applied by the
+# exporter AFTER the private rules. (Real literals live in the private file.)
+redact:
+  - regex: '\+51[\s.\-]?\d{3}[\s.\-]?\d{3}[\s.\-]?\d{3}'
+    replacement: "+00 000 000 000"
+    note: >-
+      Peruvian (+51) mobile numbers, 9-digit national format. Generic regex with
+      no real number, so it is safe to keep in the public map.
+
+# preserve: public strings + the placeholder values our redactions produce. The
+# guard treats these as an allowlist so `detect` never flags them.
+preserve:
+  # -- genuinely public, must survive verbatim in the examples --
+  - "alvaroemur/secretary-core"  # PUBLIC engine repo — everyone clones it. Keep.
+  - "Álvaro"                     # Owner's name. Public; shows real-world usage. Keep.
+  # -- placeholder / example values produced by redaction (non-sensitive) --
+  - "GoogleDrive-your.personal.email@gmail.com"  # Drive mount placeholder (greedy email match)
+  - "your.personal.email@gmail.com"
+  - "your.work.email@company.com"
+  - "dest@example.com"
+  - "cc@example.com"
+  - "sender@example.com"
+  - "git@github.com"             # appears in `git@github.com:...` remote URLs
+  - "YOUR_TACTIQ_FOLDER_ID"
+  - "YOUR_DRIVE_FOLDER_ID"
+  - "+00 000 000 000"

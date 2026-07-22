@@ -12,7 +12,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_layout.sh"
 
 INSTANCE="${SECRETARY_INSTANCE:-$HOME/.secretary}"
 RUN_SCRIPT="$ROUTINES_ROOT/run-routine.sh"
-REPO="${SECRETARY_REPO:-alvaroemur/cowork-secretary}"
+REPO="${SECRETARY_REPO:-yourusername/cowork-secretary}"
 LOG_DIR="$("$ROUTINES_ROOT/routines-log-dir.sh")"
 TODAY="$(date '+%Y-%m-%d')"
 DOW="$(date '+%u')" # 1=Mon … 7=Sun

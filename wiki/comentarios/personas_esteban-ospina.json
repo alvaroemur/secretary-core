@@ -1,0 +1,31 @@
+[
+  {
+    "id": "c-20260509-715",
+    "anchor": null,
+    "comment": "El correo está bien, pero está relacionado con Esmeralda Ospina. El nombre \"Esteban\" parece inventado.",
+    "author": "alvaro",
+    "created": "2026-05-09T17:57:36.324Z",
+    "status": "open",
+    "replies": []
+  },
+  {
+    "id": "c-20260509-597",
+    "type": "merge",
+    "anchor": null,
+    "comment": "El contenido corresponde a Luna Rondón. Lo que pasa es que ella ha heredado el correo de Esmeralda Ospina (la antigua administrativa) y eso genera confusión.",
+    "author": "alvaro",
+    "created": "2026-05-09T17:59:21.968Z",
+    "status": "open",
+    "replies": [],
+    "merge": {
+      "target": {
+        "slug": "personas/luna-rondon",
+        "title": "Luna Rondón"
+      },
+      "source": {
+        "slug": "personas/esteban-ospina",
+        "title": "Esteban Ospina"
+      }
+    }
+  }
+]

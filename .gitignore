@@ -6,6 +6,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+.venv/
+venv/
 *.tmp
 *.swp
 .vite/
@@ -13,6 +15,13 @@ dist/
 build/output/
 wiki/articulos/
 wiki/output/
+playbooks/
+skills/
+
+# Private redaction literals for `secretary core export-examples` — NEVER commit
+# (real emails, repo slugs, Drive folder ids). Template: *.example.yml.
+export_examples_secrets.yml
+
 
 # WhatsApp session credentials & personal data — NEVER commit (public repo)
 whatsapp/auth/

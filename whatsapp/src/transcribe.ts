@@ -10,11 +10,13 @@ const TRANSCRIPTS_DIR = path.join(INBOX_DIR, "transcripts");
 
 const args = process.argv.slice(2);
 let inputPath = "";
+let outputPath = "";
 let lang = "es";
 let model = "whisper-1";
 let allMissing = false;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "-i") inputPath = args[++i];
+  else if (args[i] === "-o") outputPath = args[++i];
   else if (args[i] === "-l") lang = args[++i];
   else if (args[i] === "--model") model = args[++i];
   else if (args[i] === "--all-missing") allMissing = true;
@@ -34,8 +36,14 @@ async function transcribeFile(audioPath: string): Promise<string> {
   for await (const c of stream) chunks.push(c as Buffer);
   const fileBuf = Buffer.concat(chunks);
 
+  const ext = path.extname(filename).toLowerCase();
+  let mimeType = "audio/ogg";
+  if (ext === ".mp3") mimeType = "audio/mpeg";
+  else if (ext === ".wav") mimeType = "audio/wav";
+  else if (ext === ".m4a") mimeType = "audio/mp4";
+  
   const form = new FormData();
-  form.append("file", new Blob([fileBuf], { type: "audio/ogg" }), filename);
+  form.append("file", new Blob([fileBuf], { type: mimeType }), filename);
   form.append("model", model);
   form.append("language", lang);
 
@@ -54,11 +62,11 @@ async function transcribeFile(audioPath: string): Promise<string> {
 
 function transcriptPathFor(audioPath: string): string {
   const rel = path.relative(MEDIA_DIR, audioPath);
-  return path.join(TRANSCRIPTS_DIR, rel.replace(/\.ogg$/, ".txt"));
+  return path.join(TRANSCRIPTS_DIR, rel.replace(/\.[^/.]+$/, ".txt"));
 }
 
-async function processOne(audioPath: string): Promise<void> {
-  const outPath = transcriptPathFor(audioPath);
+async function processOne(audioPath: string, customOutPath?: string): Promise<void> {
+  const outPath = customOutPath || transcriptPathFor(audioPath);
   await fs.mkdir(path.dirname(outPath), { recursive: true });
   console.log(`→ ${path.relative(INBOX_DIR, audioPath)}`);
   const text = await transcribeFile(audioPath);
@@ -96,10 +104,10 @@ async function main() {
     return;
   }
   if (!inputPath) {
-    console.error("Uso: tsx transcribe.ts -i <ruta.ogg> [-l es] [--model whisper-1]\n       tsx transcribe.ts --all-missing");
+    console.error("Uso: tsx transcribe.ts -i <ruta.ogg> [-o <ruta_txt>] [-l es] [--model whisper-1]\n       tsx transcribe.ts --all-missing");
     process.exit(1);
   }
-  await processOne(path.resolve(inputPath));
+  await processOne(path.resolve(inputPath), outputPath ? path.resolve(outputPath) : undefined);
 }
 
 main().catch((e) => { console.error(e?.message ?? e); process.exit(1); });

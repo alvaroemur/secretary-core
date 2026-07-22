@@ -10,9 +10,9 @@ La detección de referencias rotas/orphans NO vive aquí: es trabajo de
 `scripts/ci/validate_wikilinks.py` (que sabe distinguir grandfathered /
 pendiente_wiki / tolerada). Duplicarla reintroduciría ruido ya resuelto.
 
-Resuelve la ruta de la instancia vía SECRETARY_INSTANCE (default ~/.secretary),
-sin __file__. Excluye `_index` y `alvaro-mur` del cómputo de co-ocurrencia
-(hubs que distorsionan: Álvaro aparece en casi todo artículo).
+# Resuelve la ruta de la instancia vía SECRETARY_INSTANCE (default ~/.secretary),
+# sin __file__. Excluye `_index` y el perfil del usuario del cómputo de co-ocurrencia
+# (hubs que distorsionan: el usuario aparece en casi todo artículo).
 """
 import os
 import re
@@ -25,7 +25,7 @@ ARTICULOS = INSTANCE / "wiki" / "articulos"
 
 WIKILINK = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
 # hubs excluidos del cómputo de co-ocurrencia (distorsionan el ranking)
-EXCLUDE = {"personas/alvaro-mur"}
+EXCLUDE = {"personas/alvaro-mur", "personas/user-profile", "personas/user-name"}
 
 def is_index(slug: str) -> bool:
     return slug.split("/")[-1].startswith("_index")

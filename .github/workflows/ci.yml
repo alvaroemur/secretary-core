@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  leak-guard:
+    name: Leak guard + example drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Leak guard (no sensitive literals in tracked files)
+        run: python scripts/ci/check_no_leaks.py
+
+      # Drift check: the private playbooks/ and skills/ sources are gitignored and
+      # not present in CI, so `export-examples --check` cannot run here. It is a
+      # local / pre-commit gate. See cli/README.md.

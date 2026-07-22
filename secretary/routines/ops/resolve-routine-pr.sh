@@ -22,7 +22,7 @@ _resolve_pr_main() {
     remote="$(git -C "$workspace" remote get-url origin 2>/dev/null || true)"
     repo_full="$(printf '%s' "$remote" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')"
   fi
-  repo_full="${repo_full:-alvaroemur/cowork-secretary}"
+  repo_full="${repo_full:-yourusername/cowork-secretary}"
   local repo_slug="${repo_full##*/}"
   local owner="${repo_full%%/*}"
 

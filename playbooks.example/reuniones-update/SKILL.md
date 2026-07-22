@@ -279,6 +279,9 @@ fuentes:
   - tipo: tactiq
     drive_id: <id principal>
     url: https://docs.google.com/document/d/<id>/edit
+    tactiq_title: <título tal cual en Drive/Tactiq, del doc principal>
+    procesadas_mes: <YYYY-MM, mes de {fecha}>
+    local_relpath: procesadas/<procesadas_mes>/<tactiq_title>
     agregado: YYYY-MM-DD
 ultima_actualizacion: YYYY-MM-DD
 ---
@@ -325,6 +328,8 @@ ultima_actualizacion: YYYY-MM-DD
 - principal: drive:<id> (<bytes>B, createdTime)
 - secundario: drive:<id> ... (descartado/mergeado)
 ```
+
+`tactiq_title`, `procesadas_mes` y `local_relpath` existen para que un agente que solo tiene filesystem local (sin red/`gog`) pueda ubicar la transcripción cruda sin conocer el root absoluto de Tactiq Desktop en esta máquina: `procesadas_mes` es el mes de `{fecha}` (`YYYY-MM`, misma subcarpeta `procesadas/<mes>/` a la que el orquestador moverá el doc principal — ver paso de archivo), y `local_relpath` es `procesadas/<procesadas_mes>/<tactiq_title>`, relativo al root Tactiq Desktop — nunca un path absoluto `/Users/...`.
 
 5. **Extract and classify new actions** (model: spec 007). Assign draft IDs (`DRAFT-1`, `DRAFT-2`, …;
    orchestrator replaces with stable IDs). Per new action define:

@@ -17,7 +17,12 @@ from rich.table import Table
 from secretary import __version__
 from secretary.acc import fold_action
 from secretary.build_root import run_wiki_build, run_wiki_serve
-from secretary.config import all_resolved_paths, config_show_dict, resolve_path_key
+from secretary.config import (
+    all_resolved_paths,
+    config_show_dict,
+    locate_host,
+    resolve_path_key,
+)
 from secretary.fresh import (
     MODULE_ALIASES,
     format_json_report,
@@ -53,7 +58,9 @@ contract_app = typer.Typer(help="Read or update module contract.yaml.")
 dream_app = typer.Typer(help="sec-dream deterministic collection (spec 020).")
 portal_app = typer.Typer(help="Operator portal (spec 019).")
 core_app = typer.Typer(help="Engine maintenance ops (public/private example export).")
+dispatch_app = typer.Typer(help="dispatch.executor allowlist ops (no LLM).")
 app.add_typer(config_app, name="config")
+app.add_typer(dispatch_app, name="dispatch")
 app.add_typer(wiki_app, name="wiki")
 app.add_typer(acc_app, name="acc")
 app.add_typer(routines_app, name="routines")
@@ -120,6 +127,37 @@ def config_path(
         console.print(f"[red]Error:[/red] {exc}", stderr=True)
         raise typer.Exit(1) from exc
     console.print(str(path))
+
+
+@dispatch_app.command("locate")
+def dispatch_locate(
+    cwd: Annotated[
+        Optional[str],
+        typer.Argument(help="Directory to match (default: process cwd)."),
+    ] = None,
+    out_fmt: Annotated[
+        OutputFormat, typer.Option("--format", "-f", help="Output format.")
+    ] = OutputFormat.table,
+) -> None:
+    """Match a directory against `dispatch.executor.repos` in `.secretary.yml`.
+
+    Replaces the sec-drone bash loop that grep'd the allowlist for the active
+    repo — exits 1 with no match when `cwd` isn't under any allowlisted path.
+    """
+    try:
+        matches = locate_host(cwd)
+    except FileNotFoundError as exc:
+        console.print(f"[red]Error:[/red] {exc}", stderr=True)
+        raise typer.Exit(1) from exc
+
+    if out_fmt == OutputFormat.json:
+        console.print(json.dumps({"matches": matches}, ensure_ascii=False, indent=2))
+    elif matches:
+        for entry in matches:
+            console.print(f"{entry['repo']}\t{entry['path']}")
+
+    if not matches:
+        raise typer.Exit(1)
 
 
 @app.command("menu")

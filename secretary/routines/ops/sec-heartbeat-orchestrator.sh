@@ -165,6 +165,18 @@ esac
 
 "$INVOKE" sec-heartbeat "$REPO" "$PROMPT"
 
+# Ledger freshness sweep (cowork-secretary#591, primary): tareas claude-scheduled que
+# corren nativas (sin pasar por run-routine.sh/invoke-*.sh, p.ej. sec-dream) nunca llegan
+# a parse-routine-metrics.py. En vez de forzar su path de ejecución (riesgo de comportamiento
+# real, ver discusión del issue), barremos aquí — idempotente, append-only, no bloqueante —
+# aprovechando que sec-heartbeat corre ~10x/día y así el ledger no queda opaco overnight.
+BACKFILL_CLAUDE="$REPO/scripts/routines/backfill-metrics-claude-sessions.py"
+if [[ -f "$BACKFILL_CLAUDE" ]]; then
+  SINCE_DATE="$(date -v-2d +%Y-%m-%d 2>/dev/null || date -d '2 days ago' +%Y-%m-%d)"
+  python3 "$BACKFILL_CLAUDE" --since "$SINCE_DATE" >/tmp/sec-heartbeat-backfill.log 2>&1 \
+    || echo "[sec-heartbeat] WARN: backfill-metrics-claude-sessions.py falló (no bloqueante, ver /tmp/sec-heartbeat-backfill.log)" >&2
+fi
+
 INJECT_SCRIPT="$ROUTINES_OPS/inject-heartbeat-freshness.sh"
 if [[ -x "$INJECT_SCRIPT" && -f "$REPO/subsystem/heartbeat/latest.md" ]]; then
   "$INJECT_SCRIPT" "$REPO/subsystem/heartbeat/latest.md" || true

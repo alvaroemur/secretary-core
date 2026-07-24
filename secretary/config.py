@@ -73,6 +73,38 @@ def all_resolved_paths(config: dict[str, Any] | None = None) -> dict[str, Path]:
     return {k: (instance_root() / v).resolve() for k, v in flatten_paths(paths).items()}
 
 
+def dispatch_executor_repos(config: dict[str, Any] | None = None) -> list[dict[str, str]]:
+    """`dispatch.executor.repos` entries with `path` expanded to an absolute string."""
+    cfg = config if config is not None else load_config()
+    dispatch = cfg.get("dispatch") or {}
+    executor = dispatch.get("executor") or {}
+    repos = executor.get("repos") or []
+    return [
+        {"repo": entry["repo"], "path": str(expand_path(entry["path"]))}
+        for entry in repos
+        if entry.get("repo") and entry.get("path")
+    ]
+
+
+def locate_host(
+    cwd: str | Path | None = None, config: dict[str, Any] | None = None
+) -> list[dict[str, str]]:
+    """Match `cwd` (default: process cwd) against `dispatch.executor.repos`.
+
+    Returns every matching entry (`cwd` equal to or nested under `path`), most
+    specific (deepest `path`) first — mirrors the old sec-drone bash loop but
+    resolves ties deterministically instead of taking whatever `jq` iterated last.
+    """
+    target = expand_path(cwd) if cwd is not None else Path.cwd().resolve()
+    matches = []
+    for entry in dispatch_executor_repos(config):
+        repo_path = Path(entry["path"])
+        if target == repo_path or repo_path in target.parents:
+            matches.append(entry)
+    matches.sort(key=lambda e: len(e["path"]), reverse=True)
+    return matches
+
+
 def config_show_dict(config: dict[str, Any] | None = None) -> dict[str, Any]:
     """Subset of config relevant to CLI consumers."""
     cfg = config if config is not None else load_config()

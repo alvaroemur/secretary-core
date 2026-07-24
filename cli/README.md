@@ -64,6 +64,10 @@ secretary modules health
 secretary modules health --module mail --format json
 secretary modules contract get job-search --format json
 
+secretary dispatch locate                # cwd → matching dispatch.executor.repos entry
+secretary dispatch locate /path/to/repo  # explicit cwd instead of $PWD
+secretary dispatch locate --format json  # {"matches": [...]}, deepest path first
+
 secretary acc fold acc-… pr:owner/repo#N
 
 secretary portal aggregate          # snapshot → subsystem/portal/live-data.json
@@ -74,6 +78,10 @@ secretary core export-examples --check  # CI/pre-commit: fail on drift (no write
 
 secretary routines setup            # interactive router + LaunchAgent wizard
 ```
+
+`secretary dispatch locate` exits `0` with the matching repo(s) on stdout, or `1` with
+empty stdout when `cwd` isn't nested under any `dispatch.executor.repos` path — replaces
+the `jq`-based bash loop that used to live in `sec-drone`'s SKILL.md.
 
 ## Public/private example export
 

@@ -43,6 +43,7 @@ Env vars:
 secretary config show              # JSON: paths resolved absolute
 secretary config show --yaml
 secretary config path mail.memory  # → /Users/.../extractores/correo/memory
+secretary env                      # export SECRETARY_INSTANCE="..." — eval "$(secretary env)"
 
 secretary paths                    # table of all path keys
 

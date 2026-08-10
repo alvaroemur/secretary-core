@@ -20,3 +20,15 @@ export ROUTINES_BACKFILL="$ROUTINES_ROOT/backfill"
 
 INSTANCE="$SECRETARY_INSTANCE"
 CORE="$SECRETARY_CORE"
+
+# Prefer secretary-core's venv Python (PyYAML, etc.). LaunchAgent PATH puts
+# Homebrew python3 first; that interpreter is PEP 668 and has no PyYAML, so
+# read-routine-config.sh and other `python3 -c 'import yaml'` calls die at start.
+_venv_py="$CORE/.venv/bin/python"
+if [[ ! -x "$_venv_py" ]] && command -v uv >/dev/null 2>&1 && [[ -f "$CORE/pyproject.toml" ]]; then
+  (cd "$CORE" && uv sync --quiet) 2>/dev/null || true
+fi
+if [[ -x "$_venv_py" ]]; then
+  export PATH="$(dirname "$_venv_py"):$PATH"
+fi
+unset _venv_py

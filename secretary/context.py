@@ -146,7 +146,7 @@ def collect_user_doctrine(config: dict[str, Any] | None = None) -> dict[str, Any
     return {
         "identity": {
             "name": "Álvaro Mur",
-            "email": cfg.get("accounts", {}).get("personal", "alvaro.e.mur@gmail.com"),
+            "email": cfg.get("accounts", {}).get("personal", "your.personal.email@gmail.com"),
             "location": "Lima, Perú",
             "timezone": cfg.get("timezone", "America/Lima"),
             "github": "alvaroemur",
@@ -173,7 +173,7 @@ def collect_user_doctrine(config: dict[str, Any] | None = None) -> dict[str, Any
         },
         "google_workspace": {
             "cli": "gog (gogcli en PATH)",
-            "default_account": cfg.get("accounts", {}).get("personal", "alvaro.e.mur@gmail.com"),
+            "default_account": cfg.get("accounts", {}).get("personal", "your.personal.email@gmail.com"),
             "mcp_policy": "Google Drive MCP es SOLO LECTURA. Nunca asumir imposibilidad de edición por limitación del MCP.",
             "write_flow": [
                 "1. Sincronizar vía skill drive-sync (.drivesync.yaml)",

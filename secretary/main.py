@@ -110,23 +110,27 @@ def context_main(
     ),
     section: Annotated[
         Optional[list[str]],
-        typer.Option("--section", "-s", help="Sections to include (all, host, doctrine, user, taxonomy, skills, routines, git)."),
+        typer.Option("--section", "-s", help="Sections to include (all, host, doctrine, user, taxonomy, skills, routines, git, rules)."),
     ] = None,
     cwd: Annotated[
         Optional[Path],
         typer.Option("--cwd", "-C", help="Target working directory for host context."),
     ] = None,
+    max_context: Annotated[
+        bool,
+        typer.Option("--max", "-m", help="Include extended cross-repo WIP, heartbeat, and full memory."),
+    ] = False,
 ) -> None:
     """Assemble deterministic session context and doctrine."""
     if ctx.invoked_subcommand is not None:
         return
-    data = assemble_context_dict(cwd=cwd)
+    data = assemble_context_dict(cwd=cwd, is_max=max_context)
     if out_fmt == ContextFormat.json:
         typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
     elif out_fmt == ContextFormat.compact:
         typer.echo(format_compact(data))
     else:
-        typer.echo(format_markdown(data, sections=section))
+        typer.echo(format_markdown(data, sections=section, is_max=max_context))
 
 
 @context_app.command("emit")
@@ -136,21 +140,25 @@ def context_emit(
     ),
     section: Annotated[
         Optional[list[str]],
-        typer.Option("--section", "-s", help="Sections to include (all, host, doctrine, user, taxonomy, skills, routines, git)."),
+        typer.Option("--section", "-s", help="Sections to include (all, host, doctrine, user, taxonomy, skills, routines, git, rules)."),
     ] = None,
     cwd: Annotated[
         Optional[Path],
         typer.Option("--cwd", "-C", help="Target working directory for host context."),
     ] = None,
+    max_context: Annotated[
+        bool,
+        typer.Option("--max", "-m", help="Include extended cross-repo WIP, heartbeat, and full memory."),
+    ] = False,
 ) -> None:
     """Emit assembled deterministic session context."""
-    data = assemble_context_dict(cwd=cwd)
+    data = assemble_context_dict(cwd=cwd, is_max=max_context)
     if out_fmt == ContextFormat.json:
         typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
     elif out_fmt == ContextFormat.compact:
         typer.echo(format_compact(data))
     else:
-        typer.echo(format_markdown(data, sections=section))
+        typer.echo(format_markdown(data, sections=section, is_max=max_context))
 
 
 @app.callback(invoke_without_command=True)

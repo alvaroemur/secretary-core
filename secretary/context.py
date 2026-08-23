@@ -35,6 +35,33 @@ class RoutineInfo:
 
 
 @dataclass
+class CursorRuleInfo:
+    name: str
+    description: str
+    path: str
+    globs: list[str] = field(default_factory=list)
+    always_apply: bool = False
+    content: str = ""
+
+
+@dataclass
+class ClaudeMemoryInfo:
+    project_slug: str
+    memory_path: str
+    bullets: list[str] = field(default_factory=list)
+    raw_content: str = ""
+
+
+@dataclass
+class SisterRepoInfo:
+    repo: str
+    path: str
+    branch: Optional[str] = None
+    is_clean: Optional[bool] = None
+    wip_summary: Optional[str] = None
+
+
+@dataclass
 class HostRepoContext:
     path: str
     plane: str
@@ -43,6 +70,9 @@ class HostRepoContext:
     is_clean: Optional[bool] = None
     local_rules_path: Optional[str] = None
     local_rules_content: Optional[str] = None
+    cursor_rules: list[CursorRuleInfo] = field(default_factory=list)
+    claude_memory: Optional[ClaudeMemoryInfo] = None
+    spec_memory_files: list[dict[str, str]] = field(default_factory=list)
 
 
 def _safe_read_text(path: Path) -> str:
@@ -77,6 +107,12 @@ def _parse_yaml_frontmatter(content: str) -> tuple[dict[str, Any], str]:
                 invoc_m = re.search(r"^user-invocable:\s*(true|false)", raw_fm, re.MULTILINE | re.IGNORECASE)
                 if invoc_m:
                     fm["user-invocable"] = invoc_m.group(1).lower() == "true"
+                always_m = re.search(r"^alwaysApply:\s*(true|false)", raw_fm, re.MULTILINE | re.IGNORECASE)
+                if always_m:
+                    fm["alwaysApply"] = always_m.group(1).lower() == "true"
+                globs_m = re.search(r"^globs:\s*(.+)$", raw_fm, re.MULTILINE)
+                if globs_m:
+                    fm["globs"] = [g.strip().strip('"\'') for g in globs_m.group(1).split(",") if g.strip()]
                 return fm, body
     return {}, content.strip()
 
@@ -85,7 +121,6 @@ def collect_user_doctrine(config: dict[str, Any] | None = None) -> dict[str, Any
     """Collect global user rules, identity, language, and tone doctrine."""
     cfg = config if config is not None else (load_config() if (instance_root() / ".secretary.yml").is_file() else {})
 
-    # Candidate sources for global user doctrine
     sources_to_try: list[Path] = [
         Path.home() / ".claude" / "CLAUDE.md",
         Path.home() / ".gemini" / "config" / "AGENTS.md",
@@ -319,8 +354,74 @@ def collect_git_policy(config: dict[str, Any] | None = None) -> dict[str, Any]:
     }
 
 
+def _find_cursor_rules(target_dir: Path) -> list[CursorRuleInfo]:
+    """Find Cursor .mdc rules in target_dir or parent workspace directories."""
+    rules: list[CursorRuleInfo] = []
+    searched_dirs: list[Path] = [target_dir]
+    
+    # Check parent directory if within Cowork/Dev
+    if target_dir.parent != Path.home() and target_dir.parent.is_dir():
+        searched_dirs.append(target_dir.parent)
+
+    seen_paths: set[str] = set()
+    for sdir in searched_dirs:
+        rules_dir = sdir / ".cursor" / "rules"
+        if not rules_dir.is_dir():
+            continue
+        for rfile in sorted(rules_dir.glob("*.mdc")):
+            if str(rfile) in seen_paths:
+                continue
+            seen_paths.add(str(rfile))
+            content = _safe_read_text(rfile)
+            fm, body = _parse_yaml_frontmatter(content)
+            rules.append(
+                CursorRuleInfo(
+                    name=rfile.stem,
+                    description=fm.get("description", rfile.stem),
+                    path=str(rfile),
+                    globs=fm.get("globs", []),
+                    always_apply=bool(fm.get("alwaysApply", False)),
+                    content=body.strip(),
+                )
+            )
+    return rules
+
+
+def _find_claude_project_memory(target_dir: Path) -> Optional[ClaudeMemoryInfo]:
+    """Find Claude Code persistent project memory for the given workspace path."""
+    claude_projects = Path.home() / ".claude" / "projects"
+    if not claude_projects.is_dir():
+        return None
+
+    target_str = str(target_dir.resolve())
+    slug = target_str.replace("/", "-")
+
+    candidate_dirs: list[Path] = [
+        claude_projects / slug,
+    ]
+
+    # Also search by repo base name if in a worktree or subfolder
+    if not (claude_projects / slug).is_dir():
+        for pdir in claude_projects.iterdir():
+            if pdir.is_dir() and (slug.startswith(pdir.name) or pdir.name.startswith(slug)):
+                candidate_dirs.append(pdir)
+
+    for cdir in candidate_dirs:
+        mem_file = cdir / "memory" / "MEMORY.md"
+        if mem_file.is_file():
+            raw = _safe_read_text(mem_file)
+            bullets = [l.strip() for l in raw.splitlines() if l.strip().startswith("- ")]
+            return ClaudeMemoryInfo(
+                project_slug=cdir.name,
+                memory_path=str(mem_file),
+                bullets=bullets,
+                raw_content=raw.strip(),
+            )
+    return None
+
+
 def collect_host_context(cwd: Path | None = None) -> HostRepoContext:
-    """Collect context for current working directory (repo, branch, plane, local rules)."""
+    """Collect context for current working directory (repo, branch, plane, local rules, cursor rules, claude memory)."""
     target_dir = (cwd or Path.cwd()).resolve()
 
     home = Path.home()
@@ -380,6 +481,18 @@ def collect_host_context(cwd: Path | None = None) -> HostRepoContext:
             local_rules_content = _safe_read_text(cand)
             break
 
+    cursor_rules = _find_cursor_rules(target_dir)
+    claude_memory = _find_claude_project_memory(target_dir)
+
+    spec_files: list[dict[str, str]] = []
+    for spec_cand in [
+        target_dir / "_diseño" / ".specify" / "memory" / "constitucion-operativa.md",
+        target_dir / ".specify" / "memory" / "constitucion-operativa.md",
+        target_dir / "MEMORY.md",
+    ]:
+        if spec_cand.is_file():
+            spec_files.append({"path": str(spec_cand), "content": _safe_read_text(spec_cand)})
+
     return HostRepoContext(
         path=str(target_dir),
         plane=plane,
@@ -388,28 +501,107 @@ def collect_host_context(cwd: Path | None = None) -> HostRepoContext:
         is_clean=is_clean,
         local_rules_path=local_rules_path,
         local_rules_content=local_rules_content,
+        cursor_rules=cursor_rules,
+        claude_memory=claude_memory,
+        spec_memory_files=spec_files,
     )
+
+
+def collect_cross_repo_wip(config: dict[str, Any] | None = None) -> list[SisterRepoInfo]:
+    """Collect active status and WIP summaries across sister repositories."""
+    cfg = config if config is not None else (load_config() if (instance_root() / ".secretary.yml").is_file() else {})
+    inst = instance_root()
+    wip_dir = inst / "subsystem" / "wip"
+
+    repos: list[SisterRepoInfo] = []
+    for r in cfg.get("dispatch", {}).get("executor", {}).get("repos", []):
+        if not isinstance(r, dict):
+            continue
+        slug = r.get("repo", "")
+        raw_path = r.get("path", "")
+        p = Path(os.path.expanduser(raw_path)).resolve()
+        
+        branch = None
+        is_clean = None
+        if p.is_dir() and (p / ".git").exists():
+            try:
+                branch = subprocess.check_output(
+                    ["git", "branch", "--show-current"],
+                    cwd=p,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                ).strip()
+                status_out = subprocess.check_output(
+                    ["git", "status", "--porcelain"],
+                    cwd=p,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                ).strip()
+                is_clean = len(status_out) == 0
+            except Exception:
+                pass
+
+        # Look for WIP file
+        wip_summary = None
+        short_name = p.name
+        if wip_dir.is_dir():
+            for wcand in [wip_dir / f"{short_name}.md", wip_dir / f"{slug.replace('/', '-')}.md"]:
+                if wcand.is_file():
+                    wip_text = _safe_read_text(wcand)
+                    wip_lines = [l.strip() for l in wip_text.splitlines() if l.strip() and not l.startswith("#")]
+                    if wip_lines:
+                        wip_summary = " ".join(wip_lines[:2])
+                    break
+
+        repos.append(
+            SisterRepoInfo(
+                repo=slug,
+                path=str(p),
+                branch=branch,
+                is_clean=is_clean,
+                wip_summary=wip_summary,
+            )
+        )
+    return repos
+
+
+def collect_latest_heartbeat() -> Optional[str]:
+    """Collect latest consolidated heartbeat text."""
+    hb_file = instance_root() / "subsystem" / "heartbeat" / "latest.md"
+    if hb_file.is_file():
+        return _safe_read_text(hb_file).strip()
+    return None
 
 
 def assemble_context_dict(
     config: dict[str, Any] | None = None,
     cwd: Path | None = None,
+    is_max: bool = False,
 ) -> dict[str, Any]:
     """Assemble all deterministic context components into a structured dict."""
     cfg = config if config is not None else (load_config() if (instance_root() / ".secretary.yml").is_file() else {})
-    return {
+    host_ctx = collect_host_context(cwd)
+
+    data: dict[str, Any] = {
         "user_doctrine": collect_user_doctrine(cfg),
         "system_taxonomy": collect_system_taxonomy(cfg),
         "skills": [asdict(s) for s in collect_skills(cfg)],
         "routines": collect_routines(cfg),
         "git_policy": collect_git_policy(cfg),
-        "host_context": asdict(collect_host_context(cwd)),
+        "host_context": asdict(host_ctx),
     }
+
+    if is_max:
+        data["cross_repo_wip"] = [asdict(s) for s in collect_cross_repo_wip(cfg)]
+        data["latest_heartbeat"] = collect_latest_heartbeat()
+
+    return data
 
 
 def format_markdown(
     context_data: dict[str, Any],
     sections: list[str] | None = None,
+    is_max: bool = False,
 ) -> str:
     """Format assembled context into high-density, agent-ready Markdown."""
     sel = set(sections or ["all"])
@@ -417,6 +609,7 @@ def format_markdown(
 
     out: list[str] = ["# Contexto de Sesión Determinístico (Secretary Engine)", ""]
 
+    # 1. Host Context
     if show_all or "host" in sel:
         host = context_data.get("host_context", {})
         out.append("## 📍 Contexto del Workspace Anfitrión")
@@ -428,9 +621,33 @@ def format_markdown(
             out.append(f"- **Rama Git:** `{host.get('branch')}` ({clean_str})")
         if host.get("local_rules_path"):
             out.append(f"- **Reglas locales cargadas:** `{host.get('local_rules_path')}`")
+
+        # Cursor .mdc semantic rules
+        cursor_rules = host.get("cursor_rules", [])
+        if cursor_rules:
+            out.append(f"- **Reglas semánticas de Cursor (`.cursor/rules/*.mdc`, {len(cursor_rules)} encontradas):**")
+            for cr in cursor_rules:
+                always_str = " [Always Apply]" if cr.get("always_apply") else ""
+                globs_str = f" (globs: {', '.join(cr.get('globs', []))})" if cr.get("globs") else ""
+                out.append(f"  - `{cr.get('name')}`: {cr.get('description')}{always_str}{globs_str}")
+                if is_max and cr.get("content"):
+                    out.append(f"    > {cr.get('content')[:200]}...")
+
+        # Claude Code Project Memory
+        claude_mem = host.get("claude_memory")
+        if claude_mem:
+            bullets = claude_mem.get("bullets", [])
+            out.append(f"- **Memoria persistente de Claude Code (`MEMORY.md`, {len(bullets)} entradas acumuladas):**")
+            limit = len(bullets) if is_max else min(6, len(bullets))
+            for b in bullets[:limit]:
+                out.append(f"  {b}")
+            if not is_max and len(bullets) > limit:
+                out.append(f"  ... y {len(bullets) - limit} entradas más (usa `--max` para ver todo)")
+
         out.append("")
 
-    if show_all or "doctrine" in sel or "user" in sel:
+    # 2. User Doctrine
+    if show_all or "doctrine" in sel or "user" in sel or "rules" in sel:
         user = context_data.get("user_doctrine", {})
         ident = user.get("identity", {})
         out.append("## 👤 Doctrina del Usuario")
@@ -446,6 +663,7 @@ def format_markdown(
         out.append(f"- **Carpetas de Tránsito:** {', '.join(user.get('transit_folders', {}).get('paths', []))} → {user.get('transit_folders', {}).get('policy')}")
         out.append("")
 
+    # 3. System Taxonomy
     if show_all or "taxonomy" in sel:
         tax = context_data.get("system_taxonomy", {})
         out.append("## 🗺️ Mapa del Sistema y Taxonomía")
@@ -465,6 +683,7 @@ def format_markdown(
             out.append(f"- **Repos con ejecutor autónomo (`dispatch:execute`):** {repos_str}")
         out.append("")
 
+    # 4. Git Policy
     if show_all or "git" in sel:
         git_p = context_data.get("git_policy", {})
         out.append("## 🌿 Convenciones de Git y Entregas")
@@ -475,6 +694,7 @@ def format_markdown(
         out.append(f"- **Firmas de Agente:** `{git_p.get('signatures', {}).get('generator')}`")
         out.append("")
 
+    # 5. Active Skills
     if show_all or "skills" in sel:
         skills = context_data.get("skills", [])
         out.append(f"## ⚡ Skills Disponibles ({len(skills)} registrados)")
@@ -488,6 +708,7 @@ def format_markdown(
             out.append(f"| `{s.get('name')}` | {desc} | {inv} |")
         out.append("")
 
+    # 6. Routines
     if show_all or "routines" in sel:
         routines_info = context_data.get("routines", {})
         routines = routines_info.get("routines", [])
@@ -500,6 +721,30 @@ def format_markdown(
             out.append(f"| `{r.get('id')}` | `{r.get('cron')}` | {status_emoji} {r.get('status')} | {r.get('description')} | {opens_pr_str} |")
         out.append("")
 
+    # 7. Extended Context (--max)
+    if is_max:
+        out.append("## 🌐 Estado Cruzado del Sistema (--max)")
+        sister_repos = context_data.get("cross_repo_wip", [])
+        if sister_repos:
+            out.append("### Repositorios Hermano y Fichas WIP")
+            out.append("| Repositorio | Rama | Estado | Ficha WIP |")
+            out.append("|-------------|------|--------|-----------|")
+            for sr in sister_repos:
+                branch = sr.get("branch") or "—"
+                clean_str = "✓ limpio" if sr.get("is_clean") else "· sucio"
+                wip = sr.get("wip_summary") or "—"
+                if len(wip) > 60:
+                    wip = wip[:57] + "..."
+                out.append(f"| `{sr.get('repo')}` | `{branch}` | {clean_str} | {wip} |")
+            out.append("")
+
+        hb = context_data.get("latest_heartbeat")
+        if hb:
+            out.append("### Último Latido del Subsistema (`heartbeat/latest.md`)")
+            hb_excerpt = "\n".join(hb.splitlines()[:20])
+            out.append(f"```markdown\n{hb_excerpt}\n```")
+            out.append("")
+
     return "\n".join(out).strip() + "\n"
 
 
@@ -509,9 +754,13 @@ def format_compact(context_data: dict[str, Any]) -> str:
     user = context_data.get("user_doctrine", {})
     skills_count = len(context_data.get("skills", []))
     routines_count = len(context_data.get("routines", {}).get("routines", []))
+    cursor_rules_count = len(host.get("cursor_rules", []))
+    claude_mem = host.get("claude_memory")
+    mem_str = f" | Claude Memory: {len(claude_mem.get('bullets', []))} bullets" if claude_mem else ""
+    cr_str = f" | Cursor Rules: {cursor_rules_count}" if cursor_rules_count else ""
 
     lines = [
-        f"Secretary Context [Plane: {host.get('plane')}, Branch: {host.get('branch', 'none')}]",
+        f"Secretary Context [Plane: {host.get('plane')}, Branch: {host.get('branch', 'none')}]{cr_str}{mem_str}",
         f"User: {user.get('identity', {}).get('name')} | Language: {user.get('language', {}).get('primary')}",
         f"Active Skills: {skills_count} | Scheduled Routines: {routines_count}",
         f"Git: Conventional Commits (Spanish) | Workspace: {host.get('path')}",

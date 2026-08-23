@@ -40,6 +40,11 @@ from secretary.modules import (
     load_contract,
     merge_contract,
 )
+from secretary.context import (
+    assemble_context_dict,
+    format_compact,
+    format_markdown,
+)
 from secretary.portal import run_aggregate
 from secretary.validate import VALIDATORS, run_all, run_validator
 
@@ -51,6 +56,10 @@ app = typer.Typer(
 )
 
 config_app = typer.Typer(help="Instance config and path resolution.")
+context_app = typer.Typer(
+    help="Assemble deterministic session context and doctrine.",
+    invoke_without_command=True,
+)
 wiki_app = typer.Typer(help="Wiki build and related ops.")
 acc_app = typer.Typer(help="Action ledger operations.")
 routines_app = typer.Typer(help="Scheduled routines router and LaunchAgent setup.")
@@ -61,6 +70,7 @@ portal_app = typer.Typer(help="Operator portal (spec 019).")
 core_app = typer.Typer(help="Engine maintenance ops (public/private example export).")
 dispatch_app = typer.Typer(help="dispatch.executor allowlist ops (no LLM).")
 app.add_typer(config_app, name="config")
+app.add_typer(context_app, name="context")
 app.add_typer(dispatch_app, name="dispatch")
 app.add_typer(wiki_app, name="wiki")
 app.add_typer(acc_app, name="acc")
@@ -83,7 +93,72 @@ class FreshFormat(str, Enum):
     markdown = "markdown"
 
 
+class ContextFormat(str, Enum):
+    markdown = "markdown"
+    json = "json"
+    compact = "compact"
+
+
 FRESH_MODULES = ("mail", "meeting", "reuniones", "drive", "whatsapp", "all")
+
+
+@context_app.callback(invoke_without_command=True)
+def context_main(
+    ctx: typer.Context,
+    out_fmt: ContextFormat = typer.Option(
+        ContextFormat.markdown, "--format", "-f", help="Output format (markdown, json, compact)."
+    ),
+    section: Annotated[
+        Optional[list[str]],
+        typer.Option("--section", "-s", help="Sections to include (all, host, doctrine, user, taxonomy, skills, routines, git, rules)."),
+    ] = None,
+    cwd: Annotated[
+        Optional[Path],
+        typer.Option("--cwd", "-C", help="Target working directory for host context."),
+    ] = None,
+    max_context: Annotated[
+        bool,
+        typer.Option("--max", "-m", help="Include extended cross-repo WIP, heartbeat, and full memory."),
+    ] = False,
+) -> None:
+    """Assemble deterministic session context and doctrine."""
+    if ctx.invoked_subcommand is not None:
+        return
+    data = assemble_context_dict(cwd=cwd, is_max=max_context)
+    if out_fmt == ContextFormat.json:
+        typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
+    elif out_fmt == ContextFormat.compact:
+        typer.echo(format_compact(data))
+    else:
+        typer.echo(format_markdown(data, sections=section, is_max=max_context))
+
+
+@context_app.command("emit")
+def context_emit(
+    out_fmt: ContextFormat = typer.Option(
+        ContextFormat.markdown, "--format", "-f", help="Output format (markdown, json, compact)."
+    ),
+    section: Annotated[
+        Optional[list[str]],
+        typer.Option("--section", "-s", help="Sections to include (all, host, doctrine, user, taxonomy, skills, routines, git, rules)."),
+    ] = None,
+    cwd: Annotated[
+        Optional[Path],
+        typer.Option("--cwd", "-C", help="Target working directory for host context."),
+    ] = None,
+    max_context: Annotated[
+        bool,
+        typer.Option("--max", "-m", help="Include extended cross-repo WIP, heartbeat, and full memory."),
+    ] = False,
+) -> None:
+    """Emit assembled deterministic session context."""
+    data = assemble_context_dict(cwd=cwd, is_max=max_context)
+    if out_fmt == ContextFormat.json:
+        typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
+    elif out_fmt == ContextFormat.compact:
+        typer.echo(format_compact(data))
+    else:
+        typer.echo(format_markdown(data, sections=section, is_max=max_context))
 
 
 @app.callback(invoke_without_command=True)

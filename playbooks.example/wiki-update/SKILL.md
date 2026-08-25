@@ -160,7 +160,7 @@ Invoca el skill `sec-sys-integrate` con el worktree como raíz. El skill:
 1. Detecta todos los artículos con `<!-- sec:pending ... -->`.
 2. Integra cada señal en el prose de la sección correspondiente.
 3. Elimina el bloque una vez integrado (o lo marca `sec:conflict` si hay contradicción).
-4. Registra los cambios en `$WT/knowledge/wiki/memory/indice.md`.
+4. Registra los cambios en `$WT/knowledge/wiki/memory/indices/$(date +%Y-%m).md`.
 
 Si no hay bloques pending, este paso no produce ningún cambio (es idempotente). Si el skill reporta `sec:conflict` en algún artículo, inclúyelo en la sección "Dudas para Álvaro" del reporte (Paso 7).
 
@@ -176,10 +176,10 @@ Si no hay bloques pending, este paso no produce ningún cambio (es idempotente).
 
 ## Paso 0 — Preparación
 
-1. Abrir `secretary/knowledge/wiki/README.md` y `secretary/knowledge/wiki/memory/indice.md` para tener presente el contrato y el historial.
+1. Abrir `secretary/knowledge/wiki/README.md` y `secretary/knowledge/wiki/memory/indices/$(date +%Y-%m).md` para tener presente el contrato y el historial.
 2. Listar los artículos actuales: `ls secretary/knowledge/wiki/articulos/**/*.md`.
-3. Inicializar un *changelog* de esta corrida (se volcará al final en `memory/indice.md`).
-4. Fijar la **fecha actual** (`date +%Y-%m-%d`) en una variable — úsala en todos los campos `agregado:`, `ultima_actualizacion:` y líneas de `indice.md` de esta corrida. No uses la fecha de ejemplo de este documento.
+3. Inicializar un *changelog* de esta corrida (se volcará al final en `memory/indices/YYYY-MM.md`).
+4. Fijar la **fecha actual** (`date +%Y-%m-%d`) en una variable — úsala en todos los campos `agregado:`, `ultima_actualizacion:` y líneas de `indices/YYYY-MM.md` de esta corrida. No uses la fecha de ejemplo de este documento.
 5. Si encuentras copias antiguas del skill (p. ej. `secretary/.claude/skills/sync-wiki/SKILL.md`), están obsoletas: repórtalas para borrar. Este archivo (`~/.claude/scheduled-tasks/wiki-update/SKILL.md`) es la única fuente de verdad.
 
 ## Paso 1 — Recorrer fuentes registradas
@@ -429,7 +429,7 @@ Chequeos a ejecutar:
 
 6. **Fechas `ultima_actualizacion` en el futuro o con formato incorrecto.** Si alguna fecha es posterior a hoy o no matchea `^\d{4}-\d{2}-\d{2}$`, reportar.
 
-Criterio general: **arregla sin preguntar lo que sea puramente cosmético/consistencia** (titulo desactualizado, frontmatter con typo, enlace a slug con prefijo incorrecto). **Reporta y no toques** lo que implique juicio (recategorizar, rebautizar slugs, inventar datos). Cada arreglo automático debe loguearse en `indice.md` igual que los del Paso 4.
+Criterio general: **arregla sin preguntar lo que sea puramente cosmético/consistencia** (titulo desactualizado, frontmatter con typo, enlace a slug con prefijo incorrecto). **Reporta y no toques** lo que implique juicio (recategorizar, rebautizar slugs, inventar datos). Cada arreglo automático debe loguearse en `indices/YYYY-MM.md` igual que los del Paso 4.
 
 ## Paso 3.7 — Auto-mejora de wikilinks rotos (consume el validator de CI)
 
@@ -614,7 +614,7 @@ Antepón la línea nueva a las anteriores (no las borres — es el mismo histori
 
 ## Paso 5 — Registrar cambios
 
-Añadir una línea al final de `secretary/knowledge/wiki/memory/indice.md` por cada artículo creado o modificado:
+Añadir una línea al final de `secretary/knowledge/wiki/memory/indices/$(date +%Y-%m).md` por cada artículo creado o modificado:
 
 ```
 YYYY-MM-DD | sync-wiki | <ruta> | <breve resumen del cambio>
@@ -633,7 +633,7 @@ El build debe leer los artículos **del worktree** (los que editaste en esta cor
 SECRETARY_DATA="$WT" python3 ~/Dev/secretary-core/wiki/build/build.py
 ```
 
-Lee artículos y fuentes (`estado.md`, `acciones.md`, conteos de resúmenes) desde `$WT/...` y escribe el HTML en `~/Dev/secretary-core/wiki/output` (el repo de deploy). Debe imprimir `Generados N artículos en .../output`. Si falla, **no** silencies el error: no registres los cambios en `indice.md` y reporta el fallo.
+Lee artículos y fuentes (`estado.md`, `acciones.md`, conteos de resúmenes) desde `$WT/...` y escribe el HTML en `~/Dev/secretary-core/wiki/output` (el repo de deploy). Debe imprimir `Generados N artículos en .../output`. Si falla, **no** silencies el error: no registres los cambios en `indices/YYYY-MM.md` y reporta el fallo.
 
 **Bug conocido 2026-07-02 — `ARTICULOS` de `build.py` apunta a una ruta obsoleta.** El engine (`~/Dev/secretary-core/wiki/build/build.py`) resuelve `ARTICULOS = SECRETARY_DATA / "wiki" / "articulos"`, pero tras la migración a `.secretary` los artículos viven en `knowledge/wiki/articulos` (no `wiki/articulos`). Con `SECRETARY_DATA="$WT"` el build imprime `Generados 0 artículos` sin error — parece éxito pero está vacío. Afecta también al repo principal (`SECRETARY_DATA=~/.secretary` da el mismo resultado). **Workaround temporal (aplicado esta corrida) que no requiere tocar el engine:** crear un symlink efímero **dentro del worktree**, `ln -s "$WT/knowledge/wiki" "$WT/wiki"`, correr el build, y luego `rm "$WT/wiki"` antes de comitear (no está en `.gitignore` porque no debería existir; no lo dejes en el diff). **Arreglo real pendiente:** corregir `ARTICULOS` en `build.py` a `SECRETARY / "knowledge" / "wiki" / "articulos"` — vive en `~/Dev/secretary-core`, fuera del alcance de un worktree de `.secretary`; repórtalo/hazlo en una sesión de ese repo. Verifica primero con `SECRETARY_DATA="$WT" python3 build.py` si imprime `0 artículos` — si ya fue arreglado, el workaround del symlink deja de ser necesario (no falla si el symlink ya no hace falta, simplemente sería redundante).
 
@@ -741,7 +741,7 @@ Reglas al editarse:
 
 1. **Integridad primero**: nunca dejes el archivo en estado inconsistente. Si una edición es grande, hazla al final, tras el rebuild exitoso.
 2. **Preserva estructura**: frontmatter intacto, orden de pasos intacto, formato de subsecciones consistente con las existentes.
-3. **Registra el cambio** en `secretary/knowledge/wiki/memory/indice.md` con una línea extra: `YYYY-MM-DD | sync-wiki | SKILL.md | <resumen del aprendizaje incorporado>`.
+3. **Registra el cambio** en `secretary/knowledge/wiki/memory/indices/$(date +%Y-%m).md` con una línea extra: `YYYY-MM-DD | sync-wiki | SKILL.md | <resumen del aprendizaje incorporado>`.
 4. **No borres fuentes** aunque estén vacías o inactivas; márcalas con `Estado: inactiva — <motivo>` en su encabezado.
 5. **No inventes reglas especulativas**: sólo codifica aprendizajes observados en esta corrida o anteriores. Si tienes una idea no validada, déjala como comentario HTML (`<!-- idea: ... -->`) dentro de la subsección, no como regla activa.
 6. **No modifiques** el bloque de frontmatter YAML (`name`, `description`) sin que un cambio de alcance lo justifique.

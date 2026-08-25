@@ -46,7 +46,7 @@ description: Internal primitive. Scans wiki articles for sec:pending annotation 
 
 3. **Write** the updated article.
 
-4. **Log** to `WIKI_ROOT/memory/indice.md` — one line per article touched:
+4. **Log** to `WIKI_ROOT/memory/indices/YYYY-MM.md` — one line per article touched:
    ```
    YYYY-MM-DD | sec-sys-integrate | <slug> | integrados <N> bloques, <M> conflictos
    ```
@@ -54,7 +54,7 @@ description: Internal primitive. Scans wiki articles for sec:pending annotation 
 
 5. **Commit** (`~/.secretary` auto-commit policy — main directo):
    ```bash
-   git -C ~/.secretary add wiki/articulos/ wiki/memory/indice.md
+   git -C ~/.secretary add wiki/articulos/ wiki/memory/indices/$(date +%Y-%m).md
    git -C ~/.secretary commit -m "docs(wiki): integrar anotaciones pendientes — <N> artículos"
    ```
    Only commit if at least one article changed.

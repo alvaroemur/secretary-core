@@ -38,14 +38,14 @@ description: Internal primitive. Adds a sec:pending annotation block inline in a
    -->
    ```
 
-4. **Log** to `WIKI_ROOT/memory/indice.md`:
+4. **Log** to `WIKI_ROOT/memory/indices/YYYY-MM.md`:
    ```
    YYYY-MM-DD | sec-sys-annotate | <slug> | anotación pendiente en §<sección> desde <fuente_id>
    ```
 
 5. **Commit** (`~/.secretary` auto-commit policy — main directo):
    ```bash
-   git -C ~/.secretary add wiki/articulos/<slug>.md wiki/memory/indice.md
+   git -C ~/.secretary add wiki/articulos/<slug>.md wiki/memory/indices/$(date +%Y-%m).md
    git -C ~/.secretary commit -m "docs(wiki): anotar <slug> §<sección> — pendiente de integrar"
    ```
    Only commit if the file actually changed.

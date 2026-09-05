@@ -49,6 +49,7 @@ from secretary.portal import run_aggregate
 from secretary.validate import VALIDATORS, run_all, run_validator
 
 console = Console()
+err_console = Console(stderr=True)
 app = typer.Typer(
     name="secretary",
     help="Atomic operations for secretary — config, status, validate, recall, wiki.",
@@ -200,7 +201,7 @@ def config_path(
     try:
         path = resolve_path_key(key)
     except KeyError as exc:
-        console.print(f"[red]Error:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from exc
     console.print(str(path))
 
@@ -223,7 +224,7 @@ def dispatch_locate(
     try:
         matches = locate_host(cwd)
     except FileNotFoundError as exc:
-        console.print(f"[red]Error:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from exc
 
     if out_fmt == OutputFormat.json:
@@ -272,7 +273,7 @@ def status_cmd(
     try:
         _, summary = post_status(emoji, ref, note)
     except (RuntimeError, subprocess.CalledProcessError) as exc:
-        console.print(f"[red]secretary status:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]secretary status:[/red] {exc}")
         raise typer.Exit(1) from exc
     console.print(summary)
 
@@ -288,10 +289,9 @@ def validate_cmd(
     if target == "":
         rc = run_all()
     elif target not in VALIDATORS:
-        console.print(
+        err_console.print(
             f"[red]Error:[/red] validador desconocido {target!r}. "
             f"Opciones: {', '.join(VALIDATORS)}",
-            stderr=True,
         )
         raise typer.Exit(2)
     else:
@@ -305,7 +305,7 @@ def wiki_build() -> None:
     try:
         rc = run_wiki_build()
     except FileNotFoundError as exc:
-        console.print(f"[red]Error:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from exc
     raise typer.Exit(rc)
 
@@ -316,7 +316,7 @@ def wiki_serve(port: int = typer.Option(8123, help="Port to serve the wiki on"))
     try:
         rc = run_wiki_serve(port)
     except FileNotFoundError as exc:
-        console.print(f"[red]Error:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from exc
     raise typer.Exit(rc)
 
@@ -338,10 +338,9 @@ def fresh_cmd(
     """Paso 0 fresh-first — main, auto-pr, fuente viva por extractor."""
     mod = module.lower()
     if mod not in FRESH_MODULES:
-        console.print(
+        err_console.print(
             f"[red]Error:[/red] módulo desconocido {module!r}. "
             f"Opciones: {', '.join(FRESH_MODULES)}",
-            stderr=True,
         )
         raise typer.Exit(2)
     try:
@@ -360,7 +359,7 @@ def fresh_cmd(
                 **report.to_dict(),
             }
     except ValueError as exc:
-        console.print(f"[red]secretary fresh:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]secretary fresh:[/red] {exc}")
         raise typer.Exit(1) from exc
 
     if out_fmt == FreshFormat.json:
@@ -460,7 +459,7 @@ def acc_fold(
     try:
         msg = fold_action(acc_id, evidencia, cerrado=cerrado)
     except (FileNotFoundError, LookupError, ValueError) as exc:
-        console.print(f"[red]secretary acc fold:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]secretary acc fold:[/red] {exc}")
         raise typer.Exit(1) from exc
     console.print(msg)
 
@@ -508,7 +507,7 @@ def portal_aggregate(
             port=port,
         )
     except FileNotFoundError as exc:
-        console.print(f"[red]secretary portal aggregate:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]secretary portal aggregate:[/red] {exc}")
         raise typer.Exit(1) from exc
     raise typer.Exit(rc)
 
@@ -540,16 +539,15 @@ def core_export_examples(
     try:
         rc, messages = export_examples(check=check)
     except (FileNotFoundError, ValueError) as exc:
-        console.print(f"[red]secretary core export-examples:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]secretary core export-examples:[/red] {exc}")
         raise typer.Exit(1) from exc
     for line in messages:
         style = "green" if line.strip().endswith("al día.") or "regenerado" in line else ""
         console.print(f"[{style}]{line}[/{style}]" if style else line)
     if check and rc != 0:
-        console.print(
+        err_console.print(
             "[red]Drift:[/red] los *.example no coinciden con la fuente. "
             "Corré `secretary core export-examples` y commiteá.",
-            stderr=True,
         )
     raise typer.Exit(rc)
 
@@ -615,7 +613,7 @@ def modules_health(
             rows = health_rows()
             data = None
     except (FileNotFoundError, KeyError, RuntimeError, json.JSONDecodeError) as exc:
-        console.print(f"[red]secretary modules health:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]secretary modules health:[/red] {exc}")
         raise typer.Exit(1) from exc
 
     if out_fmt == OutputFormat.json:
@@ -651,7 +649,7 @@ def modules_contract_get(
     try:
         contract = load_contract(module_id)
     except (KeyError, FileNotFoundError, ValueError) as exc:
-        console.print(f"[red]secretary modules contract get:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]secretary modules contract get:[/red] {exc}")
         raise typer.Exit(1) from exc
     if out_fmt == OutputFormat.json:
         console.print(json.dumps(contract, ensure_ascii=False, indent=2))
@@ -669,21 +667,21 @@ def modules_contract_put(
 ) -> None:
     """Admin update — shallow-merge patch into contract.yaml (human gate)."""
     if patch_file is None:
-        console.print("[red]Error:[/red] --file required", stderr=True)
+        err_console.print("[red]Error:[/red] --file required")
         raise typer.Exit(2)
     text = patch_file.read_text(encoding="utf-8")
     try:
         patch = yaml.safe_load(text)
     except yaml.YAMLError as exc:
-        console.print(f"[red]YAML inválido:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]YAML inválido:[/red] {exc}")
         raise typer.Exit(1) from exc
     if not isinstance(patch, dict):
-        console.print("[red]Error:[/red] patch debe ser un objeto YAML/JSON", stderr=True)
+        err_console.print("[red]Error:[/red] patch debe ser un objeto YAML/JSON")
         raise typer.Exit(1)
     try:
         merged = merge_contract(module_id, patch)
     except (KeyError, FileNotFoundError, ValueError) as exc:
-        console.print(f"[red]secretary modules contract put:[/red] {exc}", stderr=True)
+        err_console.print(f"[red]secretary modules contract put:[/red] {exc}")
         raise typer.Exit(1) from exc
     console.print(json.dumps({"ok": True, "module": module_id, "contract": merged}, ensure_ascii=False))
 

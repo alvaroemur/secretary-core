@@ -50,6 +50,7 @@ That's it. The agent will read the docs, ask you the right questions, and config
 
 ```
 secretary-core/            ← this repo (engine, public)
+├── plugin.json            # Agent Plugins 1.0.0 manifest (skills/ is the portable skill set)
 ├── architecture/          # System diagrams (Mermaid DFD + flowcharts)
 ├── cli/                   # CLI documentation and scripts
 ├── mail/                  # Email settings templates
@@ -61,11 +62,14 @@ secretary-core/            ← this repo (engine, public)
 ├── secretary/             # Main Python CLI engine (status, validate, recall)
 │   └── routines/          #   Routines engine logic, LaunchAgents setup wizard
 ├── secd/                  # Local daemon server (bridge to Axon browser extension)
+├── skills/                # Agent Skills (sec-*, jump, topology) — discovered via plugin.json
 ├── playbooks.example/     # Anonymized templates for scheduled routine prompts
 └── skills.example/        # Anonymized templates for agentic assistant skills
 ```
 
 Open `architecture/index.html` via a local server to browse the system diagrams interactively.
+
+`plugin.json` follows [Agent Plugins 1.0.0](https://agent-plugins.org/schemas/1.0.0/plugin.schema.json). Compatible clients discover skills under `skills/`.
 
 ## Core / instance split
 

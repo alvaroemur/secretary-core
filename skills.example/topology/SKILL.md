@@ -3,10 +3,10 @@ name: topology
 description: >-
   Design a multi-agent work graph for scoped work: nodes in three modes (in_session,
   autonomous, parallel_hitl), joins as edges, optional named subgraph patterns
-  (gauntlet, bake_off, fan_out). Persists a durable plan under docs/plans/ that
-  sessions update together. Triggers: "/topology", "how should we run this",
-  "work graph", "multi-agent layout". NOT for locking scope or writing continuation
-  prompts alone.
+  (gauntlet, bake_off, fan_out). Persists a durable plan under docs/plans/ (or
+  instance `_diseño/plans/`) that sessions update together. Triggers: "/topology",
+  "how should we run this", "work graph", "multi-agent layout". NOT for locking
+  scope or writing continuation prompts alone.
 user-invocable: true
 ---
 
@@ -33,7 +33,7 @@ Emit this block before the graph:
 
 **goal:** <one line>
 **cwd:** <repo or path>
-**plan_ref:** <docs/plans/<slug>.md | none>
+**plan_ref:** <docs/plans/<slug>.md | _diseño/plans/<slug>.md | none>
 **node_counts:** in_session N · autonomous N · parallel_hitl N
 **ready_to_run:** <node ids with deps met> | none
 ```
@@ -68,7 +68,10 @@ Prefer the smallest graph that fits. Default if unclear: one `in_session` node.
 
 ## Durable plan
 
-Path: `<repo>/docs/plans/<slug>.md` (git-versionable).
+Path (git-versionable):
+
+- Work repos (Cowork / Dev): `<repo>/docs/plans/<slug>.md`
+- Secretary instance: `_diseño/plans/<slug>.md` (root `docs/` is denylisted)
 
 1. Propose `plan_ref` + slug.
 2. **Create or rewrite the graph only after owner OK** (🚧).
@@ -127,7 +130,8 @@ Cite an entity-contract EDT activity id only if the owner already scoped one. Ne
 2. Emit **header**.
 3. Draft graph (Mermaid + Nodes table). Recommend one graph; offer numbered alternatives
    (this graph / all in_session / skip parallel_hitl / adjust).
-4. On owner pick + OK for persistence → write/update `docs/plans/<slug>.md`, append Log.
+4. On owner pick + OK for persistence → write/update the plan file under
+   `docs/plans/` or `_diseño/plans/`, append Log.
 5. Start only `ready_to_run` nodes. Do not spawn work before a pick.
 6. As nodes finish, append Log and update the Nodes status column (append-only semantics).
 

@@ -34,7 +34,7 @@ git branch --show-current
 Also read, when present:
 
 - Active conversation artifacts
-- `docs/plans/*.md` with `status: active` (prefer the one cited as `plan_ref`)
+- `docs/plans/*.md` or `_diseño/plans/*.md` with `status: active` (prefer `plan_ref`)
 - cwd `contract.yaml` if `kind: entity` (EDT activities — read-only)
 - `.cursor/tasks/` briefs in the repo
 

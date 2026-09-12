@@ -70,7 +70,7 @@ Workspace/repo routing for handover destinations and offload context: **instance
 | Open PR with unread comments | mention sync next session | Park, don't sync now |
 | Project hygiene | `sec-project-sync` | AGENTS.md, scratch, layout, entity-contract drift |
 | Continuity prompts | **jump** | Archetypes + tiers; owner picks; optional offload |
-| Active work plan | `docs/plans/<slug>.md` | Append node status + Log for nodes touched this session |
+| Active work plan | `docs/plans/<slug>.md` or `_diseño/plans/<slug>.md` | Append node status + Log for nodes touched this session |
 
 When calling handover, pre-fill inputs from Stage 1 — no re-interrogation.
 
@@ -97,9 +97,10 @@ reporting.
 **Project sync (Cowork/Dev).** Run project sync for AGENTS.md, scratch purge, layout,
 entity-contract / EDT drift.
 
-**Work plan status.** If `docs/plans/` has an `active` plan (or `plan_ref` in session):
-for each node touched this session, propose status updates (`running`→`done` /
-`blocked`) and Log rows. Do **not** reshape the graph without owner OK.
+**Work plan status.** If `docs/plans/` or `_diseño/plans/` has an `active` plan
+(or `plan_ref` in session): for each node touched this session, propose status
+updates (`running`→`done` / `blocked`) and Log rows. Do **not** reshape the graph
+without owner OK.
 
 **Continuity (jump).** If the session produced material work, run jump (scan →
 archetype table → owner picks → emit prompts). Do not reimplement prompt generation.

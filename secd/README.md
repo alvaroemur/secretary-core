@@ -47,8 +47,10 @@ The bundle root comes from `.secretary.yml`:
 
 ```yaml
 paths:
-  whatsapp:
-    inbox: extractors/whatsapp/inbox
+  extractors:
+    whatsapp:
+      inbox: extractors/whatsapp/inbox
+timezone: Etc/UTC
 ```
 
 Each case is written below `cases/<date>-<chat>-<case>/` with:
@@ -57,6 +59,10 @@ Each case is written below `cases/<date>-<chat>-<case>/` with:
 - `messages.jsonl`: ordered source records plus per-item processing state
 - `manifest.json`: counts, failures, status, account/profile identifier, and paths
 - `transcript.md`: ordered text and media derivatives
+
+Messages carry a validated `source_order`. Equal timestamps use that ordinal
+before the message ID. Bundle dates and transcript headings use the payload's
+IANA timezone, with the instance `timezone` as fallback.
 
 Audio processing uses OpenAI Whisper, then creates a punctuation-cleaned
 transcription without summarizing. Image processing produces a factual
@@ -88,12 +94,14 @@ Missing rates produce an unavailable estimate, never a fabricated cost.
 
 ```bash
 export SECRETARY_INSTANCE=/absolute/path/to/instance
+export SECD_PORT=8910 # optional; the installer persists it
 ./secd/install-macos.sh
 ```
 
 The installer resolves the current Node executable, daemon location, and
 instance at install time. It writes a user LaunchAgent and keeps secd bound to
-loopback.
+loopback. Configure OpenAI in `<instance>/.secd/llm.json` before installing.
+LaunchAgents do not normally inherit `OPENAI_API_KEY` from an interactive shell.
 
 ## Security model
 

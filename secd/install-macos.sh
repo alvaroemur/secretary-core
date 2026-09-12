@@ -14,6 +14,18 @@ INSTANCE=$(CDPATH= cd -- "$SECRETARY_INSTANCE" && pwd)
 LABEL=${SECD_LAUNCHD_LABEL:-org.secretary.secd}
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_DIR="$INSTANCE/.secd/logs"
+PORT_ENTRY=
+
+if [ -n "${SECD_PORT:-}" ]; then
+  case "$SECD_PORT" in
+    *[!0-9]*|'') echo "SECD_PORT must be numeric." >&2; exit 1 ;;
+  esac
+  if [ "$SECD_PORT" -lt 1 ] || [ "$SECD_PORT" -gt 65535 ]; then
+    echo "SECD_PORT must be between 1 and 65535." >&2
+    exit 1
+  fi
+  PORT_ENTRY="    <key>SECD_PORT</key><string>$(printf '%s' "$SECD_PORT")</string>"
+fi
 
 escape_xml() {
   printf '%s' "$1" | sed \
@@ -38,6 +50,7 @@ cat > "$PLIST" <<EOF
   <key>EnvironmentVariables</key>
   <dict>
     <key>SECRETARY_INSTANCE</key><string>$(escape_xml "$INSTANCE")</string>
+$PORT_ENTRY
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>

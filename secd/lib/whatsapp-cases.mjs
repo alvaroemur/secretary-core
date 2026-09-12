@@ -9,7 +9,7 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { loadLlmConfig } from './llm.mjs';
 
-export const CASE_SCHEMA_VERSION = '1.0';
+export const CASE_SCHEMA_VERSION = '1.1';
 const MAX_MESSAGES = 5000;
 const MAX_MEDIA_BYTES = 100 * 1024 * 1024;
 const MAX_CASE_BYTES = 1024 * 1024 * 1024;
@@ -35,51 +35,77 @@ function writeJsonAtomic(path, value) {
 }
 
 function scalar(value) {
-  return value.trim().replace(/^['"]|['"]$/g, '');
+  return value.trim().replace(/\s+#.*$/, '').replace(/^['"]|['"]$/g, '');
 }
 
-/** Resolve paths.whatsapp.inbox from the instance config without a YAML dependency. */
-export function resolveCasesRoot(instance) {
-  const config = existsSync(join(instance, '.secretary.yml'))
-    ? readFileSync(join(instance, '.secretary.yml'), 'utf8')
-    : '';
-  const lines = config.split(/\r?\n/);
-  let pathsIndent = -1;
-  let whatsappIndent = -1;
-  let candidate = null;
-  for (const line of lines) {
+function readConfigScalars(instance) {
+  const path = join(instance, '.secretary.yml');
+  const config = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  const values = new Map();
+  const stack = [];
+  for (const line of config.split(/\r?\n/)) {
     if (!line.trim() || line.trimStart().startsWith('#')) continue;
     const indent = line.length - line.trimStart().length;
     const text = line.trim();
-    if (/^paths:\s*$/.test(text)) {
-      pathsIndent = indent;
-      whatsappIndent = -1;
-      continue;
-    }
-    if (pathsIndent >= 0 && indent <= pathsIndent) {
-      pathsIndent = -1;
-      whatsappIndent = -1;
-    }
-    if (pathsIndent < 0) continue;
-    const flat = text.match(/^whatsapp\.inbox:\s*(.+)$/);
-    if (flat) candidate = scalar(flat[1]);
-    if (/^whatsapp:\s*$/.test(text)) {
-      whatsappIndent = indent;
-      continue;
-    }
-    if (whatsappIndent >= 0 && indent <= whatsappIndent) whatsappIndent = -1;
-    if (whatsappIndent >= 0) {
-      const inbox = text.match(/^inbox:\s*(.+)$/);
-      if (inbox) candidate = scalar(inbox[1]);
-    }
+    const match = text.match(/^([A-Za-z0-9_.-]+):(?:\s*(.*))?$/);
+    if (!match) continue;
+    while (stack.length && stack.at(-1).indent >= indent) stack.pop();
+    const keyPath = [...stack.map((entry) => entry.key), match[1]].join('.');
+    if (match[2]) values.set(keyPath, scalar(match[2]));
+    else stack.push({ indent, key: match[1] });
   }
-  const inbox = candidate || 'extractors/whatsapp/inbox';
+  return values;
+}
+
+/** Resolve the canonical paths.extractors.whatsapp.inbox, then exact legacy aliases. */
+export function resolveCasesRoot(instance) {
+  const values = readConfigScalars(instance);
+  const inbox =
+    values.get('paths.extractors.whatsapp.inbox') ||
+    values.get('paths.whatsapp.inbox') ||
+    'extractors/whatsapp/inbox';
   const root = isAbsolute(inbox) ? resolve(inbox) : resolve(instance, inbox);
   const rel = relative(resolve(instance), root);
   if (rel.startsWith('..') || isAbsolute(rel)) {
-    throw new Error('paths.whatsapp.inbox must stay inside SECRETARY_INSTANCE');
+    throw new Error('configured WhatsApp inbox must stay inside SECRETARY_INSTANCE');
   }
   return join(root, 'cases');
+}
+
+function validateTimezone(value) {
+  if (typeof value !== 'string' || value.length > 100) throw new Error('timezone is invalid');
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: value }).format(0);
+    return value;
+  } catch {
+    throw new Error('timezone is invalid');
+  }
+}
+
+function resolveTimezone(instance, payloadTimezone) {
+  if (payloadTimezone) return validateTimezone(payloadTimezone);
+  const configured = instance ? readConfigScalars(instance).get('timezone') : null;
+  return validateTimezone(configured || 'UTC');
+}
+
+function localTimestamp(epochMs, timezone) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+      timeZoneName: 'longOffset',
+    }).formatToParts(epochMs).map((part) => [part.type, part.value]),
+  );
+  return {
+    timestamp_local: `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} ${parts.timeZoneName} [${timezone}]`,
+    local_date: `${parts.year}-${parts.month}-${parts.day}`,
+  };
 }
 
 export function slug(value, fallback = 'case') {
@@ -103,7 +129,7 @@ function safeId(value, field) {
   return value;
 }
 
-function normalizeTimestamp(message) {
+function normalizeTimestamp(message, timezone) {
   const epoch = Number(message.timestamp_epoch);
   const parsed = Date.parse(message.timestamp_iso);
   if (!Number.isFinite(epoch) || epoch <= 0 || !Number.isFinite(parsed)) {
@@ -116,11 +142,18 @@ function normalizeTimestamp(message) {
   return {
     timestamp_iso: new Date(parsed).toISOString(),
     timestamp_epoch: Math.floor(epochMs / 1000),
+    source_timestamp_local: message.timestamp_local == null
+      ? null
+      : String(message.timestamp_local).slice(0, 160),
+    ...localTimestamp(epochMs, timezone),
   };
 }
 
 function normalizeMedia(media, messageId) {
   if (!media) return null;
+  if (typeof media.selected !== 'boolean') {
+    throw new Error(`media decision is unresolved for ${messageId}`);
+  }
   const mediaId = safeId(String(media.media_id || `${messageId}-media`), 'media_id');
   const mime = String(media.mime_type || '').toLowerCase();
   if (!/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(mime)) throw new Error('media MIME is invalid');
@@ -160,25 +193,35 @@ function normalizeMedia(media, messageId) {
   };
 }
 
-export function validateCasePayload(payload) {
+export function validateCasePayload(payload, instance = null) {
   if (!payload || typeof payload !== 'object') throw new Error('JSON object required');
   const accountId = safeId(payload.account_profile_id, 'account_profile_id');
   const chatId = safeId(payload.chat_id, 'chat_id');
   const caseId = safeId(payload.case_id, 'case_id');
+  const timezone = resolveTimezone(instance, payload.timezone);
   if (!Array.isArray(payload.messages) || payload.messages.length === 0) {
     throw new Error('messages must be a non-empty array');
   }
   if (payload.messages.length > MAX_MESSAGES) throw new Error(`messages exceeds ${MAX_MESSAGES}`);
   const seen = new Set();
+  const seenOrders = new Set();
   let totalBytes = 0;
   const messages = payload.messages.map((input, index) => {
     const messageId = safeId(input.message_id, `messages[${index}].message_id`);
     if (seen.has(messageId)) throw new Error(`duplicate message_id: ${messageId}`);
     seen.add(messageId);
+    const sourceOrder = Number(input.source_order);
+    if (!Number.isInteger(sourceOrder) || sourceOrder < 0 || seenOrders.has(sourceOrder)) {
+      throw new Error(`source_order is invalid or duplicated for ${messageId}`);
+    }
+    seenOrders.add(sourceOrder);
+    if (typeof input.selected !== 'boolean') {
+      throw new Error(`message selection is invalid for ${messageId}`);
+    }
     if (!ALLOWED_DIRECTIONS.has(input.direction)) throw new Error(`invalid direction for ${messageId}`);
     const kind = String(input.kind || 'text').toLowerCase();
     if (!ALLOWED_KINDS.has(kind)) throw new Error(`invalid kind for ${messageId}`);
-    const timestamps = normalizeTimestamp(input);
+    const timestamps = normalizeTimestamp(input, timezone);
     const media = normalizeMedia(input.media, messageId);
     if (media?.selected && kind === 'audio' && !media.mime_type.startsWith('audio/')) {
       throw new Error(`audio MIME does not match kind for ${messageId}`);
@@ -194,6 +237,7 @@ export function validateCasePayload(payload) {
     if (media) totalBytes += media.size_bytes;
     return {
       message_id: messageId,
+      source_order: sourceOrder,
       ...timestamps,
       sender_name: String(input.sender_name || (input.direction === 'out' ? 'You' : 'Unknown')).slice(0, 240),
       direction: input.direction,
@@ -206,20 +250,23 @@ export function validateCasePayload(payload) {
   });
   if (totalBytes > MAX_CASE_BYTES) throw new Error('case media exceeds 1 GiB');
   messages.sort((a, b) =>
-    a.timestamp_epoch - b.timestamp_epoch || a.message_id.localeCompare(b.message_id));
+    a.timestamp_epoch - b.timestamp_epoch ||
+    a.source_order - b.source_order ||
+    a.message_id.localeCompare(b.message_id));
   return {
     case_id: caseId,
     account_profile_id: accountId,
     chat_id: chatId,
     chat_name: String(payload.chat_name || 'chat').slice(0, 240),
     title: payload.title == null ? null : String(payload.title).slice(0, 240),
+    timezone,
     messages,
     total_bytes: totalBytes,
   };
 }
 
 export function estimateCase(payload, instance) {
-  const normalized = validateCasePayload(payload);
+  const normalized = validateCasePayload(payload, instance);
   const selected = normalized.messages.filter((m) => m.selected);
   const media = selected.filter((m) => m.media?.selected);
   const pricing = readJson(join(instance, '.secd', 'capture.json'), {})?.pricing || {};
@@ -269,8 +316,11 @@ function selectedCounts(messages) {
 function publicMessage(message, mediaRecord) {
   return {
     message_id: message.message_id,
+    source_order: message.source_order,
     timestamp_iso: message.timestamp_iso,
     timestamp_epoch: message.timestamp_epoch,
+    timestamp_local: message.timestamp_local,
+    source_timestamp_local: message.source_timestamp_local,
     sender_name: message.sender_name,
     direction: message.direction,
     kind: message.kind,
@@ -292,7 +342,7 @@ function publicMessage(message, mediaRecord) {
 function renderTranscript(manifest, messages) {
   const lines = [`# ${manifest.title || `${manifest.date} — ${manifest.chat_name}`}`, ''];
   for (const message of messages.filter((m) => m.selected)) {
-    lines.push(`## ${message.sender_name} — ${message.timestamp_iso}`, '');
+    lines.push(`## ${message.sender_name} — ${message.timestamp_local}`, '');
     if (message.text) lines.push(message.text, '');
     if (message.caption && message.caption !== message.text) lines.push(`Caption: ${message.caption}`, '');
     if (message.media?.selected) {
@@ -445,8 +495,8 @@ async function processBundle(instance, bundlePath, fetchImpl = globalThis.fetch)
 }
 
 export async function createCase(instance, payload, options = {}) {
-  const normalized = validateCasePayload(payload);
-  const date = normalized.messages[0].timestamp_iso.slice(0, 10);
+  const normalized = validateCasePayload(payload, instance);
+  const date = normalized.messages[0].local_date;
   const root = resolveCasesRoot(instance);
   mkdirSync(root, { recursive: true });
   const bundleName = `${date}-${slug(normalized.chat_name, 'chat')}-${slug(normalized.case_id)}`;
@@ -492,6 +542,7 @@ export async function createCase(instance, payload, options = {}) {
     chat_id: normalized.chat_id,
     chat_name: normalized.chat_name,
     title: normalized.title,
+    timezone: normalized.timezone,
     date,
     source_counts: sourceCounts,
     selected_counts: selected,

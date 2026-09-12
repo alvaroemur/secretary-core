@@ -5,7 +5,11 @@ description: Revisión diaria de higiene del ecosistema — CLAUDE.md reviews, m
 
 # housekeeping — Mantenimiento diario del ecosistema de repos
 
-Rutina que corre 1×/día (06:00 Lima) y revisa el estado de higiene de todos los repos y workspaces de Álvaro. Aplica cambios seguros automáticamente y reporta todo lo que requiere decisión humana como PR en `~/.secretary`.
+Rutina que corre 1×/día (06:00 Lima) y revisa el estado de higiene de todos los repos y workspaces de Álvaro. Aplica cambios seguros automáticamente.
+
+> **Spec 024:** separa **nada urgente** (sin PR / ambient) de **hay algo que decidir** (PR).
+> No uses `--allow-empty`. Un run en verde sin decisión no abre PR — mismo patrón que
+> `tidy-up` / `revision-correo`.
 
 ## Repos a revisar
 
@@ -151,6 +155,12 @@ Sección **🔄 Reconciliación acciones (007)** con tablas:
 
 Álvaro o una sesión de `reuniones-update` / `sec-status` / **`sec-acc-fold`** (post-merge en
 `sec-merge`) aplica los cierres. Housekeeping solo propone.
+
+> **Nota (2026-07-27):** el automatismo de `knowledge/catalog/automatismos.md` (proyecto+persona,
+> enviar/actualizar-acta/enviar-resumen/compartir-transcripcion) vivió acá brevemente por
+> conveniencia de código adyacente (esta fase ya tocaba `acciones.md`) — se movió a
+> `secretary-briefing` § "Automatismos de catálogo" porque el bounded context de housekeeping es
+> higiene del ecosistema de repos, no seguimiento de comunicaciones/reuniones. No reintroducir aquí.
 
 ## Fase 3.6 — Issues de backlog vs specs (rules/issues-relacionados.md)
 
@@ -372,15 +382,48 @@ Candidatos detectados en Fase 3.6 — spec cambió después del último update d
   esta fase).
 - **Procedencia inline** donde aplique: `` · `repo:rama` `` o link al PR/comentario.
 
-## Cierre — Commit + PR
+## Cierre — PR solo si hay algo que decidir (spec 024)
+
+Separa **nada urgente** (ambient / sin PR) de **hay algo que decidir** (PR).
+
+**Hay algo que decidir** si ocurre al menos uno de:
+- En `## 🔴 Atención primero` hay ≥1 ítem con flag 🔴 / 🟡 / ⚠️ (no la línea sola `🟢 Nada urgente — todo en verde.`).
+- Hay cambios versionables en el worktree de secretary que Álvaro debe ver (ledger de comentarios, consolidación de memoria, propuesta de reconciliación escrita, etc.).
+
+**Nada urgente** = lead en verde **y** sin diffs versionables (o solo ruido que no merece review). Entonces: **no** abrir PR, **no** usar `--allow-empty`. Echo de cierre + limpiar worktree/rama. Mismo criterio porcelain que `tidy-up` / `revision-correo` / `wiki-update`.
+
+Si el único diff es un store de higiene ambient (p. ej. ledger `comentarios-vistos.jsonl` sin ítems nuevos que decidir): commit+push **directo a `main`** desde el checkout principal (tier ambient, precedente heartbeat / tidy-up), sin PR.
 
 ```bash
 cd "$WT"
-if [ -z "$(git status --porcelain)" ]; then
-  echo "Sin cambios en secretary — PR solo con reporte."
+REPO=~/.secretary
+HAY_DECIDIR=0
+# Heurística: el body ya generado marca decisión
+if ! grep -q '🟢 Nada urgente — todo en verde' /tmp/pr-housekeeping.md 2>/dev/null; then
+  HAY_DECIDIR=1
 fi
+# O hay archivos versionables más allá de scratch
+if [ -n "$(git status --porcelain)" ]; then
+  HAY_DECIDIR=1
+fi
+
+if [ "$HAY_DECIDIR" = "0" ]; then
+  echo "Nada urgente / sin cambio de fondo — no se abre PR."
+  cd "$REPO"
+  git worktree remove "$WT" --force 2>/dev/null || true
+  git branch -D "$BRANCH" 2>/dev/null || true
+  exit 0
+fi
+
 git add -A
-git commit -m "chore(housekeeping): revisión diaria $(date +%Y-%m-%d)" --allow-empty
+if [ -z "$(git status --porcelain)" ]; then
+  # Solo reporte (cambios fuera de secretary, p. ej. CLAUDE.md ajenos) pero SÍ hay decisión
+  # Escribe el body al worktree para que el PR tenga diff:
+  mkdir -p subsystem/housekeeping/memory
+  cp /tmp/pr-housekeeping.md "subsystem/housekeeping/memory/housekeeping-$(date +%Y%m%d).md"
+  git add subsystem/housekeeping/memory/
+fi
+git commit -m "chore(housekeeping): revisión diaria $(date +%Y-%m-%d)"
 git push -u origin "$BRANCH"
 gh label create "hilo:housekeeping" --description "Mantenimiento diario del ecosistema" --color E6E6FA 2>/dev/null || true
 gh pr create --title "chore(housekeeping): revisión diaria $(date +%Y-%m-%d)" \
@@ -388,15 +431,16 @@ gh pr create --title "chore(housekeeping): revisión diaria $(date +%Y-%m-%d)" \
 cd "$REPO" && git worktree remove "$WT" --force
 ```
 
-- Usar `--allow-empty` porque a veces los únicos cambios son a CLAUDE.md de otros repos (fuera de este worktree) y el reporte es lo que importa.
-- Si hay cambios en memorias dentro de secretary (consolidación), esos sí van en el commit.
+- **No** `--allow-empty`. Si no hay decisión y no hay diff → sin PR.
+- Si hay cambios en memorias dentro de secretary (consolidación), esos van en el commit del PR (o ambient si no hay nada que decidir).
 - El body del PR (y **cualquier comentario** que postee la rutina) lleva firma vía `sec-signature.sh housekeeping` (ver `_firma.md`).
-- Devolver la **URL del PR** al final.
+- Devolver la **URL del PR** al final (solo si abriste uno).
 - **Haptics** (ver `~/.secretary/rules/sec-haptics.md`): al entregar el PR, dejar
   señal `📬 _secretary entregó — housekeeping <fecha>, <n> ítems en "Atención primero"_`. Si la
   corrida detectó algo que reclama decisión (rama con WIP huérfano, PR auto acumulado, anomalía
   de rutina), súbelo a tier **notice**: `💡 _secretary detectó — <qué>_`. El brief diario es
   quien rutea esos hallazgos a tu lista; housekeeping solo los marca con su flag y los señala.
+  Corrida en verde sin PR: haptic ambient opcional `🫧 _secretary housekeeping — nada urgente_`.
 
 ## Qué NO hacer
 

@@ -7,7 +7,15 @@ Eres la rutina de búsqueda de oportunidades laborales de la instancia personal 
 
 Idioma de todo lo que escribas: castellano neutro con tuteo (tú/tienes/quieres), nunca voseo (nada de vos/tenés/querés). Tono directo, sin relleno.
 
-> **Cadencia (decisión 2026-06-08, PR #184):** corres **L/X/V** (cron `0 7 * * 1,3,5`), no diario. Tras 8 corridas secas se confirmó que los feeds genéricos traen match con los tracks de Álvaro menos de 1×/semana, y que sus oportunidades reales llegan por correo (alertas LinkedIn) y referidos, no por estos feeds. Te quedas vivo sobre todo por el track freelance-AI worldwide. Si encadenas otra racha larga de corridas secas (≥6), vuelve a plantear en el PR si conviene pausar del todo o sustituir un feed genérico por uno especializado con endpoint usable.
+> **Cadencia (decisión 2026-06-08, PR #184):** corres **L/X/V** (cron `0 7 * * 1,3,5`), no diario. Tras 8 corridas secas se confirmó que los feeds genéricos traen match con los tracks de Álvaro menos de 1×/semana, y que sus oportunidades reales llegan por correo (alertas LinkedIn) y referidos, no por estos feeds. Te quedas vivo sobre todo por el track freelance-AI worldwide.
+>
+> **Recurrencia (spec 024):** la racha seca ya no se “vuelve a plantear en el PR”. Contador mecánico en
+> `loops/job-search/sources-web/recurrence.yaml` (fingerprint `feeds-dry`). Cada corrida con **0
+> reportables** → `streak += 1`. Con ≥1 reportable → `streak = 0`. Al cruzar **N=3** (`class: escala`):
+> abrir o actualizar un issue `para-alvaro` citando evidence; **no** repetir la propuesta de pausar /
+> sustituir feed en un PR nuevo. Corrida seca sin cambio de fondo (0 reportables, solo state/ledger/
+> recurrence) → **sin PR** (mismo criterio que correo/wiki); si el único diff es recurrence/state,
+> ambient main-only como tidy-up.
 
 ## Contexto del usuario (para filtrar bien)
 
@@ -36,7 +44,7 @@ SCOPE=job-search
 BRANCH="$SCOPE/auto-$TS"
 WT="$(mktemp -d)/secretary-$SCOPE"
 PREV=$(gh pr list --label hilo:job-search --state open --json number,headRefName,createdAt \
-    --jq 'map(select(.headRefName|test("^loops/job-search/auto-")))
+    --jq 'map(select(.headRefName|test("^job-search/auto-")))
           | sort_by(.createdAt) | last | ((.number|tostring)+" "+.headRefName)' 2>/dev/null || true)
 PREV_NUM="${PREV%% *}"; PREV_BRANCH="${PREV#* }"
 if [ -n "$PREV_NUM" ] && [ "$PREV_NUM" != "$PREV_BRANCH" ]; then
@@ -129,24 +137,78 @@ N oportunidades nuevas tras filtro y dedup.
 
 Mantén el digest conciso: máximo ~15 oportunidades por corrida (las de mejor encaje). Si hay más, anótalo ("N adicionales no listadas por límite").
 
-## 4. ACTUALIZAR ESTADO Y LEDGER
+## 4. ACTUALIZAR ESTADO, LEDGER Y RECURRENCIA
 
 Reescribe `$WT/loops/job-search/sources-web/state.md`:
 - Fecha/hora de esta corrida (no hardcodear "primera corrida"; léelo del estado previo y continúa el conteo).
 - Stats: cuántos jobs trajo cada feed, cuántos pasaron el filtro, cuántos eran nuevos vs. ya en ledger.
 - LEDGER de deduplicación: lista de URLs reportadas con fecha de primer reporte. AÑADE las nuevas de hoy. PODA las entradas con más de 30 días para no crecer sin límite.
+- En la entrada de corrida: una línea `dry_streak: N` (copia del store abajo) — rastro legible; la fuente de verdad es el YAML.
 
-## 5. CIERRE — PR como reporte
+**Store de recurrencia** (spec 024) — `$WT/loops/job-search/sources-web/recurrence.yaml`:
 
-```bash
-cd "$WT"
-git add loops/job-search/sources-web/
-git status
+```yaml
+# job-search-crawler — recurrencia (spec 024). N=3.
+findings:
+  feeds-dry:
+    description: "0 oportunidades reportables tras filtro+curado"
+    streak: <int>
+    last_seen: YYYY-MM-DD
+    class: escala
+    status: open | escalated | resolved
+    default_action: "Abrir/actualizar issue para-alvaro: pausar rutina o sustituir feed genérico"
+    issue: <número o null>
+    evidence: []  # paths de digest o URLs de PR
 ```
 
-Si NO hay matches nuevos y nada cambió: no abras PR, solo limpia el worktree (paso final) y termina.
+Cada corrida:
+1. Leer el store (créalo si no existe con `streak: 0`, `status: open`).
+2. Si esta corrida reportó ≥1 oportunidad → `streak = 0`, `status: open` (salvo que hubiera un issue abierto ya resuelto por Álvaro).
+3. Si reportó 0 → `streak += 1`, `last_seen = hoy`, añadir evidence (digest path o "corrida #K state.md").
+4. Si `streak >= 3` y `status: open` → **escalar una sola vez**: abrir o actualizar issue con label
+   `para-alvaro` (y `hilo:job-search`) proponiendo pausar o sustituir feed; citar evidence; guardar
+   `issue: N` y `status: escalated`. No reabrir el debate en el body de un PR de oportunidades.
+5. Si ya está `escalated` y sigue seco → solo incrementar streak + evidence en el store; **no** nuevo
+   issue ni nuevo PR de “misma propuesta”.
 
-Si hay cambios:
+## 5. CIERRE — PR solo con cambio de fondo
+
+**Cambio de fondo** = ≥1 oportunidad nueva en el digest (o escalación que aún no tenía issue).
+Actualizar `state.md` / ledger / `recurrence.yaml` **solo** no es cambio de fondo.
+
+```bash
+REPO=~/.secretary
+cd "$WT"
+git add loops/job-search/sources-web/
+REPORTABLES=<n>   # oportunidades nuevas escritas al digest esta corrida
+```
+
+### 5a — Sin reportables (diagnóstico / racha)
+
+No abras PR de oportunidades. Si escalaste en el paso 4, el issue `para-alvaro` es la superficie.
+
+Si hay diffs solo en `state.md` / `recurrence.yaml` / ledger:
+```bash
+# Ambient main-only (spec 024 / precedente heartbeat)
+cd "$REPO"
+# checkout principal en main (disciplina de worktrees)
+git pull --ff-only origin main
+# copiar los archivos tocados desde $WT al checkout principal
+cp "$WT/loops/job-search/sources-web/state.md" loops/job-search/sources-web/state.md
+cp "$WT/loops/job-search/sources-web/recurrence.yaml" loops/job-search/sources-web/recurrence.yaml
+# ledger si cambió:
+# cp "$WT/loops/job-search/sources-web/..." según corresponda
+git add loops/job-search/sources-web/
+git commit -m "chore(job-search): recurrence/state $(date +%Y-%m-%d) (dry)"
+git push origin main
+git worktree remove "$WT" --force 2>/dev/null || true
+git branch -D "$BRANCH" 2>/dev/null || true
+```
+
+Si no hay ningún diff versionable: limpia worktree/rama y termina.
+
+### 5b — Con reportables (PR como reporte)
+
 ```bash
 git commit -m "chore(job-search): barrido de feeds $(date +%Y-%m-%d)"
 git push -u origin "$BRANCH"
@@ -154,7 +216,7 @@ git push -u origin "$BRANCH"
 Crea/actualiza el PR con `gh pr create`:
 - **Firma del body:** `_firma.md` → `sec-signature.sh job-search-crawler`.
 - Título: `chore(job-search): oportunidades web YYYY-MM-DD`
-- Body: resumen — cuántas oportunidades nuevas por track, las 3-5 más interesantes con link, fuentes caídas si las hubo, y nota de pendiente: "Wellfound y Contra siguen requiriendo navegador autenticado; cobertura parcial vía RemoteOK." Si continuó un PR previo, indicar "Continúa y reemplaza #$PREV_NUM".
+- Body: resumen — cuántas oportunidades nuevas por track, las 3-5 más interesantes con link, fuentes caídas si las hubo, `dry_streak` actual (debería ser 0), y nota: "Wellfound y Contra siguen requiriendo navegador autenticado; cobertura parcial vía RemoteOK." Si continuó un PR previo, indicar "Continúa y reemplaza #$PREV_NUM". **No** re-proponer pausar la rutina aquí — eso vive en el issue `para-alvaro` del store.
 - Label: `hilo:job-search` (créala si no existe: `gh label create hilo:job-search --description "Rutina de búsqueda de oportunidades" --color 0e8a16`).
 - Base: `main`.
 

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "secretary-core",
+  "version": "0.1.0",
+  "description": "CLI, Agent Skills, and playbooks for the secretary personal-assistant engine: extractors, wiki, recall, and session harness.",
+  "author": {
+    "name": "Alvaro Mur",
+    "url": "https://github.com/alvaroemur"
+  },
+  "homepage": "https://github.com/alvaroemur/secretary-core",
+  "repository": "https://github.com/alvaroemur/secretary-core",
+  "license": "MIT",
+  "keywords": [
+    "secretary",
+    "agent-skills",
+    "personal-assistant",
+    "wiki",
+    "extractors"
+  ]
+}

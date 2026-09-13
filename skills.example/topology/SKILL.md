@@ -4,7 +4,9 @@ description: >-
   Design a multi-agent work graph for scoped work: nodes in three modes (in_session,
   autonomous, parallel_hitl), joins as edges, optional named subgraph patterns
   (gauntlet, bake_off, fan_out). Persists a durable plan under docs/plans/ (or
-  instance `_diseño/plans/`) that sessions update together. Triggers: "/topology",
+  instance `_diseño/plans/`) that sessions update together. Default progress surface:
+  Mermaid in the plan plus re-emitted status Mermaid during execution; optional
+  harness canvas or minimal interactive HTML. Triggers: "/topology",
   "how should we run this", "work graph", "multi-agent layout". NOT for locking
   scope or writing continuation prompts alone.
 user-invocable: true
@@ -121,8 +123,40 @@ Status values: `pending` | `running` | `done` | `blocked`
 - `autonomous` — rounded `("label")`
 - `parallel_hitl` — hexagon `{{"label"}}`
 - Join/consume — dotted or labeled edges (`consume`, `blocks`)
+- **Status on the drawing** (when emitting progress): put status in the node
+  label (`n1<br/>done`) and/or Mermaid `classDef` for `done` | `running` |
+  `pending` | `blocked`. The plan file Graph block stays the structural source;
+  progress emits may add status classes without rewriting topology edges.
 
 Cite an entity-contract EDT activity id only if the owner already scoped one. Never invent EDT ids. Never mutate `contract.yaml`.
+
+## Progress surfaces
+
+How the owner **sees** the graph advance. Source of truth remains the plan file
+(Nodes + Log + Graph). Surfaces are projections.
+
+### Default (always)
+
+1. **Mermaid lives in the plan** under `## Graph` (structural graph).
+2. **During execution**, after each material node status change (or at a sensible
+   batch join), **re-emit an updated Mermaid artifact in chat** reflecting current
+   statuses — same node ids/edges, fresh status labels/classes. Do not wait until
+   the whole graph finishes.
+3. Keep chat Mermaid **short**: no Log dump inside the diagram; point to `plan_ref`
+   for history.
+
+### Optional (harness-dependent)
+
+Prefer the cheapest surface that the harness already provides:
+
+| Priority | When | What |
+|----------|------|------|
+| 1 | Harness has a **native canvas / side-panel** app surface | Offer or refresh a canvas that embeds nodes + statuses (and optionally a DAG). Link it; do not paste the full React source into chat. |
+| 2 | No canvas available | **Offer** a **minimal** interactive HTML in-transcript artifact (progress + node pick → one-line detail). Owner can decline. |
+
+**HTML budget (hard):** few tokens. Allowed: progress bar, compact node buttons or chips, one detail line, tiny legend. Forbidden: full DAG redraw in HTML, long scripts, duplicated Nodes tables, prose essays inside the fragment. If the HTML would rival Mermaid in size, skip HTML and use Mermaid only.
+
+Do not require canvas or HTML to run the graph. Do not invent a third durable file format for progress — update the plan; project to surfaces.
 
 ## Procedure
 
@@ -134,6 +168,9 @@ Cite an entity-contract EDT activity id only if the owner already scoped one. Ne
    `docs/plans/` or `_diseño/plans/`, append Log.
 5. Start only `ready_to_run` nodes. Do not spawn work before a pick.
 6. As nodes finish, append Log and update the Nodes status column (append-only semantics).
+   **Re-emit** the default Mermaid progress artifact. Optionally refresh canvas or
+   offer minimal HTML per **Progress surfaces**.
+7. When the graph completes (or pauses), one final Mermaid + plan status update.
 
 ## Agnosticism
 
@@ -142,8 +179,12 @@ Cite an entity-contract EDT activity id only if the owner already scoped one. Ne
 - No hardcoded instance paths, account emails, repo slugs, or timezones.
 - Platform spawn/dispatch mechanics: follow the active harness playbook at runtime
   (issue + clean-context restart). Topology defines **mode**; the harness executes it.
+- Progress surfaces may use harness capabilities (canvas, in-transcript HTML) without
+  naming the product; fall back to Mermaid-only when those are absent.
 
 ## Don't
 
 - Grill scope. Execute before a pick. Invent quality bars. Reshape the plan graph
   without owner OK. Treat joins as nodes. Hardcode who invokes this skill.
+- Dump full canvas source or large HTML into chat. Skip Mermaid because a richer
+  surface exists. Require canvas/HTML to proceed.

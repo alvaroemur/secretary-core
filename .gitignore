@@ -29,3 +29,10 @@ whatsapp/inbox/
 whatsapp/media/
 whatsapp/qr.png
 .wt/
+
+# Spec Kit runner skills (local only — not shared across worktrees/cloud).
+# Covered by the existing `skills/` rule; listed for clarity.
+.claude/skills/
+.cursor/skills/
+.agents/skills/
+

@@ -11,18 +11,19 @@ user-invocable: true
 
 # sec-learn — harness learning → dispatch
 
-**Mission:** turn a concrete harness/system friction or improvement into an actionable backlog
+**What this does:** turn a concrete harness/system friction or improvement into an actionable backlog
 signal by invoking the **dispatch** playbook (usually `ISSUE`, optionally `ISSUE+WIKI`). Never a
 second write path.
 
 Doctrine: `rules/skills-contract.md` · GitHub signatures: `rules/github-signatures.md` ·
-Issues relacionados: `rules/issues-relacionados.md` · Playbook: skill `dispatch`
+Issues relacionados: `rules/issues-relacionados.md` · Playbook: skill `dispatch` · Recurrence
+(spec 024 SC-4): fingerprint = issue marker `<!-- fingerprint: <slug> -->` — dedupe before create.
 
 ## Instance setup
 
 ```bash
+eval "$(secretary env)"
 CFG=$(secretary config show)
-export SECRETARY_INSTANCE="${SECRETARY_INSTANCE:-$(echo "$CFG" | jq -r .instance)}"
 # Destination allowlist (slug + local path)
 echo "$CFG" | jq -r '.dispatch.executor.repos[] | "\(.repo)\t\(.path)"'
 BRIEF_REPO=$(echo "$CFG" | jq -r '.brief.repo // empty')
@@ -69,10 +70,33 @@ Either:
 2. **Choose destination repo** from `dispatch.executor.repos` (+ instance Cowork/Dev map):
    - Skills, gog, sec-mail, signatures, secretary CI → instance / `brief.repo`
    - Client product / Dev repo infra → that allowlisted repo (or report out-of-allowlist and ask)
-3. **Build the learning payload** with this issue body shape (keep owner language in the body;
-   skill prose stays English):
+3. **Fingerprint (spec 024, SC-4) — before opening anything.**
+   The ad-hoc registro de recurrencia **is the issue itself**. Compute a stable kebab-case slug
+   from the *finding* (object/path/symptom), not from free prose. Examples:
+   `main-checkout-guard-missing`, `gog-attach-no-cid`, `validate-wikilinks-scans-worktrees`.
+
+   ```bash
+   FP="<slug>"   # kebab-case, stable across sessions
+   DEST_REPO="<chosen allowlist slug>"   # from step 2; usually $BRIEF_REPO for harness
+   # Search open + recently closed issues for the HTML marker (not title fuzzy match):
+   MATCH=$(gh issue list --repo "$DEST_REPO" --state all --limit 50 \
+     --json number,title,state,body,labels,url \
+     --jq --arg fp "$FP" \
+     '.[] | select(.body | contains("<!-- fingerprint: " + $fp + " -->"))')
+   ```
+
+   - **If match:** do **not** create a duplicate. Comment the new evidence on the existing issue.
+     Count prior `sec-learn` / fingerprint evidence comments (+ original body = 1). At **N=3**
+     consecutive reports of the same finding while still open: add label `para-alvaro` (if missing)
+     and say so in the comment. Report the existing URL and stop.
+   - **If no match:** continue to step 4 and **embed** the marker in the new issue body.
+
+4. **Build the learning payload** (owner language in the body; skill prose stays English).
+   Put the fingerprint marker on its own line near the top (after the signature mark):
 
    ```markdown
+   <!-- fingerprint: <slug> -->
+
    ## Discovery
    <what was observed>
 
@@ -89,11 +113,14 @@ Either:
    - <paths, versions, dates, related PRs/issues>
    ```
 
-4. **Invoke dispatch playbook** (capability-gated, same as `dispatch`):
+5. **Invoke dispatch playbook** (capability-gated, same as `dispatch`):
    - If `spawn_task` exists → chip with-context; `prompt` includes the payload labeled
-     `learning` and triage hint **ISSUE** (optionally ISSUE+WIKI). Chip `cwd` = dest root.
-   - Else (Cursor / core) → create the GitHub issue now with signatures; optional
-     `.briefs/` brief only if follow-up execute is requested.
+     `learning`, the fingerprint slug, and triage hint **ISSUE** (optionally ISSUE+WIKI).
+     Chip `cwd` = dest root. Instruct the chip to run the fingerprint search (step 3) before
+     `gh issue create`.
+   - Else (Cursor / core) → after step 3 found no match, create the GitHub issue now with
+     signatures + fingerprint marker; optional `.briefs/` brief only if follow-up execute is
+     requested.
 
    Signature block before `gh issue create`:
 
@@ -102,18 +129,20 @@ Either:
    export SECRETARY_BRANCH=$(git -C <dest> branch --show-current 2>/dev/null || true)
    SIG_MARK=$(~/.claude/scripts/sec-signature.sh sec-learn --mark)
    SIG_FOOT=$(~/.claude/scripts/sec-signature.sh sec-learn --footer)
-   # Body: "${SIG_MARK}\n\n<learning sections>\n\n---\n${SIG_FOOT}"
+   # Body: "${SIG_MARK}\n\n<!-- fingerprint: ${FP} -->\n\n<learning sections>\n\n---\n${SIG_FOOT}"
    ```
 
-5. If the new issue lists related issues under `## Relacionado`, add reciprocal links per
+6. If the new issue lists related issues under `## Relacionado`, add reciprocal links per
    `rules/issues-relacionados.md`.
-6. **Report** the issue URL and stop — do not implement the improvement in this call unless the
-   owner asked for EXECUTE.
+7. **Report** the issue URL (or "evidence added to #N") and stop — do not implement the
+   improvement in this call unless the owner asked for EXECUTE.
 
 ## Report
 
-One **inline** line. Header: `📎 **Learn** · `` `<repo>` `` · issue `<url>` `` · triage ISSUE|ISSUE+WIKI`.
-Add a second line only for warnings (out-of-allowlist repo, redirected to sec-write/lessons).
+One **inline** line. Header: `📎 **Learn** · `` `<repo>` `` · issue `<url>` `` · triage ISSUE|ISSUE+WIKI`
+· `fp:<slug>` (add `· evidence-on-existing` when step 3 commented instead of creating).
+Add a second line only for warnings (out-of-allowlist repo, redirected to sec-write/lessons,
+escalated to `para-alvaro` at N=3).
 
 Use judgment on the detail; don't enumerate every case. Owner language, git conventions, and
 workspace maps live in runtime `CLAUDE.md`.

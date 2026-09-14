@@ -93,7 +93,7 @@ Either:
    - If `spawn_task` exists → chip with-context; `prompt` includes the payload labeled
      `learning` and triage hint **ISSUE** (optionally ISSUE+WIKI). Chip `cwd` = dest root.
    - Else (Cursor / core) → create the GitHub issue now with signatures; optional
-     `.cursor/tasks/` brief only if follow-up execute is requested.
+     `.briefs/` brief only if follow-up execute is requested.
 
    Signature block before `gh issue create`:
 

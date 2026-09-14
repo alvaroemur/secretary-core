@@ -142,7 +142,7 @@ gog gmail search 'in:sent newer_than:7d' --max 50 --plain --no-input
 # Reply en hilo (SIEMPRE --reply-to-message-id)
 gog gmail drafts create \
   --to "dest@example.com" \
-  --cc "otro@example.com" \
+  --cc "cc@example.com" \
   --subject "Re: asunto original" \
   --body-file /tmp/borrador.md \
   --reply-to-message-id <messageId> \
@@ -183,7 +183,7 @@ Detectar reunión recién terminada aún no en memoria oficial, comprobar si la 
 
 | Variable | Valor |
 |----------|-------|
-| `TACTIQ_ROOT` | `1TE6Z1uhZo7YrwOnWvp83se3CCXHiCKt9` |
+| `TACTIQ_ROOT` | `YOUR_TACTIQ_FOLDER_ID` |
 | Estabilidad Tactiq | No procesar si `modifiedTime` < 10 min |
 | Shell vacío | `fileSize < 3000` bytes |
 | Cadencia rutina | `:00` laboral 9–21 + catch-up 22:00 (America/Lima) |
@@ -206,7 +206,7 @@ secretary fresh meeting --format json
 ### Probe transcripción (antes de que mergee reuniones-update)
 
 ```bash
-TACTIQ_ROOT=1TE6Z1uhZo7YrwOnWvp83se3CCXHiCKt9
+TACTIQ_ROOT=YOUR_TACTIQ_FOLDER_ID
 
 # Docs nuevos en raíz Tactiq (no en procesadas/descartadas)
 gog drive ls --parent="$TACTIQ_ROOT" --json --account=<gog-account> --no-input \
@@ -345,7 +345,7 @@ python3 $SECRETARY_INSTANCE/scripts/ci/validate_ordenamiento.py  # solo .secreta
 
 | Operación | Comando |
 |-----------|---------|
-| Listar Tactiq pendientes | `gog drive ls --parent=1TE6Z1uhZo7YrwOnWvp83se3CCXHiCKt9 --json` |
+| Listar Tactiq pendientes | `gog drive ls --parent=YOUR_TACTIQ_FOLDER_ID --json` |
 | Metadata doc | `gog drive get <fileId> --json` |
 | Eventos hoy | `gog calendar events primary --from today --to tomorrow --plain` |
 | Procesados local | `git show origin/main:extractors/meetings/memory/_procesados.jsonl \| tail` |

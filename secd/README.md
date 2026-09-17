@@ -1,7 +1,7 @@
 # secd — Secretary local daemon
 
 A tiny loopback-only HTTP server that exposes Secretary's context to a browser
-extension ([Axon](https://github.com/yourusername/axon)) while you read a WhatsApp
+extension ([Axon](https://github.com/alvaroemur/axon)) while you read a WhatsApp
 conversation, and accepts signals back into Secretary. It is the bridge defined
 in **Feature 007 — Axon × Secretary** (RFC in the instance repo at
 `_design/specs/007-axon-secretary-relay/spec.md`).
@@ -52,8 +52,8 @@ npm test     # offline checks against $SECRETARY_INSTANCE (resolver, context, ob
 | POST | `/objectives` | yes | create/update an objective (daemon mints id/date) |
 | GET | `/recall?q=` | yes | free-text search over wiki articles |
 | POST | `/relay` | yes | LLM-backed (or stub) intention + objective + reply suggestions |
-| POST | `/signal` | yes | record a durable fact (scaffold → `whatsapp/memory/relay-signals.md`) |
-| POST | `/capture` | yes | persist a scraped conversation (scaffold → `whatsapp/inbox/axon/`) |
+| POST | `/signal` | yes | record a durable fact (scaffold → `extractors/whatsapp/memory/relay-signals.md`) |
+| POST | `/capture` | yes | persist a scraped conversation as chat summary + optional `acciones.md` entry (P3) |
 | GET | `/modules` | yes | list extractors + loops with contract metadata (spec 015) |
 | GET | `/modules/:id` | yes | full contract + computed health |
 | GET | `/modules/:id/health` | yes | `{ freshness_ok, health, criteria[] }` |
@@ -81,6 +81,7 @@ secd/
     objectives.mjs    read/write the objetivos/ store
     relay.mjs         deterministic stub (LLM goes here later)
     modules.mjs       module contracts via `secretary modules` CLI (spec 015)
+    capture.mjs       write-path for /capture (chat summary + acciones.md)
   test/run.mjs        offline checks
 ```
 
@@ -88,6 +89,6 @@ secd/
 
 - Relay is live on OpenAI; switching to Claude is a config change (`provider: "anthropic"`).
 - `secd` lifecycle (login item / Secretary runtime) — currently run by hand.
-- `/capture` and `/signal` are scaffolds; full wiki-lazy integration is P3.
+- `/capture` writes chat summaries + `acciones.md` (P3); `/signal` is still a scaffold, not wired into sec-write's wiki annotation flow.
 - Tighter objective↔entity grounding (e.g. relationship objectives linked to the
   people in an org, not just the org) so replies cite the right numbers.

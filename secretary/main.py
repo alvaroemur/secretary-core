@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.table import Table
 
 from secretary import __version__
-from secretary.acc import fold_action
+from secretary.acc import archive_actions, fold_action, show_action
 from secretary.build_root import run_wiki_build, run_wiki_serve
 from secretary.config import (
     all_resolved_paths,
@@ -454,14 +454,63 @@ def acc_fold(
         Optional[str],
         typer.Argument(help="YYYY-MM-DD (default: hoy)"),
     ] = None,
+    module: Annotated[
+        str, typer.Option("--module", help="Módulo dueño del ledger (meetings | whatsapp).")
+    ] = "meetings",
 ) -> None:
     """Fold canonical action closure into acciones.md."""
     try:
-        msg = fold_action(acc_id, evidencia, cerrado=cerrado)
+        msg = fold_action(acc_id, evidencia, cerrado=cerrado, module=module)
     except (FileNotFoundError, LookupError, ValueError) as exc:
         err_console.print(f"[red]secretary acc fold:[/red] {exc}")
         raise typer.Exit(1) from exc
     console.print(msg)
+
+
+@acc_app.command("show")
+def acc_show(
+    acc_id: Annotated[str, typer.Argument(help="acc-YYYYMMDD-NNN")],
+    module: Annotated[str, typer.Option("--module", help="meetings | whatsapp")] = "meetings",
+) -> None:
+    """Show an action by id: active ledger first, then the monthly archive."""
+    try:
+        hits = show_action(acc_id, module=module)
+    except (FileNotFoundError, LookupError) as exc:
+        err_console.print(f"[red]secretary acc show:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    for location, block in hits:
+        console.print(f"[dim]# {location}[/dim]")
+        console.print(block.raw.rstrip(), markup=False, highlight=False)
+
+
+@acc_app.command("archive")
+def acc_archive(
+    apply: Annotated[
+        bool, typer.Option("--apply", help="Escribir. Sin esta bandera solo muestra el plan.")
+    ] = False,
+    retention_days: Annotated[
+        int, typer.Option("--retention-days", help="Días que una cerrada se queda en el activo.")
+    ] = 14,
+    module: Annotated[str, typer.Option("--module", help="meetings | whatsapp")] = "meetings",
+    verbose: Annotated[bool, typer.Option("--verbose", help="Listar acc-ids omitidos.")] = False,
+) -> None:
+    """Move closed entries to acciones/archivo/YYYY-MM.md (plan by default; --apply writes)."""
+    try:
+        plan, stats = archive_actions(module=module, apply=apply, retention_days=retention_days)
+    except (FileNotFoundError, ValueError) as exc:
+        err_console.print(f"[red]secretary acc archive:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    mode = "APLICADO" if apply and plan.moves else "PLAN (no se escribió nada)"
+    console.print(f"[bold]{mode}[/bold] · retención {retention_days} d")
+    for month in sorted(plan.moves):
+        console.print(f"  archivo/{month}.md  +{len(plan.moves[month])} bloques")
+    console.print(
+        f"  bloques: {stats['blocks_before']} → {stats['blocks_after']} en el activo · "
+        f"bytes: {stats['bytes_before']:,} → {stats['bytes_after']:,}"
+    )
+    for reason, ids in sorted(plan.skipped.items()):
+        shown = f": {', '.join(ids[:10])}{' …' if len(ids) > 10 else ''}" if verbose else ""
+        console.print(f"  omitidas · {reason}: {len(ids)}{shown}")
 
 
 @routines_app.command("setup")

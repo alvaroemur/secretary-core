@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from enum import Enum
@@ -248,6 +249,25 @@ def menu_cmd() -> None:
     """Launch the interactive guided menu."""
     from secretary.tui import run_menu
     run_menu()
+
+
+@app.command(
+    "gwork",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    add_help_option=False,
+)
+def gwork_cmd(ctx: typer.Context) -> None:
+    """Pass all arguments to the standalone gwork CLI."""
+    executable = shutil.which("gwork")
+    if executable is None:
+        err_console.print(
+            "[red]Error:[/red] gwork is not installed. "
+            "Initialize the plugins/gwork submodule and install it with "
+            "`python -m pip install -e plugins/gwork`."
+        )
+        raise typer.Exit(127)
+    result = subprocess.run([executable, *ctx.args], check=False)
+    raise typer.Exit(result.returncode)
 
 
 @app.command("paths")

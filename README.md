@@ -61,6 +61,8 @@ secretary-core/            ← this repo (engine, public)
 │   └── serve.py           #   local dev server
 ├── secretary/             # Main Python CLI engine (status, validate, recall)
 │   └── routines/          #   Routines engine logic, LaunchAgents setup wizard
+├── plugins/
+│   └── gwork/             # Google Workspace sync and style tool (git submodule)
 ├── secd/                  # Local daemon server (bridge to Axon browser extension)
 ├── skills/                # Agent Skills (sec-*, jump, topology) — discovered via plugin.json
 ├── playbooks.example/     # Anonymized templates for scheduled routine prompts
@@ -117,6 +119,7 @@ The engine provides a python-based CLI tool and a local daemon:
   - `secretary validate` — Run instance CI validators.
   - `secretary recall` — Deterministic memory search.
   - `secretary wiki build` — Safe legacy-to-instance wiki builds.
+  - `secretary gwork ...` — Pass commands to the standalone `gwork` CLI.
   - `secretary routines setup` — Interactive wizard to schedule LaunchAgents.
 - **Daemon (`secd`)**: A loopback-only Node.js HTTP server. It serves as a bridge to browser extensions (like Axon), exposing context cards, objectives, modules, and accepting signals back into Secretary.
 
@@ -163,7 +166,8 @@ The engine and all templates are in **English**. Your instance (policies, wiki a
 
 If you prefer to set things up yourself instead of using the AI prompt above:
 
-1. **Fork/clone this repo** as your engine.
+1. **Fork/clone this repo** as your engine, including submodules:
+   `git clone --recurse-submodules https://github.com/alvaroemur/secretary-core`.
 2. **Create your instance repo** (private) following the structure above.
 3. **Copy and adapt** the template files:
    - `mail/policy.example.md` → `your-instance/mail/policy.md`
@@ -173,6 +177,13 @@ If you prefer to set things up yourself instead of using the AI prompt above:
 5. **Create your first wiki article** about yourself in `wiki/articulos/your-name.md`.
 6. **Run the wiki build** via the CLI: `SECRETARY_INSTANCE="$INSTANCE" secretary wiki build`
 7. **Schedule the routines** using the setup wizard: `secretary routines setup`
+
+For local development, install both CLIs in editable mode:
+
+```bash
+python -m pip install -r requirements-dev.txt
+secretary gwork --help
+```
 
 ## License
 

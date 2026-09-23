@@ -22,7 +22,8 @@ Requires **Python 3.11+**.
 ```bash
 export SECRETARY_CORE=~/Dev/secretary-core
 export SECRETARY_INSTANCE=~/.secretary
-pip install -e ~/Dev/secretary-core
+git -C ~/Dev/secretary-core submodule update --init plugins/gwork
+pip install -r ~/Dev/secretary-core/requirements-dev.txt
 secretary --version
 ```
 
@@ -78,6 +79,7 @@ secretary core export-examples          # regen playbooks.example/ + skills.exam
 secretary core export-examples --check  # CI/pre-commit: fail on drift (no writes)
 
 secretary routines setup            # interactive router + LaunchAgent wizard
+secretary gwork --help              # passthrough to the gwork plugin CLI
 ```
 
 `secretary dispatch locate` exits `0` with the matching repo(s) on stdout, or `1` with

@@ -98,9 +98,15 @@ git -C "$SECRETARY_INSTANCE" rev-list --left-right --count main...origin/main
 [ -n "$PERSONAL_ACCOUNT" ] && gog drive ls --account="$PERSONAL_ACCOUNT" --max 1 --plain --no-input 2>/dev/null | head -1
 
 curl -sf http://127.0.0.1:9477/health 2>/dev/null && echo secd:ok || echo secd:skip
+
+# Every stored gog account, not only personal/work: exchanges each refresh token
+# (read-only, --no-input, never opens OAuth). `gog auth list` does NOT detect revocation.
+secretary gog-health --format markdown
 ```
 
-`401` / `invalid_grant` from `gog` → report re-login (instance `CLAUDE.md` § accounts); mark 🚧.
+`401` / `invalid_grant` from `gog`, or a failed row in `secretary gog-health` → report
+`gog auth add <account>` (instance `CLAUDE.md` § accounts); mark 🚧. Do not run `gog auth add`
+yourself: it needs the owner's browser.
 
 #### Phase 1 report
 
@@ -113,6 +119,7 @@ curl -sf http://127.0.0.1:9477/health 2>/dev/null && echo secd:ok || echo secd:s
 | gog personal | ✅ / 🚧 | |
 | gog work | ✅ / skip / 🚧 | |
 | gog drive | ✅ / 🚧 | |
+| gog-health (all accounts) | ✅ / 🚧 | `gog auth add <account>` per failed row |
 | secd /health | ✅ / skip / 🚧 | |
 ```
 

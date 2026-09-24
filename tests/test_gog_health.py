@@ -31,28 +31,28 @@ def _patch_gog(monkeypatch, payload, returncode=0):
 
 
 def test_parse_all_ok():
-    report = parse_doctor(_doctor(("a@example.com", "ok", "refresh token exchange succeeded")))
+    report = parse_doctor(_doctor(("acct-a", "ok", "refresh token exchange succeeded")))
     assert report["ok"] is True
-    assert report["accounts"][0]["account"] == "a@example.com"
+    assert report["accounts"][0]["account"] == "acct-a"
     assert report["failed"] == []
 
 
 def test_parse_revoked_account_suggests_reauth():
     report = parse_doctor(
         _doctor(
-            ("a@example.com", "ok", "refresh token exchange succeeded"),
-            ("b@example.org", "error", "invalid_grant: Token has been expired or revoked."),
+            ("acct-a", "ok", "refresh token exchange succeeded"),
+            ("acct-b", "error", "invalid_grant: Token has been expired or revoked."),
         )
     )
     assert report["ok"] is False
-    assert report["failed"] == ["b@example.org"]
+    assert report["failed"] == ["acct-b"]
     bad = report["accounts"][1]
-    assert bad["fix"] == "gog auth add b@example.org"
-    assert "gog auth add b@example.org" in format_markdown(report)
+    assert bad["fix"] == "gog auth add acct-b"
+    assert "gog auth add acct-b" in format_markdown(report)
 
 
 def test_parse_non_refresh_problem_fails():
-    payload = _doctor(("a@example.com", "ok", "ok"))
+    payload = _doctor(("acct-a", "ok", "ok"))
     payload["checks"].append({"name": "keyring.password", "status": "warn", "detail": "unset"})
     report = parse_doctor(payload)
     assert report["ok"] is False
@@ -60,7 +60,7 @@ def test_parse_non_refresh_problem_fails():
 
 
 def test_check_is_non_interactive(monkeypatch):
-    calls = _patch_gog(monkeypatch, _doctor(("a@example.com", "ok", "ok")))
+    calls = _patch_gog(monkeypatch, _doctor(("acct-a", "ok", "ok")))
     check_accounts()
     assert calls == [["/tmp/gog", "auth", "doctor", "--check", "--json", "--no-input"]]
 
@@ -80,10 +80,10 @@ def test_check_unparseable_output(monkeypatch):
 
 
 def test_cli_exit_codes(monkeypatch):
-    _patch_gog(monkeypatch, _doctor(("a@example.com", "ok", "ok")))
+    _patch_gog(monkeypatch, _doctor(("acct-a", "ok", "ok")))
     assert runner.invoke(app, ["gog-health", "--format", "json"]).exit_code == 0
 
-    _patch_gog(monkeypatch, _doctor(("a@example.com", "error", "invalid_grant")))
+    _patch_gog(monkeypatch, _doctor(("acct-a", "error", "invalid_grant")))
     result = runner.invoke(app, ["gog-health", "--format", "markdown"])
     assert result.exit_code == 1
-    assert "gog auth add a@example.com" in result.output
+    assert "gog auth add acct-a" in result.output

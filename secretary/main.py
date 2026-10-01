@@ -706,6 +706,36 @@ def modules_contract_put(
     console.print(json.dumps({"ok": True, "module": module_id, "contract": merged}, ensure_ascii=False))
 
 
+@app.command("gog-health")
+def gog_health_cmd(
+    out_fmt: FreshFormat = typer.Option(
+        FreshFormat.table, "--format", "-f", help="Output format."
+    ),
+) -> None:
+    """Probe every gog account's refresh token (read-only, no OAuth prompt). Exit 1 if any fails."""
+    from secretary.gog_health import check_accounts
+    from secretary.gog_health import format_markdown as gog_markdown
+
+    report = check_accounts()
+    if out_fmt == FreshFormat.json:
+        console.print(json.dumps(report, ensure_ascii=False, indent=2))
+    elif out_fmt == FreshFormat.markdown:
+        console.print(gog_markdown(report), end="")
+    else:
+        if report.get("error"):
+            err_console.print(f"[red]secretary gog-health:[/red] {report['error']}")
+        table = Table("account", "state", "detail / action")
+        for a in report.get("accounts") or []:
+            if a["ok"]:
+                table.add_row(a["account"], "[green]ok[/green]", a["detail"])
+            else:
+                table.add_row(a["account"], "[red]fail[/red]", f"{a['detail']} → {a['fix']}")
+        console.print(table)
+        for p in report.get("problems") or []:
+            console.print(f"[yellow]{p['check']}[/yellow]: {p['detail']}")
+    raise typer.Exit(0 if report["ok"] else 1)
+
+
 def run() -> None:
     app()
 

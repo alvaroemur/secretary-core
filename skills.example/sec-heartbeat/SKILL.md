@@ -50,14 +50,18 @@ TIMEZONE=$(echo "$CFG" | jq -r '.timezone // "UTC"')
    [ -n "$PERSONAL" ] && gog calendar events --account="$PERSONAL" --from "$FROM" --to "$TO" --plain
    # Repeat per work account if registered in gog
    ```
-6. **Freshness** — run `$INSTANCE/scripts/routines/extractor-freshness.sh` and include output verbatim in `## Extractor freshness`.
-7. **Git/PR per repo** — systematic sweep:
+6. **gog accounts** — `secretary gog-health --format markdown` (read-only refresh-token probe of
+   every stored account; never prompts). Include the output verbatim as `## gog accounts`. A failed
+   row goes to Operational notes as 🚧 `gog auth add <account>`, so the brief surfaces it before a
+   routine fails with `invalid_grant`.
+7. **Freshness** — run `$INSTANCE/scripts/routines/extractor-freshness.sh` and include output verbatim in `## Extractor freshness`.
+8. **Git/PR per repo** — systematic sweep:
    - Allowlist: `dispatch.executor.repos` from config (each `owner/repo` + local `path`).
    - Plus Cowork repos referenced by open actions (`workspace` field in acciones.md).
    - Per repo: `gh pr list`, `git worktree list`, `git branch -vv`, `git status -sb`.
    - Cross-match acc-ids against PR titles, branch names, dirty trees.
 
-8. **Multi-source conflicts** — if `extractors/mail/state.md` contradicts a recent `summaries/` entry or calendar on the same entity, flag in Operational notes citing both sources. Do not invent resolution.
+9. **Multi-source conflicts** — if `extractors/mail/state.md` contradicts a recent `summaries/` entry or calendar on the same entity, flag in Operational notes citing both sources. Do not invent resolution.
 
 If a source fails, record the gap in Operational notes; do not fabricate data.
 

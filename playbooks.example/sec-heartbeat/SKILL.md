@@ -51,6 +51,7 @@ Generar un latido operativo en:
 - `subsystem/wip/`
 - Issue briefing abierto + comentarios `sec-status`
 - Calendario hoy ±1d (`gog calendar`, todas las cuentas registradas)
+- Salud de cuentas `gog`: `secretary gog-health --format markdown` (sonda de solo lectura del refresh token de cada cuenta; nunca abre OAuth). Copiar verbatim a `## gog accounts`; cada fila fallida va a "Notas operativas" como 🚧 `gog auth add <cuenta>`
 - Frescura extractoras + conflictos multi-fuente (spec 008 § Frescura / § Conflictos)
   - Script: `$REPO/scripts/routines/extractor-freshness.sh` (precomputado en `run.sh`; copiar verbatim a `## Frescura extractoras`)
 - **Git/PR:** `gh pr list` + branch/worktree/dirty scan por repo en allowlist (`.secretary.yml` → `dispatch.executor.repos`) **más** repos Cowork de acc abiertas (`workspace`)

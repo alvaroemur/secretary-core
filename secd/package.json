@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node server.mjs",
-    "test": "node test/run.mjs"
+    "test": "node --test test/whatsapp-cases.test.mjs",
+    "test:instance": "node test/run.mjs"
   },
   "engines": {
     "node": ">=20"

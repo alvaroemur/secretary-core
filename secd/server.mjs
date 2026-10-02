@@ -11,7 +11,7 @@
 // bearer token printed on startup (and stored at <instance>/.secd/token).
 
 import { createServer } from 'node:http';
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { HOST, PORT, VERSION, loadOrCreateToken, resolveInstance } from './lib/config.mjs';
 import { buildIndex, resetIndex } from './lib/resolver.mjs';
@@ -26,6 +26,7 @@ import {
   moduleHealth,
   putModuleContract,
 } from './lib/modules.mjs';
+import { appendAccion, appendChatCapture } from './lib/capture.mjs';
 
 const instance = resolveInstance();
 const TOKEN = loadOrCreateToken(instance);
@@ -183,24 +184,41 @@ const server = createServer(async (req, res) => {
     if (path === '/signal' && req.method === 'POST') {
       const body = await readBody(req);
       if (!body || !body.text) return send(res, 400, { error: 'text required' }, origin);
-      // Scaffold: append to a pending-signals file for wiki-update to pick up.
-      const file = join(instance, 'whatsapp', 'memory', 'relay-signals.md');
+      // Scaffold: append to a pending-signals file. Not yet wired into
+      // sec-write's wiki annotation flow — that's relay/P2 territory, not
+      // part of the P3 capture write-path. Path fixed to the post-migration
+      // instance layout (was whatsapp/memory/, pre spec-012).
+      const dir = join(instance, 'extractors', 'whatsapp', 'memory');
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      const file = join(dir, 'relay-signals.md');
       const entry =
         `\n## ${new Date().toISOString()} — ${body.entity || 'sin-entidad'}\n` +
         `- fuente: axon-relay\n- texto: ${body.text}\n- pendiente_wiki: false\n`;
       appendFileSync(file, entry);
-      return send(res, 200, { ok: true, recorded: file }, origin);
+      return send(res, 200, { ok: true, recorded: 'extractors/whatsapp/memory/relay-signals.md' }, origin);
     }
 
     if (path === '/capture' && req.method === 'POST') {
       const body = await readBody(req);
       if (!body || !body.chatId) return send(res, 400, { error: 'chatId required' }, origin);
-      const dir = join(instance, 'whatsapp', 'inbox', 'axon');
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const file = join(dir, `${stamp}-${String(body.chatId).replace(/[^\w-]/g, '_')}.json`);
-      writeFileSync(file, JSON.stringify(body, null, 2));
-      return send(res, 200, { ok: true, captured: file }, origin);
+      const chat = appendChatCapture(instance, {
+        chatId: body.chatId,
+        alias: body.alias || body.name,
+        jid: body.jid,
+        isGroup: !!body.isGroup,
+        messages: body.messages || [],
+      });
+      let accion = null;
+      if (body.accion && body.accion.accion) {
+        accion = appendAccion(instance, {
+          ...body.accion,
+          origen: chat ? chat.summaryFile : 'axon',
+        });
+      }
+      if (!chat && !accion) {
+        return send(res, 200, { ok: true, skipped: 'no-new-messages' }, origin);
+      }
+      return send(res, 200, { ok: true, chat, accion }, origin);
     }
 
     return send(res, 404, { error: 'not found', path }, origin);

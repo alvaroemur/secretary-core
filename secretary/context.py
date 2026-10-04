@@ -122,7 +122,8 @@ def collect_user_doctrine(config: dict[str, Any] | None = None) -> dict[str, Any
     cfg = config if config is not None else (load_config() if (instance_root() / ".secretary.yml").is_file() else {})
 
     sources_to_try: list[Path] = [
-        Path.home() / ".claude" / "CLAUDE.md",
+        Path.home() / ".agents" / "AGENTS.md",
+        Path.home() / ".codex" / "AGENTS.md",
         Path.home() / ".gemini" / "config" / "AGENTS.md",
         Path.home() / ".cursorrules",
         instance_root() / "canon" / "rules" / "session" / "estilo-voz.md",
@@ -238,7 +239,10 @@ def collect_system_taxonomy(config: dict[str, Any] | None = None) -> dict[str, A
 def collect_skills(config: dict[str, Any] | None = None) -> list[SkillInfo]:
     """Scan and list all active skills across known directories."""
     skill_dirs: list[Path] = [
+        core_root() / "portable" / "skills",
+        Path.home() / ".agents" / "skills",
         Path.home() / ".claude" / "skills",
+        Path.home() / ".cursor" / "skills",
         Path.home() / ".gemini" / "config" / "skills",
         Path.home() / ".cursor" / "skills-cursor",
         core_root() / "skills",

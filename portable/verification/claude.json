@@ -1,0 +1,13 @@
+{
+  "harness": "claude",
+  "passed": true,
+  "exit_code": 0,
+  "answer": "ROOT_PORTABLE_OK\nCHILD_PORTABLE_OK\n\nSiguiente acción del brief: PORTABLE_NEXT_OK",
+  "checked_at": "2026-10-05T04:37:20.620111+00:00",
+  "legacy_files": 0,
+  "markers": [
+    "ROOT_PORTABLE_OK",
+    "CHILD_PORTABLE_OK",
+    "PORTABLE_NEXT_OK"
+  ]
+}

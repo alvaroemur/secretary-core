@@ -785,6 +785,14 @@ def gog_health_cmd(
     raise typer.Exit(0 if report["ok"] else 1)
 
 
+
+@app.command("efficiency", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+def efficiency_command(ctx: typer.Context):
+    """Portable close, routine preflight and local usage metrics."""
+    from secretary.efficiency import main
+    raise typer.Exit(main(ctx.args))
+
+
 def run() -> None:
     app()
 

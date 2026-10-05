@@ -107,7 +107,9 @@ def _wall_duration_ms(started_at: str, ended_at: str) -> int | None:
         return None
 
 
-def _estimate_cost_usd(usage: dict[str, int], price_row: dict[str, Any]) -> float:
+def _estimate_cost_usd(usage: dict[str, int | None], price_row: dict[str, Any]) -> float | None:
+    if any(usage.get(k) is None for k in ("input", "output", "cache_read", "cache_write")):
+        return None
     def tier(key: str, tokens: int) -> float:
         rate = float(price_row.get(key, 0) or 0)
         return (tokens / 1_000_000) * rate
@@ -158,13 +160,13 @@ def parse_jsonl(path: Path) -> dict[str, Any]:
                 errors.append(str(err))
 
     usage_raw = usage_evt.get("usage") or {}
-    usage = {
-        "input": int(usage_raw.get("inputTokens") or 0),
-        "output": int(usage_raw.get("outputTokens") or 0),
-        "cache_read": int(usage_raw.get("cacheReadTokens") or 0),
-        "cache_write": int(usage_raw.get("cacheWriteTokens") or 0),
-    }
-    usage["total"] = sum(usage.values())
+    aliases = {"input": ("inputTokens", "input_tokens"), "output": ("outputTokens", "output_tokens"),
+               "cache_read": ("cacheReadTokens", "cache_read_input_tokens"),
+               "cache_write": ("cacheWriteTokens", "cache_creation_input_tokens")}
+    usage = {key: next((int(usage_raw[name]) for name in names if usage_raw.get(name) is not None), None)
+             for key, names in aliases.items()}
+    usage["total"] = sum(usage.values()) if all(v is not None for v in usage.values()) else None
+
 
     provider_cost: float | None = None
     raw_pc = usage_raw.get("providerCostUsd")
@@ -233,7 +235,7 @@ def build_record(
         duration_ms = _wall_duration_ms(started_at, ended_at)
 
     cost_block: dict[str, Any] = {
-        "estimated_usd": round(cost, 6),
+        "estimated_usd": round(cost, 6) if cost is not None else None,
         "pricing_proxy": price_key,
         "pricing_label": price_row.get("label"),
         "note": (
@@ -247,11 +249,14 @@ def build_record(
     }
     if provider_cost is not None:
         cost_block["provider_cost_usd"] = round(float(provider_cost), 6)
-        cost_block["local_estimated_usd"] = round(local_est, 6)
+        cost_block["local_estimated_usd"] = round(local_est, 6) if local_est is not None else None
 
     record = {
         "run_id": run_id,
         "routine_id": routine_id,
+        "task_id": os.environ.get("SECRETARY_TASK_ID") or routine_id,
+        "outcome": os.environ.get("SECRETARY_OUTCOME") or "unknown",
+        "reason": os.environ.get("SECRETARY_OUTCOME_REASON") or None,
         "started_at": started_at,
         "ended_at": ended_at,
         "executor": executor,
@@ -304,6 +309,9 @@ def build_mechanical_record(
     record: dict[str, Any] = {
         "run_id": run_id,
         "routine_id": routine_id,
+        "task_id": os.environ.get("SECRETARY_TASK_ID") or routine_id,
+        "outcome": os.environ.get("SECRETARY_OUTCOME") or "unknown",
+        "reason": os.environ.get("SECRETARY_OUTCOME_REASON") or None,
         "started_at": started_at,
         "ended_at": ended_at,
         "executor": executor,
@@ -344,13 +352,14 @@ def format_summary(record: dict[str, Any]) -> str:
     t = record["tokens"]
     c = record["cost"]
     tools = record["tools"]
+    cost_text = f"${c['estimated_usd']:.4f}" if c.get("estimated_usd") is not None else "unknown"
     return (
         f"[metrics] routine={record['routine_id']} status={record['status']} "
         f"exit={record['exit_code']} duration_ms={record.get('duration_ms')} "
         f"model={record.get('model_resolved')} ({record.get('model_requested')}) "
         f"billing={record.get('billing_mode')} "
         f"tokens in={t['input']} out={t['output']} cache_read={t['cache_read']} total={t['total']} "
-        f"tools={tools['total']} est_usd=${c['estimated_usd']:.4f} "
+        f"tools={tools['total']} est_usd={cost_text} "
         f"proxy={c.get('pricing_proxy')}"
     )
 

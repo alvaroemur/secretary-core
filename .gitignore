@@ -36,3 +36,7 @@ whatsapp/qr.png
 .cursor/skills/
 .agents/skills/
 
+
+# Canonical portable close skills are public source, not private exports.
+!portable/skills/
+!portable/skills/**

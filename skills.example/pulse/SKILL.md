@@ -281,7 +281,7 @@ gh label list --repo <owner/repo> --search "hilo:" --json name --jq '.[].name'
     --json number,title,state,labels,updatedAt
   ```
   then bucket by each PR's `hilo:*` label (a PR with none → `sin-hilo`).
-- If the repo has no `hilo:` labels yet, fall back to the Conventional Commit scope in the title (`^\w+\(([^)]+)\):`) as a proxy grouping — but flag it as unlabeled and suggest adopting `hilo:` labels (see `~/.claude/CLAUDE.md` § "Etiquetas de GitHub para hilos y series") rather than treating the proxy as durable.
+- If the repo has no `hilo:` labels yet, fall back to the Conventional Commit scope in the title (`^\w+\(([^)]+)\):`) as a proxy grouping — but flag it as unlabeled and suggest adopting `hilo:` labels (see `~/.claude/AGENTS.md` § "Etiquetas de GitHub para hilos y series") rather than treating the proxy as durable.
 - Per front, report: most recent PR (number + state), total PR count, and whether the latest PR is open/merged — this is the "chain" view, not just the flat brief list.
 
 ### 5 — Cross and report status
@@ -296,7 +296,7 @@ When the user picks an item (or passed as argument):
 
 a) **Prior WIP:** `secretary config path operations.wip`; load matching handover if any.
 b) **Artifact:** `gh issue view` / `gh pr view` / acciones.md entry.
-c) **Repo context:** read `CLAUDE.md`, `git branch --show-current`, `git status -sb`, `git log --oneline -5`.
+c) **Repo context:** read `AGENTS.md`, `git branch --show-current`, `git status -sb`, `git log --oneline -5`.
 d) **Orient and stop:** compact brief below; close with "ready to start?". Do not execute.
 
 ### 6.5 — Offer to queue for `sec-dream` (optional, only on explicit approval)

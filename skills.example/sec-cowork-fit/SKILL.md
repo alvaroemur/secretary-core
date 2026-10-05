@@ -153,5 +153,5 @@ If OK was vague ("sí") but plan had medium/high-risk mvs → re-list mv rows an
 
 - Portfolio audit / "ordena todo Cowork".
 - CI on Cowork repos.
-- Editing `~/Cowork/CLAUDE.md`.
+- Editing `~/Cowork/AGENTS.md`.
 - Creating full Mundo CLab Drive trees (`01 ADMINISTRACIÓN` with spaces) unless TARGET is already a Drive mirror that uses that convention — then respect existing convention, don't dual-create.

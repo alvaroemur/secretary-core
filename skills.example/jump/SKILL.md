@@ -10,6 +10,10 @@ description: >-
 user-invocable: true
 ---
 
+## Integration with wind-down
+
+When given `close_context`, reuse its state, decisions, active plan and brief. Do not repeat git scans, read other worktrees or create another brief. The restart prompt names its objective, first file to read and completion criterion. It does not depend on chat history or a harness-specific tool. This rule overrides the collection and writing steps below.
+
 # jump — continuation prompts from live session state
 
 Generate **where next** options and prompts. Does not close the session, push, or merge.

@@ -1,4 +1,4 @@
-"""Portable close snapshots, conservative routine gates and local usage reports.
+"""Optional close snapshots, experimental routine gates and local usage reports.
 
 Run with ``python -m secretary.efficiency --help``. No model calls.
 """

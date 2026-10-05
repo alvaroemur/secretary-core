@@ -21,7 +21,7 @@ Este repo contiene el engine reutilizable. Los datos, políticas y configuració
 ## Contexto portable
 
 - `AGENTS.md` guarda instrucciones estables; el estado transitorio vive en un brief de continuidad del repo.
-- Los skills compartidos de cierre se editan en `portable/skills/`. Las instalaciones de cada harness son copias generadas por `secretary.portable_deploy`.
+- Los skills se editan en `skills/` (fuente privada); `skills.example/` contiene sus exports sanitizados. No mantengas una segunda fuente de cierre.
 - `wind-down` recoge una vez el contexto y produce un brief único. No inicia otra sesión de reflexión ni inspecciona worktrees ajenos.
-- CLI y contratos del cierre, comprobaciones y métricas: `portable/README.md`. Lee ese detalle solo para tareas que lo requieran.
-- El resto de `skills.example/` y `playbooks.example/` son exports sanitizados; conserva la separación público/privado documentada en `cli/README.md`.
+- `secretary efficiency` ofrece snapshot y métricas opcionales dentro del CLI; ningún skill requiere un runtime adicional.
+- `skills.example/` y `playbooks.example/` son exports sanitizados; conserva la separación público/privado documentada en `cli/README.md`.

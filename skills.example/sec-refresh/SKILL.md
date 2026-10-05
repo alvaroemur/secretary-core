@@ -105,7 +105,7 @@ secretary gog-health --format markdown
 ```
 
 `401` / `invalid_grant` from `gog`, or a failed row in `secretary gog-health` → report
-`gog auth add <account>` (instance `CLAUDE.md` § accounts); mark 🚧. Do not run `gog auth add`
+`gog auth add <account>` (instance `AGENTS.md` § accounts); mark 🚧. Do not run `gog auth add`
 yourself: it needs the owner's browser.
 
 #### Phase 1 report

@@ -22,7 +22,7 @@ def verify(harness: str, output: Path) -> int:
         (root/'.briefs/continuidad.md').write_text('Decisión: usar AGENTS.md. Siguiente acción: PORTABLE_NEXT_OK.\n')
         prompt = 'Prueba de solo lectura. Lee ../.briefs/continuidad.md. Devuelve únicamente los marcadores de las instrucciones cargadas de raíz y subcarpeta y la siguiente acción del brief. No escribas archivos ni crees agentes.'
         commands = {
-            'claude': ['claude', '-p', '--output-format', 'json', prompt],
+            'claude': ['claude', '-p', '--add-dir', str(root), '--tools', 'Read', '--allowedTools', 'Read', '--output-format', 'json', prompt],
             'codex': ['codex', 'exec', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'read-only', '--json', prompt],
             'cursor': ['cursor-agent', '--mode', 'ask', '--sandbox', 'enabled', '--trust', '--print', '--output-format', 'json', prompt],
         }

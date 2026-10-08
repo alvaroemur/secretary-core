@@ -13,6 +13,8 @@ from pathlib import Path
 
 from secretary.config import resolve_path_key
 
+CLOSED_STATES = ("hecha", "caducada", "cancelada")
+
 
 def fold_action(
     acc_id: str,
@@ -41,6 +43,15 @@ def fold_action(
 
     next_hdr = text.find("\n## ", idx + len(header))
     block = text[idx : next_hdr if next_hdr != -1 else len(text)]
+
+    m = re.search(r"^- estado:\s*(\S+)", block, re.M)
+    actual = m.group(1) if m else None
+    if actual == estado:
+        return f"= {acc_id} ya estaba en {estado} (sin cambios)"
+    if actual in CLOSED_STATES:
+        raise ValueError(
+            f"{acc_id} ya está cerrada como {actual}; no se pisa con {estado}"
+        )
 
     def set_field(b: str, key: str, value: str) -> str:
         pat = re.compile(rf"^- {re.escape(key)}:.*$", re.M)

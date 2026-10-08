@@ -11,7 +11,7 @@
 // bearer token printed on startup (and stored at <instance>/.secd/token).
 
 import { createServer } from 'node:http';
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HOST, PORT, VERSION, loadOrCreateToken, resolveInstance } from './lib/config.mjs';
 import { buildIndex, resetIndex } from './lib/resolver.mjs';
@@ -26,6 +26,12 @@ import {
   moduleHealth,
   putModuleContract,
 } from './lib/modules.mjs';
+import {
+  createCase,
+  estimateCase,
+  readCase,
+  retryCase,
+} from './lib/whatsapp-cases.mjs';
 
 const instance = resolveInstance();
 const TOKEN = loadOrCreateToken(instance);
@@ -61,10 +67,19 @@ function authed(req) {
   return bearer === TOKEN || alt === TOKEN;
 }
 
-function readBody(req) {
-  return new Promise((resolve) => {
+function readBody(req, maxBytes = 2 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
     let data = '';
-    req.on('data', (c) => (data += c));
+    let bytes = 0;
+    req.on('data', (c) => {
+      bytes += c.length;
+      if (bytes > maxBytes) {
+        reject(new Error('request body too large'));
+        req.destroy();
+        return;
+      }
+      data += c;
+    });
     req.on('end', () => {
       try {
         resolve(data ? JSON.parse(data) : {});
@@ -192,20 +207,43 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { ok: true, recorded: file }, origin);
     }
 
-    if (path === '/capture' && req.method === 'POST') {
-      const body = await readBody(req);
-      if (!body || !body.chatId) return send(res, 400, { error: 'chatId required' }, origin);
-      const dir = join(instance, 'whatsapp', 'inbox', 'axon');
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const file = join(dir, `${stamp}-${String(body.chatId).replace(/[^\w-]/g, '_')}.json`);
-      writeFileSync(file, JSON.stringify(body, null, 2));
-      return send(res, 200, { ok: true, captured: file }, origin);
+    if (path === '/cases/estimate' && req.method === 'POST') {
+      const body = await readBody(req, 1024 * 1024 * 1024 + 64 * 1024 * 1024);
+      if (!body) return send(res, 400, { error: 'invalid_json' }, origin);
+      return send(res, 200, estimateCase(body, instance), origin);
+    }
+
+    if ((path === '/cases' || path === '/capture') && req.method === 'POST') {
+      const body = await readBody(req, 1024 * 1024 * 1024 + 64 * 1024 * 1024);
+      if (!body) return send(res, 400, { error: 'invalid_json' }, origin);
+      const result = await createCase(instance, body, { defer: true });
+      return send(res, 202, result, origin);
+    }
+
+    const caseStatus = path.match(/^\/cases\/([^/]+)$/);
+    if (caseStatus && req.method === 'GET') {
+      const result = readCase(instance, decodeURIComponent(caseStatus[1]));
+      return result
+        ? send(res, 200, result, origin)
+        : send(res, 404, { error: 'case_not_found' }, origin);
+    }
+
+    const caseRetry = path.match(/^\/cases\/([^/]+)\/retry$/);
+    if (caseRetry && req.method === 'POST') {
+      const result = await retryCase(instance, decodeURIComponent(caseRetry[1]));
+      return result
+        ? send(res, result.status === 'ready' ? 200 : 202, result, origin)
+        : send(res, 404, { error: 'case_not_found' }, origin);
     }
 
     return send(res, 404, { error: 'not found', path }, origin);
   } catch (err) {
-    return send(res, 500, { error: 'internal', message: String(err && err.message) }, origin);
+    const message = String(err && err.message);
+    const clientError = /invalid|required|exceeds|duplicate|unsafe|disagree|too large|must stay|collision/i.test(message);
+    return send(res, clientError ? 400 : 500, {
+      error: clientError ? 'invalid_request' : 'internal',
+      message,
+    }, origin);
   }
 });
 

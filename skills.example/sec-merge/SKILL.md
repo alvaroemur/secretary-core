@@ -24,7 +24,7 @@ export SECRETARY_INSTANCE="${SECRETARY_INSTANCE:-$(echo "$CFG" | jq -r .instance
 ```
 
 Haptics: `secretary` CLI or instance harness scripts for compuerta/delivery signals (see
-`rules/sec-haptics.md`). Do not hardcode script paths — resolve from harness `CLAUDE.md` if needed.
+`rules/sec-haptics.md`). Do not hardcode script paths — resolve from harness `AGENTS.md` if needed.
 
 ## What this is NOT
 
@@ -126,7 +126,7 @@ wait for remote CI or explicit owner override.
 ```bash
 # Resolve meetings actions path
 ACTIONS=$(secretary config path meetings.memory 2>/dev/null)
-# Use instance harness acc-fold script if configured — see CLAUDE.md
+# Use instance harness acc-fold script if configured — see AGENTS.md
 ```
 
 8. **Refresh heartbeat:** invoke `sec-heartbeat`, **commit+push `main`**.

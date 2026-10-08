@@ -22,5 +22,5 @@ Render **inline**. Header: `🧭 **Estado** · <N> repos activos`. One bullet pe
 
 Use judgment on the detail; don't enumerate every case. Anything invariant about
 the user (language, git conventions, what's private, folder layout) lives in the
-runtime's CLAUDE.md, not here. Current-moment data comes from the runtime (the
+runtime's AGENTS.md, not here. Current-moment data comes from the runtime (the
 engine's lookup sources), not this file.

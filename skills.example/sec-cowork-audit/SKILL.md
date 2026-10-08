@@ -34,7 +34,7 @@ ESQUELETO="$SECRETARY_INSTANCE/templates/esqueleto-proyecto-cowork.md"
 | `COWORK_ROOT` | `~/Cowork/` (owner layout — not in `.secretary.yml`) |
 | `POLICY` | `$ORDENAMIENTO` §3–§3.4, §8 — profiles + skeleton (not four-folder minimum) |
 | Templates | `$ESQUELETO`, `$SECRETARY_INSTANCE/templates/proceso-constitutivo.md` |
-| Parent rules | `rules/etl.md`, `rules/drive-cowork.md`, `~/Cowork/CLAUDE.md` |
+| Parent rules | `rules/etl.md`, `rules/drive-cowork.md`, `~/Cowork/AGENTS.md` |
 
 ## Inputs
 
@@ -99,5 +99,5 @@ Output table:
 - Physical migration of project folders without owner OK (use `sec-cowork-fit` apply after 🚧).
 - Mass multi-project migration in one shot.
 - Drive mutations / Dev moves.
-- `~/Cowork/CLAUDE.md` edits (spec 003 — deferred until Álvaro closes §9 open questions).
+- `~/Cowork/AGENTS.md` edits (spec 003 — deferred until Álvaro closes §9 open questions).
 - Inventing EDT phases under `03-ejecucion/` (owner decides phase names).

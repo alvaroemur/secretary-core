@@ -106,7 +106,7 @@ blocks in this skill.
 
 ### Persist MD mirror (when deliverable is a file, not chat only)
 
-Per `operational/sistemas-ordenamiento.md` §6.1 (instance `CLAUDE.md` for Cowork workspace layout):
+Per `operational/sistemas-ordenamiento.md` §6.1 (instance `AGENTS.md` for Cowork workspace layout):
 
 - Active project → `proyectos/<slug>/borradores/` or `<contacto-slug>/` when applicable.
 - **Not** `extractors/mail/drafts/` for project work.

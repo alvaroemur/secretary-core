@@ -18,6 +18,16 @@ each to the resolving skill, reports in tables. No coaching, no nagging.
 
 Doctrine: `rules/skills-contract.md` · related issues doctrine · GitHub signatures
 
+## Shared close context
+
+Collect session state once. Identify only the repos and files touched by this session; do not infer them from the last commit or inspect unrelated worktrees. State uncertainty rather than attributing another session's edits to this one.
+
+Build one `close_context`: session id, actual checkout, branch, commit, touched files and their status, decisions and reasons, result, blockers, next action, PR, references, and one brief path. Query the branch PR and unpublished commits once. No auxiliary session or reflection agent is needed.
+
+Pass this object to project sync, handover and jump. They reuse it instead of repeating git or conversation collection. Handover is the only brief writer; jump uses that brief. Keep Cowork/Dev briefs in the actual checkout's `.briefs/`, never in the instance brief tree.
+
+An optional `secretary efficiency close-snapshot` can supply mechanical git state when available. It is not required: normal git tools and the current conversation suffice. Do not install a runtime to close a session.
+
 ## Instance setup
 
 ```bash
@@ -27,7 +37,7 @@ BRIEF_REPO=$(echo "$CFG" | jq -r '.brief.repo // empty')
 ```
 
 Workspace/repo routing for handover destinations and offload context: **instance
-`CLAUDE.md`** (Cowork/Dev layout, client map). Do not embed absolute cwd tables.
+`AGENTS.md`** (Cowork/Dev layout, client map). Do not embed absolute cwd tables.
 
 ## Principles
 
@@ -46,7 +56,7 @@ Workspace/repo routing for handover destinations and offload context: **instance
     dedicated question before merge.
   - **Mixed → high wins. Unclear → high.** Block merge on conflicts, unresolved
     human comments, or code-failure CI. When CI is infra-blocked, local validation
-    on PR head may satisfy the gate (same suite as merge skill). Run babysit first
+    on PR head may satisfy the gate (same suite as merge skill). Run the available PR maintenance skill first
     for conflicts, human comments, or real test failures.
 - **Capture, don't execute.** Loose ideas → offload, not implementation now.
 - **One sweep, one checklist, one confirmation.** Pre-resolve sub-skill inputs.
@@ -108,7 +118,7 @@ archetype table → owner picks → emit prompts). Do not reimplement prompt gen
 **Fallback** if jump is missing or there was no material work — two lines only:
 
 ```
-Continuity: local handover in .cursor/tasks/ <or> none.
+Continuity: local handover in <session-cwd>/.briefs/ <or> none.
 Open issues: <list or none>.
 ```
 
@@ -158,7 +168,7 @@ plan node <id>: done
 
 ### Stage 2 — Execution & close report
 
-Hard rules: Conventional Commits per instance `CLAUDE.md`. Never force-push. Never
+Hard rules: Conventional Commits per instance `AGENTS.md`. Never force-push. Never
 push code to `main` without a branch. On failure, park as issue and continue.
 
 **GitHub signature (mandatory)** before any `gh pr create`, `gh issue create`, or
@@ -187,7 +197,7 @@ If Stage 2 produced material changes → heartbeat once per instance policy; not
 - ⏸️ **plan**: none active
 
 ### Continuity
-- ✅ **jump**: prompts in chat and/or `.cursor/tasks/<date>-<slug>.md`
+- ✅ **jump**: prompts in chat and/or `<session-cwd>/.briefs/<date>-<slug>.md`
 - ⏸️ **jump**: fallback
 - ✅ **heartbeat**: updated
 

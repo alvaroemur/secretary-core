@@ -47,7 +47,7 @@ BRIEF_REPO=$(echo "$CFG" | jq -r '.brief.repo // empty')
 - **Signature mandatory** on every `gh issue create` / comment — same as `dispatch`.
 - **Do not send mail, merge PRs, or rewrite skills** unless Stage/owner explicitly asks for that
   separate work.
-- Resolve repos via `dispatch.executor.repos` / instance `CLAUDE.md` — never hardcode slugs.
+- Resolve repos via `dispatch.executor.repos` / instance `AGENTS.md` — never hardcode slugs.
 
 ## Inputs
 
@@ -145,4 +145,4 @@ Add a second line only for warnings (out-of-allowlist repo, redirected to sec-wr
 escalated to `para-alvaro` at N=3).
 
 Use judgment on the detail; don't enumerate every case. Owner language, git conventions, and
-workspace maps live in runtime `CLAUDE.md`.
+workspace maps live in runtime `AGENTS.md`.

@@ -77,5 +77,5 @@ secretary paths                # all configured destinations
 
 Use the printed path in the skill report; do not hardcode `extractors/...`.
 
-User language, git conventions, and folder layout live in runtime `CLAUDE.md`. Wiki integration is
+User language, git conventions, and folder layout live in runtime `AGENTS.md`. Wiki integration is
 handled by `sec-sys-integrate` inside `wiki-update`.

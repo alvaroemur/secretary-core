@@ -239,7 +239,6 @@ def collect_system_taxonomy(config: dict[str, Any] | None = None) -> dict[str, A
 def collect_skills(config: dict[str, Any] | None = None) -> list[SkillInfo]:
     """Scan and list all active skills across known directories."""
     skill_dirs: list[Path] = [
-        core_root() / "portable" / "skills",
         Path.home() / ".agents" / "skills",
         Path.home() / ".claude" / "skills",
         Path.home() / ".cursor" / "skills",
@@ -479,7 +478,7 @@ def collect_host_context(cwd: Path | None = None) -> HostRepoContext:
 
     local_rules_path: Optional[str] = None
     local_rules_content: Optional[str] = None
-    for cand in [target_dir / "AGENTS.md", target_dir / "CLAUDE.md", target_dir / ".cursorrules"]:
+    for cand in [target_dir / "AGENTS.md", target_dir / ".cursorrules"]:
         if cand.is_file():
             local_rules_path = str(cand)
             local_rules_content = _safe_read_text(cand)

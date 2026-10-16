@@ -7,7 +7,7 @@ import shutil
 import sys
 from pathlib import Path
 
-SKILLS = ('wind-down', 'sec-project-sync', 'handover', 'jump')
+SKILLS = ('wind-down', 'desk-project-sync', 'sec-project-sync', 'handover', 'jump')
 
 
 def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = False,

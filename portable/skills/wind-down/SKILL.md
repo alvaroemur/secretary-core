@@ -1,7 +1,6 @@
 ---
 name: wind-down
 description: Cierra la sesión con una sola recogida de estado, instrucciones estables y un brief de continuidad portable. Resuelve solo los pendientes de esta sesión.
-user-invocable: true
 ---
 
 # wind-down
@@ -13,15 +12,15 @@ Al cerrar una sesión, reutiliza su contexto. No abras una sesión auxiliar ni u
 1. Identifica los repos y archivos que esta sesión tocó. Recoge decisiones, trabajo terminado, bloqueos y siguiente acción de la conversación. Si el historial no permite identificar un archivo, declara la incertidumbre; no atribuyas cambios ajenos.
 2. Para cada repo, crea una sola instantánea temporal mediante `secretary-portable close-snapshot --repo <checkout-real> --session-id <id> --path <archivo> --decision <decisión> --next <acción> --output <temporal.json>`. Repite las opciones según haga falta. En instalaciones del core que ya incluyan el comando, `secretary efficiency` es equivalente. Sin archivos tocados, omite `--path`; nunca uses el último commit como sustituto.
 3. Consulta una vez el PR de la rama y los commits sin publicar. No recorras otros worktrees ni repos ajenos a la sesión. Menciona cambios ajenos conocidos una vez, sin modificarlos.
-4. Entrega el mismo objeto `close_context` a `sec-project-sync`, `handover` y `jump`. No deben volver a recopilar git ni la conversación.
+4. Entrega el mismo objeto `close_context` a `desk-project-sync`, `handover` y `jump`. No deben volver a recopilar git ni la conversación.
 
 `close_context` contiene: id de sesión, checkout real, rama, commit, archivos tocados con estado, decisiones, resultado, bloqueos, siguiente acción, PR, ruta del brief y referencias. El snapshot mecánico aporta git; el agente agrega la información de la sesión. No contiene transcripciones ni credenciales.
 
 ## Propuesta única
 
-- `sec-project-sync`: revisar solo archivos tocados y decisiones estables; actualizar `AGENTS.md` cuando cambie una regla, comando, fuente canónica o convención.
+- `desk-project-sync`: revisar solo archivos tocados y decisiones estables; actualizar `AGENTS.md` cuando cambie una regla, comando, fuente canónica o convención.
 - `handover`: escribir o actualizar un único brief para la continuidad. `jump` reutiliza ese brief para ofrecer una continuación; no crea otro.
-- Ideas sueltas: capturar mediante el skill disponible de dispatch/offload. No ejecutarlas.
+- Ideas sueltas: capturar mediante el skill disponible de delegate/offload. No ejecutarlas.
 - Hechos durables y hitos: enrutar a memoria/wiki mediante el skill correspondiente; no incorporarlos como estado transitorio en `AGENTS.md`.
 - Avance comunicado por el usuario: persistir lo pendiente con `secretary status`.
 - Issues afectados: comprobar las relaciones en ambas direcciones antes de declarar cierre.
@@ -39,3 +38,8 @@ Muestra una lista breve de acciones concretas y bloqueos. Si el usuario ya autor
 - Mantén el brief de esta sesión en el repo correspondiente. Para Cowork/Dev usa `<checkout>/.briefs/`; nunca la carpeta de briefs de la instancia.
 
 Reporte final: resultado, instrucciones estables actualizadas (o ninguna), enlace al brief único, PR/issue y bloqueos. Omite secciones vacías. No declares verificaciones que no se ejecutaron.
+
+
+## Integración opcional con Desk
+
+Cuando Secretary esté disponible, reutiliza `close_context` para registrar avances, PR, bloqueos y decisiones pendientes mediante `secretary status`. No vuelvas a inspeccionar otros repos o worktrees. Actualiza desk-heartbeat según la política vigente si hubo cambios materiales. Las propuestas nuevas se registran sin habilitarlas; una preparación autónoma requiere la política `prepare-pr-v1` o autorización específica. Este cierre sigue funcionando sin Secretary. Brief-update publica el estado; wind-down no envía correos ni duplica el brief.

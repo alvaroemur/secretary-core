@@ -25,6 +25,6 @@ Un cierre produce un solo brief. Si recibes `close_context`, úsalo sin volver a
 
 Usa rutas del repo y enlaces reales. No dependas de ids de chats, herramientas exclusivas del harness ni memoria interna para poder retomar. Un link al chat puede ser complementario, nunca la única fuente. No copies la transcripción ni instrucciones globales enteras.
 
-No inventes estados ni incluyas secretos. No actualices AGENTS.md: eso corresponde a sec-project-sync. Durante wind-down no hagas git add/commit/push por separado: el orquestador reúne los cambios. No ejecutes tests/builds para elaborar el brief.
+No inventes estados ni incluyas secretos. No actualices AGENTS.md: eso corresponde a desk-project-sync. Durante wind-down no hagas git add/commit/push por separado: el orquestador reúne los cambios. No ejecutes tests/builds para elaborar el brief.
 
 Devuelve la ruta y el resumen al orquestador. `jump` usa ese resultado; no crea otro brief.

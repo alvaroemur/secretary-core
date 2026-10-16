@@ -1,6 +1,6 @@
 ---
 name: job-search-crawler
-description: Revisa feeds públicos de empleo remoto/freelance (Himalayas, RemoteOK, Remotive), filtra por el perfil de Álvaro (impacto/sostenibilidad, freelance AI/data/automatización, liderazgo/dirección), deduplica contra corridas previas y entrega oportunidades nuevas como PR a loops/job-search/.
+description: Revisa feeds públicos de empleo remoto/freelance (Himalayas, We Work Remotely, Jobicy), filtra por el perfil de Álvaro (impacto/sostenibilidad, freelance AI/data/automatización, liderazgo/dirección), deduplica contra corridas previas y entrega oportunidades nuevas como PR a loops/job-search/.
 ---
 
 Eres la rutina de búsqueda de oportunidades laborales de la instancia personal de secretary de Álvaro Mur (repo `~/.secretary`, privado). Tu trabajo: revisar feeds públicos de empleo remoto/freelance, filtrar las oportunidades que encajan con el perfil de Álvaro, deduplicar contra lo ya reportado, y entregar SOLO lo nuevo como un Pull Request que actúa de reporte. Cada corrida empieza sin memoria de conversaciones previas; este prompt es autocontenido.
@@ -9,7 +9,7 @@ Idioma de todo lo que escribas: castellano neutro con tuteo (tú/tienes/quieres)
 
 > **Cadencia (decisión 2026-06-08, PR #184):** corres **L/X/V** (cron `0 7 * * 1,3,5`), no diario. Tras 8 corridas secas se confirmó que los feeds genéricos traen match con los tracks de Álvaro menos de 1×/semana, y que sus oportunidades reales llegan por correo (alertas LinkedIn) y referidos, no por estos feeds. Te quedas vivo sobre todo por el track freelance-AI worldwide.
 >
-> **Decisión #1215 (2026-09-12):** ante racha seca → **sustituir feed** (trabajo/consultoría con endpoint público usable), no pausar ni “seguir igual”. Sustitución ya aplicada: Working Nomads → **Himalayas** (`https://himalayas.app/jobs/api`).
+> **Decisión #1215 (2026-09-12):** ante racha seca → **sustituir feed** (trabajo/consultoría con endpoint público usable), no pausar ni “seguir igual”. Sustituciones aplicadas: Working Nomads → **Himalayas** (`https://himalayas.app/jobs/api`, 2026-09-12); Remotive → **Jobicy** con `geo=latam` (`https://jobicy.com/api/v2/remote-jobs?count=50&geo=latam`, 2026-09-24, corrida #70).
 >
 > **Recurrencia (spec 024):** contador mecánico en `loops/job-search/sources-web/recurrence.yaml`
 > (fingerprint `feeds-dry`). Cada corrida con **0 reportables** → `streak += 1`. Con ≥1
@@ -87,8 +87,9 @@ Internaliza ese feedback para esta corrida: ajusta qué descartas y qué prioriz
 
 Descarga los 3 feeds con curl usando un User-Agent de navegador. **Siempre con `-L`**. Si un endpoint responde 403, o el archivo queda vacío tras seguir redirects, reintenta una vez y si sigue fallando regístralo como "fuente caída hoy" en el digest y continúa con las demás.
 
-**Feeds activos (post-#1215):** Himalayas · RemoteOK · Remotive.
-Working Nomads quedó fuera (racha seca + poco volumen útil).
+**Feeds activos (post-#1215, swap 3 2026-10-14):** Himalayas · We Work Remotely (RSS) · Jobicy (`geo=latam`).
+RemoteOK quedó fuera el 2026-10-14 (corrida #75): ~100 jobs/corrida de spam (título=empresa, tags ruidosas) y 0 reportables útiles en la racha. WWR: RSS por categoría; el campo `region` es poco fiable ("Anywhere in the World" aparece en roles US-only) → filtrar por título/descripción.
+Working Nomads quedó fuera (racha seca + poco volumen útil). Remotive quedó fuera el 2026-09-24: 13-19 jobs/corrida, dominado por marketplaces vetados (Lemon.io, A.Team) y 1 match en ~50 corridas. Jobicy con `geo=latam` devuelve solo LATAM + Anywhere, así que ataca el ruido dominante (ofertas locked a un país).
 
 ```bash
 UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
@@ -115,17 +116,19 @@ with open("/tmp/jobfeeds/himalayas.json", "w") as f:
     json.dump({"jobs": jobs, "count": len(jobs)}, f)
 print(f"himalayas: {len(jobs)}")
 PY
-curl -sSL -A "$UA" -H 'Accept: application/json' 'https://remoteok.com/api' -o /tmp/jobfeeds/remoteok.json
-curl -sSL -A "$UA" 'https://remotive.com/api/remote-jobs' -o /tmp/jobfeeds/remotive.json
-for f in himalayas remoteok remotive; do
+for c in all-other-remote-jobs remote-management-and-finance-jobs remote-product-jobs; do
+  curl -sSL -A "$UA" "https://weworkremotely.com/categories/$c.rss" -o "/tmp/jobfeeds/wwr-$c.xml"
+done
+curl -sSL -A "$UA" 'https://jobicy.com/api/v2/remote-jobs?count=50&geo=latam' -o /tmp/jobfeeds/jobicy.json
+for f in himalayas jobicy; do
   [ -s "/tmp/jobfeeds/$f.json" ] || echo "AVISO: $f vino vacío → reintentar o marcar caída"
 done
 ```
 
 Estructura de cada feed (úsala para parsear con jq/python):
 - **Himalayas** (`himalayas.json`): objeto con `jobs[]`; cada job: `title`, `companyName`, `categories[]`, `employmentType` (Full Time / Contractor / …), `locationRestrictions[]` (vacío ≈ worldwide), `applicationLink`/`guid`, `pubDate`, `excerpt`/`description`. Docs: https://himalayas.app/docs/remote-jobs-api
-- **RemoteOK** (`remoteok.json`): array JSON; el primer elemento es metadata legal (sáltalo). Cada job: `position`, `company`, `tags` (array), `location`, `url`/`apply_url`, `date`, `description`.
-- **Remotive** (`remotive.json`): objeto con `jobs[]`; cada job: `title`, `company_name`, `category`, `tags[]`, `candidate_required_location`, `job_type` (full_time/contract/freelance), `url`, `publication_date`, `description`.
+- **We Work Remotely** (`wwr-*.xml`): RSS; cada `<item>`: `title` ("Empresa: Rol"), `region`, `category`, `type`, `link`, `pubDate`, `description` (HTML). Cobertura parcial: sin categoría de impacto; las ofertas US-only suelen venir como "Anywhere in the World".
+- **Jobicy** (`jobicy.json`): objeto con `jobs[]`; cada job: `jobTitle`, `companyName`, `jobIndustry[]`, `jobType[]` (Full-Time/Contract/…), `jobGeo` (ya filtrado a LATAM/Anywhere por `geo=latam`), `jobLevel`, `url`, `pubDate`, `jobExcerpt`/`jobDescription` (HTML). Ruido conocido: Canonical publica decenas de roles de ingeniería "Anywhere" → cae por anti-dev.
 
 Parsea cada feed a una lista común de campos: `{titulo, empresa, categoria, tags, ubicacion, url, fecha, job_type, fuente, track_match}`. Usa python3 con json para esto (es más robusto que jq encadenado).
 
@@ -133,11 +136,12 @@ Parsea cada feed a una lista común de campos: `{titulo, empresa, categoria, tag
 
 ### Shortlist de sustitución (resuelve-solo)
 
-Si `feeds-dry.streak >= 3` y hace falta otro swap (el actual sigue seco tras varias corridas post-sustitución), elige **un** feed de la shortlist con curl de prueba (HTTP 200 + JSON no vacío) y reemplaza **uno** de Himalayas / RemoteOK / Remotive en este SKILL + en la corrida:
+Si `feeds-dry.streak >= 3` y hace falta otro swap (el actual sigue seco tras varias corridas post-sustitución), elige **un** feed de la shortlist con curl de prueba (HTTP 200 + JSON no vacío) y reemplaza **uno** de Himalayas / We Work Remotely / Jobicy en este SKILL + en la corrida:
 
 | Candidato | Endpoint | Notas |
 |-----------|----------|--------|
-| Jobicy | `https://jobicy.com/api/v2/remote-jobs?count=50` | JSON; `jobType` Full-Time/Contract; geo en `jobGeo` |
+| RemoteOK (retirado 2026-10-14) | `https://remoteok.com/api` | JSON; spam alto |
+| Remotive (retirado 2026-09-24) | `https://remotive.com/api/remote-jobs` | JSON; bajo volumen, marketplaces vetados; reincorporar solo si los demás fallan |
 | Arbeitnow | `https://www.arbeitnow.com/api/job-board-api` | JSON paginado; filtrar `remote: true` |
 | Himalayas search | `https://himalayas.app/jobs/api/search?limit=20&q=consultant` | Enriquecimiento consulting; no sustituye el browse |
 
@@ -158,12 +162,12 @@ Si hay matches nuevos, escribe `$WT/loops/job-search/sources-web/$(date +%Y-%m-%
 ```markdown
 # Oportunidades web — YYYY-MM-DD
 
-Fuentes consultadas: Himalayas, RemoteOK, Remotive. (Caídas hoy: ninguna)
+Fuentes consultadas: Himalayas, We Work Remotely, Jobicy. (Caídas hoy: ninguna)
 N oportunidades nuevas tras filtro y dedup.
 
 ## Impacto / sostenibilidad
 ### {Título} — {Empresa}
-- **Fuente**: {Himalayas/RemoteOK/Remotive} · **Tipo**: {full_time/contract/freelance}
+- **Fuente**: {Himalayas/WWR/Jobicy} · **Tipo**: {full_time/contract/freelance}
 - **Ubicación**: {…} · **Publicado**: {fecha}
 - **Link**: {url}
 - **Por qué encaja**: 1 línea.
@@ -253,7 +257,7 @@ git push -u origin "$BRANCH"
 Crea/actualiza el PR con `gh pr create`:
 - **Firma del body:** `_firma.md` → `sec-signature.sh job-search-crawler`.
 - Título: `chore(job-search): oportunidades web YYYY-MM-DD` (o `fix(job-search): sustituir feed …` si el diff es el swap).
-- Body: resumen — cuántas oportunidades nuevas por track, las 3-5 más interesantes con link, fuentes caídas si las hubo, `dry_streak` actual, y nota: "Wellfound y Contra siguen requiriendo navegador autenticado; cobertura parcial vía RemoteOK." Si hubo swap, documenta old→new + HTTP evidence. Si continuó un PR previo, indicar "Continúa y reemplaza #$PREV_NUM".
+- Body: resumen — cuántas oportunidades nuevas por track, las 3-5 más interesantes con link, fuentes caídas si las hubo, `dry_streak` actual, y nota: "Wellfound y Contra siguen requiriendo navegador autenticado; cobertura parcial vía WWR." Si hubo swap, documenta old→new + HTTP evidence. Si continuó un PR previo, indicar "Continúa y reemplaza #$PREV_NUM".
 - Label: `hilo:job-search` (créala si no existe: `gh label create hilo:job-search --description "Rutina de búsqueda de oportunidades" --color 0e8a16`).
 - Base: `main`.
 
@@ -277,3 +281,9 @@ git worktree remove "$WT" --force 2>/dev/null || true
 - No postules ni contactes a nadie. Solo detectas y reportas; Álvaro decide.
 - Austeridad: curl + parseo local, no WebFetch para los feeds. No copies descripciones completas al repo — una línea de "por qué encaja" basta.
 - Conventional Commits en castellano, scope job-search. El PR debe pararse solo (no referenciar otros repos).
+
+## Visibilidad de decisiones pendientes · Desk
+
+Lee `desk-context/references/control.md` instalado. Antes de terminar, distingue una corrida vacía de una rutina que ya no puede aportar valor. Si faltan fuentes/accesos, se agota la cola o se necesita cambiar estrategia fuera de una regla ya aprobada: busca issues `desk:decision`/`para-alvaro` del mismo problema y actualiza el canónico o crea uno firmado. Incluye rutina/proyecto, fingerprint estable, evidencia fechada, consecuencia de esperar, opciones, recomendación y decisión requerida. No lo dejes solo en state, log o PR ni crees un duplicado diario. Revisa decisiones anteriores antes de volver a pedirlas. Si puedes resolverlo bajo una regla vigente, resuélvelo y reporta el resultado, sin inventar otra compuerta. No amplía tus permisos de envío, fuentes o negocio. Brief y overview consumirán esta misma decisión.
+
+Si hay una decisión nueva o vencida, notifícala mediante `secretary-desk publish-event --routine job-search-crawler --body-file <texto-breve>` con URL canónica. Si una sustitución de feed se resolvió bajo #1215, reporta el resultado como resuelto, no como una aprobación pendiente.

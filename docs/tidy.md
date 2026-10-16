@@ -43,7 +43,7 @@ Git y actividad caducan a los cinco minutos. No fabricar este archivo ni deducir
 1. Evaluar y revisar alcance, referencias y método de ordenamiento vigente.
 2. Reclamar el repo con `--claim acquire --fingerprint <fingerprint>`. Guardar el token del intento. Un reclamo existente bloquea; nunca se toma por timeout.
 3. Volver a evaluar con evidencia fresca; contrato y alcance deben coincidir. Una condición, cuerpo o autorización que cambie invalida el intento.
-4. Preparar un worktree propio desde la base remota comprobada. Mover solo archivos versionados de esa copia aislada, actualizar referencias y validar. No mover archivos del checkout activo ni ignorados/untracked. Si el plan necesita esos archivos o cambiar permisos, publicar propuesta sin efectos.
+4. Preparar un worktree propio desde la base remota comprobada. Mover solo archivos versionados de esa copia aislada, por archivo según `git ls-files`, actualizar referencias y validar. No mover carpetas completas que puedan arrastrar ignorados. No mover archivos del checkout activo ni ignorados/untracked. Si el plan necesita esos archivos o cambiar permisos, publicar propuesta sin efectos.
 5. Entregar un PR enlazado al issue, comprobar el conjunto de rutas real y registrar resultado. No reutilizar el permiso genérico de preparación para borrar, archivar backups, mutar Drive, cambiar reglas de autoridad ni desplegar.
 6. Liberar con `--claim release --token <token>`, también ante fallo controlado. Un fallo incierto conserva el reclamo hasta comprobar el estado anterior. Nunca liberar un token ajeno ni ejecutar un intento que perdió el reclamo.
 

@@ -167,6 +167,12 @@ def notify(cfg: dict, repo: str, number: int, body_file: Path) -> dict:
     account = cfg.get('accounts', {}).get('personal')
     if setting.get('brief_email') is not True or not account:
         raise ValueError('Notificación al propietario no habilitada o cuenta ausente')
+    # Remitente opcional: cuenta que envía y dirección "Enviar como". El destinatario sigue siendo solo `account`.
+    sender_account = setting.get('send_account') or account
+    sender_from = setting.get('from')
+    known = set(cfg.get('accounts', {}).values())
+    if sender_account not in known:
+        raise ValueError('send_account debe ser una cuenta registrada en accounts')
     if repo != cfg.get('brief', {}).get('repo'):
         raise ValueError('Solo se notifica el repositorio del brief')
     issue = json.loads(command(['gh', 'issue', 'view', str(number), '--repo', repo, '--json', 'title,url,createdAt,labels']))
@@ -179,7 +185,7 @@ def notify(cfg: dict, repo: str, number: int, body_file: Path) -> dict:
     ledger = root/(today+'.json')
     with (root/(today+'.lock')).open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        sent = json.loads(command(['gog', '--account', account, '--json', 'gmail', 'search',
+        sent = json.loads(command(['gog', '--account', sender_account, '--json', 'gmail', 'search',
                                   f'in:sent to:{account} subject:"{subject}"', '--max', '5']))
         if sent.get('threads') or sent.get('messages') or (ledger.exists() and json.loads(ledger.read_text()).get('state') == 'sent'):
             return {'state': 'already-sent'}
@@ -187,8 +193,11 @@ def notify(cfg: dict, repo: str, number: int, body_file: Path) -> dict:
             raise ValueError('Envío previo incierto: revisar Enviados antes de reintentar')
         ledger.write_text(json.dumps({'state': 'sending', 'issue': issue['url']})+'\n')
         # Only the configured owner can receive this notification; no arbitrary recipients.
-        response = json.loads(command(['gog', '--account', account, '--json', '--no-input', 'gmail', 'send',
-                                      '--to', account, '--subject', subject, '--body-file', str(body_file)]))
+        send = ['gog', '--account', sender_account, '--json', '--no-input', 'gmail', 'send',
+                '--to', account, '--subject', subject, '--body-file', str(body_file)]
+        if sender_from:
+            send += ['--from', sender_from]
+        response = json.loads(command(send))
         if not (response.get('id') or response.get('messageId') or response.get('message', {}).get('id')):
             raise ValueError('Respuesta de envío sin ID; verificar Enviados')
         ledger.write_text(json.dumps({'state': 'sent', 'issue': issue['url'], 'response': response})+'\n')

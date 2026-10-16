@@ -58,6 +58,20 @@ class DeskTests(unittest.TestCase):
             self.assertTrue((target/'pulse/SKILL.md').exists())
             self.assertTrue(all(not x['changed'] for x in deployment(source,[target],runtime)))
 
+    def test_reporting_overlay_preserves_private_procedure_and_is_repeatable(self):
+        source = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); scheduled = root/'scheduled'
+            procedure = scheduled/'private-routine/SKILL.md'
+            procedure.parent.mkdir(parents=True)
+            procedure.write_text('Private business procedure.\n')
+            deployment(source, [], root/'runtime', True, scheduled)
+            first = procedure.read_text()
+            self.assertTrue(first.startswith('Private business procedure.'))
+            self.assertIn('--evidence', first)
+            deployment(source, [], root/'runtime', True, scheduled)
+            self.assertEqual(procedure.read_text(), first)
+
     def test_catalog_does_not_count_alias_as_an_extra_procedure(self):
         from secretary.context import collect_skills
         with tempfile.TemporaryDirectory() as tmp:

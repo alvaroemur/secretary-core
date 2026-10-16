@@ -30,6 +30,41 @@ class TidyTests(unittest.TestCase):
             with self.assertRaises(ValueError): claim(root, 'owner/repo', '', first['token'])
             self.assertNotEqual(first['token'], second['token'])
 
+    def test_concurrent_claims_have_only_one_winner(self):
+        from concurrent.futures import ThreadPoolExecutor
+        with tempfile.TemporaryDirectory() as tmp:
+            def attempt(_):
+                try:
+                    return claim(Path(tmp), 'owner/repo', 'a' * 64)['state']
+                except ValueError:
+                    return 'blocked'
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                states = list(executor.map(attempt, range(2)))
+            self.assertEqual(sorted(states), ['blocked', 'claimed'])
+
+    def test_clean_repo_inspection_expands_index_and_dirty_index_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            def git(*args):
+                return subprocess.check_output(['git', '-C', str(root), *args], text=True, stderr=subprocess.DEVNULL).strip()
+            git('init', '-b', 'main'); git('config', 'user.name', 'Test'); git('config', 'user.email', 'test')
+            (root/'docs/old').mkdir(parents=True); (root/'docs/old/file.md').write_text('content')
+            (root/'README.md').write_text('See docs/old/file.md')
+            git('add', '.'); git('commit', '-m', 'base')
+            base = git('rev-parse', 'HEAD'); git('update-ref', 'refs/remotes/origin/main', base)
+            from secretary.tidy import command as actual
+            def fake(args):
+                if args[0] != 'gh': return actual(args)
+                return base if 'commits/main' in ' '.join(args) else '[]'
+            with patch('secretary.tidy.command', side_effect=fake):
+                result = inspect(root, 'owner/repo', self.request)
+                self.assertEqual(result['state'], 'eligible-for-pr')
+                self.assertIn('README.md', result['scope'])
+                (root/'README.md').write_text('Updated index: docs/old/file.md')
+                result = inspect(root, 'owner/repo', self.request, self.activity)
+                self.assertEqual(result['state'], 'blocked')
+                self.assertEqual(result['effects'], [])
+
     def test_duplicate_destinations_and_crossed_targets_are_rejected(self):
         self.request['targets'].append({'from': 'other/source', 'to': 'docs/new'})
         with tempfile.TemporaryDirectory() as tmp:
@@ -109,7 +144,7 @@ class TidyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); (root/'index.md').write_text('docs/old')
             (root/'other.md').write_text('see old')
-            with patch('secretary.tidy.git', return_value='index.md\0other.md\0'):
+            with patch('secretary.tidy.reference_files', return_value=['index.md', 'other.md']):
                 affected, errors = scope(validate(self.request, root), root)
             self.assertIn('index.md', affected)
             self.assertTrue(errors)
@@ -119,7 +154,7 @@ class TidyTests(unittest.TestCase):
             root = Path(tmp)/'repo'; root.mkdir()
             def git(*args):
                 return subprocess.check_output(['git', '-C', str(root), *args], text=True, stderr=subprocess.DEVNULL).strip()
-            git('init', '-b', 'main'); git('config', 'user.name', 'Test'); git('config', 'user.email', 'test@example.com')
+            git('init', '-b', 'main'); git('config', 'user.name', 'Test'); git('config', 'user.email', 'test')
             (root/'tracked').write_text('one'); git('add', '.'); git('commit', '-m', 'base')
             base = git('rev-parse', 'HEAD'); git('update-ref', 'refs/remotes/origin/main', base)
             wt = Path(tmp)/'parked'; git('worktree', 'add', '-b', 'parked', str(wt))

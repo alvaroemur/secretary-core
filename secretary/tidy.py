@@ -1,4 +1,4 @@
-"""Read-only eligibility checks for deferred repository reorganization."""
+"""Evalúa condiciones y rutas de reorganización; solo lectura salvo reclamos explícitos."""
 from __future__ import annotations
 
 import argparse
@@ -30,7 +30,7 @@ def relative(value: str) -> str:
     if not isinstance(value, str) or not value or any(ord(c) < 32 for c in value):
         raise ValueError('Ruta vacía o con caracteres de control')
     p = PurePosixPath(value)
-    if p.is_absolute() or '..' in p.parts or '.git' in p.parts or '\\' in value:
+    if p.is_absolute() or '..' in p.parts or any(part.casefold() == '.git' for part in p.parts) or '\\' in value:
         raise ValueError('Ruta fuera del alcance: ' + value)
     if str(p) == '.':
         raise ValueError('Declarar rutas concretas, no todo el repo')
@@ -98,7 +98,7 @@ def status_paths(raw: str) -> list[str]:
 
 
 def observe(root: Path, repo: str) -> dict:
-    """Read all worktrees, local pending commits, shared stashes and open PRs."""
+    """Consulta worktrees, commits pendientes, stashes compartidos y PRs abiertos."""
     observed = {'captured_at': datetime.now(timezone.utc).isoformat(), 'worktrees': [], 'pending': [], 'prs': [], 'errors': []}
     try:
         lines = git(root, 'worktree', 'list', '--porcelain').splitlines()
@@ -145,16 +145,30 @@ def observe(root: Path, repo: str) -> dict:
     return observed
 
 
+def reference_files(root: Path, needles: list[str]) -> list[str]:
+    args = ['git', '-C', str(root), 'grep', '-I', '-l', '-z', '-F']
+    for needle in needles:
+        args += ['-e', needle]
+    p = subprocess.run(args + ['--'], capture_output=True, text=True, timeout=60)
+    if p.returncode not in [0, 1]:
+        raise RuntimeError(p.stderr.strip() or 'No se pudieron revisar referencias')
+    return [relative(name) for name in p.stdout.split('\0') if name]
+
+
 def scope(request: dict, root: Path) -> tuple[list[str], list[str]]:
-    """Expand scope with tracked references to old/new paths; ambiguous basenames block."""
+    """Amplía el alcance con referencias versionadas; bloquea nombres ambiguos."""
     affected = {p for target in request['targets'] for p in target.values()} | set(request['dependencies'])
     errors = []
     sources = [t['from'] for t in request['targets']]
-    for name in git(root, 'ls-files', '-z').split('\0'):
+    needles = sources + [PurePosixPath(old).name for old in sources]
+    for name in reference_files(root, needles):
         if not name:
             continue
         path = root / name
         if path.is_symlink() or not path.is_file():
+            continue
+        if path.stat().st_size > 4 * 1024 * 1024:
+            errors.append('Referencia en archivo grande; delimitar manualmente: ' + name)
             continue
         data = path.read_bytes()
         if b'\0' in data:
@@ -229,6 +243,9 @@ def inspect(root: Path, repo: str, request: dict, activity: dict | None = None) 
     observed = observe(root, repo)
     affected, errors = scope(request, root)
     for target in request['targets']:
+        tracked = git(root, 'ls-files', '-z', '--', target['from'])
+        if not tracked:
+            errors.append('Origen sin archivos versionados: ' + target['from'])
         if not (root / target['from']).exists():
             errors.append('Origen ausente: ' + target['from'])
         if (root / target['to']).exists():
@@ -244,7 +261,7 @@ def inspect(root: Path, repo: str, request: dict, activity: dict | None = None) 
 
 
 def claim(directory: Path, repo: str, fingerprint: str, token: str = "") -> dict:
-    """Serialize preparation per repo. A crashed claim never expires into execution."""
+    """Serializa preparaciones por repo, sin recuperar reclamos solo por tiempo."""
     directory.mkdir(parents=True, exist_ok=True)
     key = hashlib.sha256(repo.encode()).hexdigest()
     lease = directory / (key + '.json')
@@ -267,7 +284,8 @@ def claim(directory: Path, repo: str, fingerprint: str, token: str = "") -> dict
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--repo', required=True)
+    parser.add_argument('--repo')
+    parser.add_argument('--queue', action='store_true', help='Descubrir solicitudes abiertas en la allowlist; solo lectura')
     parser.add_argument('--request', type=Path)
     parser.add_argument('--issue', type=int)
     parser.add_argument('--claim', choices=['acquire', 'release'], help='Reclamo local explícito: no mueve archivos ni autoriza ejecución')
@@ -275,7 +293,25 @@ def main() -> None:
     parser.add_argument('--token', default='')
     parser.add_argument('--activity', type=Path, help='Evidencia fresca de un colector de sesiones confiable; no inferir cobertura')
     args = parser.parse_args()
-    matches = [e for e in dispatch_executor_repos(load_config()) if e['repo'] == args.repo]
+    entries = dispatch_executor_repos(load_config())
+    if args.queue:
+        if args.request or args.issue or args.activity or args.claim:
+            raise ValueError('Descubrimiento y evaluación son operaciones separadas')
+        selected = [e for e in entries if not args.repo or e['repo'] == args.repo]
+        if not selected:
+            raise ValueError('Allowlist vacía o repo no habilitado')
+        found = []; errors = []
+        for entry in selected:
+            try:
+                issues = json.loads(command(['gh', 'issue', 'list', '--repo', entry['repo'], '--state', 'open', '--label', 'tag:tidyup', '--limit', '1000', '--json', 'number,title,url']))
+                if len(issues) >= 1000:
+                    errors.append(entry['repo'] + ': cola posiblemente truncada')
+                found.extend({'repo': entry['repo'], **issue} for issue in issues)
+            except (RuntimeError, ValueError) as exc:
+                errors.append(entry['repo'] + ': ' + str(exc))
+        print(json.dumps({'state': 'partial' if errors else 'observed', 'requests': found, 'errors': errors}, ensure_ascii=False, indent=2))
+        return
+    matches = [e for e in entries if e['repo'] == args.repo]
     if len(matches) != 1:
         raise ValueError('Repo ausente o duplicado en allowlist')
     root = Path(matches[0]['path'])
@@ -311,4 +347,8 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (RuntimeError, ValueError, OSError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
+        print(json.dumps({'state': 'blocked', 'error': str(exc), 'effects': []}, ensure_ascii=False))
+        raise SystemExit(1) from exc

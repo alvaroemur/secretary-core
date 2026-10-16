@@ -17,6 +17,7 @@ Condiciones: `{"type":"issue-completed","repo":"owner/repo","number":12}` exige 
 ## Consultas
 
 ```bash
+python -m secretary.tidy --queue
 python -m secretary.tidy --repo owner/repo --issue 12
 python -m secretary.tidy --repo owner/repo --request request.json
 ```

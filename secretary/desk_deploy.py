@@ -24,6 +24,7 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
             if origin.is_dir():
                 copies.extend((p, target/name/p.relative_to(origin)) for p in origin.rglob('*') if p.is_file())
     copies.append((source/'secretary/desk.py', runtime/'desk.py'))
+    copies.append((source/'secretary/brief_html.py', runtime/'brief_html.py'))
     if scheduled:
         # Existing IDs and paths remain stable; no extra schedule is registered.
         for name in ['dispatch-executor','pulse-headless','secretary-briefing','sec-dream',

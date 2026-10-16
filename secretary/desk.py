@@ -11,8 +11,13 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
-from secretary.brief_html import render as render_brief
 from secretary.config import load_config, instance_root
+try:
+    from secretary.brief_html import render as render_brief
+except ImportError:  # runtime desplegado: brief_html.py vive junto a desk.py
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from brief_html import render as render_brief
 
 
 def command(args: list[str]) -> str:

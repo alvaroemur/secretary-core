@@ -25,6 +25,14 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
                 copies.extend((p, target/name/p.relative_to(origin)) for p in origin.rglob('*') if p.is_file())
     copies.append((source/'secretary/desk.py', runtime/'desk.py'))
     if scheduled:
+        # Preserve the existing audit; append the gated conditional-reorganization contract.
+        tidy_contract = source/'routine-overlays/tidy-up/conditional.md'
+        tidy_target = scheduled/'tidy-up/SKILL.md'
+        if tidy_contract.is_file() and tidy_target.is_file():
+            marker = '\n\n## Tareas condicionales · tidy-up'
+            existing = tidy_target.read_text().split(marker)[0]
+            overrides[str(tidy_target)] = (existing + tidy_contract.read_text()).encode()
+            copies.append((tidy_contract, tidy_target))
         # Existing IDs and paths remain stable; no extra schedule is registered.
         for name in ['dispatch-executor','pulse-headless','secretary-briefing','sec-dream',
                      'sec-heartbeat','job-search-crawler']:

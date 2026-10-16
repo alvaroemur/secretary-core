@@ -409,6 +409,18 @@ def notification_plan(store: Store, cfg: dict, now: datetime | None = None) -> d
             'id':digest(kind+'\n'+day+'\n'+json.dumps(versions,sort_keys=True))}
 
 
+def refresh_questions(store: Store, cfg: dict):
+    """No avisar por preguntas de encargos cerrados o con un alcance ya distinto."""
+    for question in store.questions():
+        issue_ref(question['repo'],question['number'],cfg)
+        issue = github_issue(question['repo'],question['number'])
+        if issue['state'] != 'OPEN':
+            with store.transaction():
+                store.db.execute("UPDATE questions SET state='cancelled',answer=?,updated_at=? WHERE id=? AND version=?", ('Encargo cerrado en GitHub',stamp(),question['id'],question['version']))
+        elif digest(issue['body']) != question['scope_sha']:
+            raise ValueError('Alcance de pregunta cambió: revisar y publicar otra versión antes de avisar')
+
+
 def send_notifications(store: Store, cfg: dict, apply: bool = False) -> dict:
     # Recompute under the same transaction as reservation, not only a prior plan.
     with store.transaction():
@@ -465,7 +477,7 @@ def reconcile(store: Store, cfg: dict) -> list[dict]:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=['scan','pending','questions','watch','question','answer','ack','verify-source','receipt','notify','reconcile','claim-event','release-event','hold','resume','gate'])
+    parser.add_argument('action',choices=['scan','pending','questions','watch','question','answer','ack','verify-source','receipt','notify','reconcile','claim-event','release-event','hold','resume','gate','holds'])
     parser.add_argument('--repo'); parser.add_argument('--issue',type=int); parser.add_argument('--event')
     parser.add_argument('--id'); parser.add_argument('--version',type=int); parser.add_argument('--body-file',type=Path)
     parser.add_argument('--scope-sha'); parser.add_argument('--due',default=''); parser.add_argument('--outcome')
@@ -475,10 +487,10 @@ def main():
         print(json.dumps({'state':'disabled','reason':'Circuito no activado'})); return
     cfg = settings(config)
     path = Path(os.environ.get('SECRETARY_CONVERSATIONS_DB',str(Path.home()/'.local/state/secretary/conversations.sqlite3')))
-    if args.action in ['pending','questions'] and not path.is_file():
+    if args.action in ['pending','questions','holds'] and not path.is_file():
         print(json.dumps({'state':'uninitialized','reason':'Sin registro inicializado; no demuestra ausencia de pendientes'})); return
     store = Store(path)
-    if args.action in ['watch','question','receipt','hold','resume','gate']:
+    if args.action in ['watch','question','receipt','hold','resume','gate','holds']:
         issue_ref(args.repo,args.issue,cfg)
     if args.action == 'scan':
         result = {'mail':scan_mail(store,cfg),'github':scan_github(store,cfg)}
@@ -488,6 +500,7 @@ def main():
     elif args.action == 'release-event':
         store.release(args.event,args.token); result = {'state':'released'}
     elif args.action == 'questions': result = store.questions()
+    elif args.action == 'holds': result = [dict(row) for row in store.db.execute('SELECT * FROM holds WHERE active=1')]
     elif args.action == 'gate':
         issue = github_issue(args.repo,args.issue)
         result = store.gate(args.repo,args.issue,digest(issue['body']))
@@ -524,7 +537,9 @@ def main():
                   'owner_quote':event['payload']['body'],'effects':['read','local-edit','branch','open-pr'],
                   'requires_source_verification':True,'meaning':'Evidencia original, no clasificación semántica ni autorización automática'}
     elif args.action == 'reconcile': result = reconcile(store,cfg)
-    else: result = send_notifications(store,cfg,args.apply)
+    else:
+        refresh_questions(store,cfg)
+        result = send_notifications(store,cfg,args.apply)
     print(json.dumps(result,ensure_ascii=False,indent=2))
 
 

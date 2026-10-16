@@ -24,6 +24,7 @@ Registro SQLite local compartido entre rutinas y worktrees: `~/.local/state/secr
 python -m secretary.conversations scan
 python -m secretary.conversations pending
 python -m secretary.conversations questions
+python -m secretary.conversations holds
 ```
 
 Se capturan correos nuevos a la dirección Secretary y comentarios humanos en briefs desde la activación y en issues vigilados, incluidos briefs/issues cerrados. `watch --repo owner/repo --issue N` agrega un encargo al seguimiento. Las preguntas lo agregan automáticamente. Un correo nuevo no necesita pertenecer a un brief; su proyecto y alcance se interpretan antes de derivarlo.
@@ -50,7 +51,7 @@ Después de persistir el resultado en su issue: `ack --event <id> --outcome rout
 
 `notify` muestra un plan sin enviar; `notify --apply` envía solo con `question_email: true`. Agrupa preguntas nuevas de la corrida; destinatario fijo al propietario, remitente y Reply-To en Secretary. No usa notify-brief ni su límite de una notificación diaria: es una autorización separada para preguntas.
 
-Recordatorio como máximo uno por día local para preguntas todavía bloqueadas, y nunca antes de 24 horas desde su último aviso. Un plazo concreto dentro de cuatro horas admite un aviso excepcional por versión, separado al menos una hora del anterior. No inventar fechas ni urgencia para saltarse el límite. Una modificación de fecha es otra versión que debe justificarse en la fuente.
+Antes de avisar, se contrasta el issue: cerrarlo cancela su pregunta; cambiar el alcance exige revisar y publicar otra versión. Un error de lectura detiene el aviso. Recordatorio como máximo uno por día local para preguntas todavía bloqueadas, y nunca antes de 24 horas desde su último aviso. Un plazo concreto dentro de cuatro horas admite un aviso excepcional por versión, separado al menos una hora del anterior. No inventar fechas ni urgencia para saltarse el límite. Una modificación de fecha es otra versión que debe justificarse en la fuente.
 
 Un error tras reservar queda `sending`: bloquear reintentos. `reconcile` consulta Enviados por marcador único, remitente y destinatario y solo confirma coincidencias; no encontrar un mensaje no libera el intento. Resolver manualmente la incertidumbre antes de otra acción. Nunca marcar éxito sin ID.
 

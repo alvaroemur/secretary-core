@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from secretary.conversations import (Store, digest, notification_plan, plain, reconcile,
-                                     scan_github, scan_mail, send_notifications, verify_event, verify_mail)
+                                     scan_github, scan_mail, send_notifications, verify_event, verify_mail, refresh_questions)
 
 
 def address(local):
@@ -34,6 +34,15 @@ class ConversationTests(unittest.TestCase):
         question=self.store.question(key,'owner/repo',1,'Which scope? '+key,'a'*64,due)
         self.store.publication(question,'synthetic:question-comment')
         return question
+
+    def test_closed_issue_stops_reminders_and_changed_scope_requires_new_question(self):
+        self.add_question()
+        with patch('secretary.conversations.github_issue',return_value={'state':'OPEN','body':'changed'}):
+            with self.assertRaises(ValueError): refresh_questions(self.store,self.cfg)
+        self.assertEqual(len(self.store.questions()),1)
+        with patch('secretary.conversations.github_issue',return_value={'state':'CLOSED','body':'changed'}):
+            refresh_questions(self.store,self.cfg)
+        self.assertEqual(notification_plan(self.store,self.cfg)['state'],'no-op')
 
     def test_revocation_gate_blocks_only_its_issue_and_resume_is_not_authority(self):
         event=self.store.capture('owner-stop',{'body':'Pause report'},True)

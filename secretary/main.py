@@ -189,9 +189,9 @@ def config_show(
     """Dump resolved instance config (paths absolute)."""
     data = config_show_dict()
     if yaml_out:
-        console.print(yaml.dump(data, allow_unicode=True, default_flow_style=False))
+        typer.echo(yaml.dump(data, allow_unicode=True, default_flow_style=False), nl=False)
     else:
-        console.print(json.dumps(data, ensure_ascii=False, indent=2))
+        typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
 
 
 @config_app.command("path")
@@ -690,7 +690,7 @@ def modules_health(
 
     if out_fmt == OutputFormat.json:
         if module:
-            console.print(json.dumps(data, ensure_ascii=False, indent=2))
+            typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
         else:
             console.print(json.dumps(rows, ensure_ascii=False, indent=2))
         return

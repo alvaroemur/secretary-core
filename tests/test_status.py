@@ -14,6 +14,22 @@ class StatusTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(result.stdout, str(path) + "\n")
 
+    def test_config_show_json_is_parseable_with_long_paths(self):
+        import json
+        data = {"path": "/vol/" + "long directory/" * 12 + "file.yaml"}
+        with patch("secretary.main.config_show_dict", return_value=data):
+            result = CliRunner().invoke(app, ["config", "show"], env={"COLUMNS": "20"})
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(json.loads(result.stdout), data)
+
+    def test_config_show_yaml_keeps_original_path(self):
+        import yaml
+        data = {"path": "/vol/" + "long directory/" * 12 + "file.yaml"}
+        with patch("secretary.main.config_show_dict", return_value=data):
+            result = CliRunner().invoke(app, ["config", "show", "--yaml"], env={"COLUMNS": "20"})
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(yaml.safe_load(result.stdout), data)
+
     def test_progress_preserves_details_and_next_decision(self):
         with patch("secretary.status.load_config", return_value={}), patch("secretary.status.publish_event", return_value={"state": "already-published", "issue": 5}) as publish:
             issue, result = post_status("✅", "project", "Report uploaded", state="Slides pending", evidence="PR link", next_step="Review slides")

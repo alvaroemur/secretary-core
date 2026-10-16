@@ -1,7 +1,6 @@
 ---
 name: jump
 description: Propone continuaciones de la sesión y genera prompts para otro harness, reutilizando el brief único de wind-down cuando exista.
-user-invocable: true
 ---
 
 # jump

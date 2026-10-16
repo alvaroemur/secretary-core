@@ -250,6 +250,10 @@ def collect_skills(config: dict[str, Any] | None = None) -> list[SkillInfo]:
 
     seen_names: set[str] = set()
     skills: list[SkillInfo] = []
+    registry = Path(__file__).parent / "data" / "desk_names.json"
+    aliases = json.loads(registry.read_text()).get("skills", {}) if registry.is_file() else {}
+    installed = {entry.name for folder in skill_dirs if folder.is_dir()
+                 for entry in folder.iterdir() if (entry / "SKILL.md").is_file()}
 
     for sdir in skill_dirs:
         if not sdir.is_dir():
@@ -265,6 +269,9 @@ def collect_skills(config: dict[str, Any] | None = None) -> list[SkillInfo]:
                 continue
 
             name = entry.name if entry.is_dir() else entry.parent.name
+            # Compatibility aliases are callable, but not extra procedures.
+            if name in aliases and aliases[name] in installed:
+                continue
             if name in seen_names:
                 continue
 

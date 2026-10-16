@@ -419,6 +419,14 @@ def _sync_playbooks_and_skills() -> None:
                    Path.home()/".local/bin")
         print("  ✓ Portable close skills and configured pilots deployed")
 
+    # Desk is the final overlay: pilots and legacy sources must not restore the
+    # old label-is-consent contract. Native scheduler IDs remain untouched.
+    from secretary.desk_deploy import deployment as deploy_desk
+    deploy_desk(core_dir, [Path.home()/".agents/skills", dst_sk, Path.home()/".cursor/skills"],
+                Path.home()/".local/share/secretary/desk-runtime", True,
+                dst_pb, Path.home()/".local/bin")
+    print("  ✓ Desk skills, compatibility aliases and routine contracts deployed")
+
 
 def run_setup() -> int:
     """Run the interactive routines setup wizard."""

@@ -40,6 +40,22 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
                 existing = dst.read_text().split(marker)[0]
                 overrides[str(dst)] = (existing + origin.read_text()).encode()
                 copies.append((origin, dst))
+    if scheduled:
+        # Add a reporting-only contract to existing routines, preserving their procedure.
+        common = source/'routine-overlays/reporting.md'
+        if common.is_file():
+            copy_map = {dst: src for src, dst in copies}
+            destinations = set(scheduled.glob('*/SKILL.md')) | {dst for _, dst in copies if dst.parent.parent == scheduled and dst.name == 'SKILL.md'}
+            marker = '\n\n## Avances durante el día · Desk'
+            for dst in sorted(destinations):
+                if dst.parent.name == 'secretary-briefing':
+                    continue  # It creates the report; it must not report its own report.
+                original = overrides.get(str(dst))
+                if original is None:
+                    original = copy_map[dst].read_bytes() if dst in copy_map else dst.read_bytes()
+                overrides[str(dst)] = (original.decode().split(marker)[0] + common.read_text()).encode()
+                if dst not in copy_map:
+                    copies.append((common, dst))
     plan = []
     for src, dst in copies:
         data = overrides.get(str(dst), src.read_bytes());changed = not dst.exists() or dst.read_bytes() != data

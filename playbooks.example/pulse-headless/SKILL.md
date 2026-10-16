@@ -12,3 +12,5 @@ Busca el brief de la fecha local exacta. Si falta, registra el fallo; no comenta
 Deduplica por fingerprint del contenido, no por fecha: puede publicar otro avance durante el mismo día si cambió el estado. No envía otro correo, no modifica checkboxes, no crea issues/PR ni ejecuta encargos. Abrir PR es en revisión; fusionarlo se reporta aparte.
 
 La publicación material puede ejecutarse sin otro modelo usando `secretary-desk publish-event --routine <id> --body-file <texto>`. Esto permite avisos durante el día aunque no exista una tarea nativa periódica habilitada.
+
+Cada comentario incluye: avance logrado, estado actual, evidencia fechada y siguiente paso o decisión. Cruza los comentarios de avance más recientes antes de repetir el reporte matinal: un informe subido deja de figurar como pendiente, aunque la presentación siga abierta. Conserva la diferencia entre borrador, PR abierto y entrega integrada. Para sesiones y rutinas, `secretary status` admite `--state`, `--evidence` y `--next`; no requiere volver a detectar el proyecto.

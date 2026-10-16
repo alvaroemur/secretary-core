@@ -43,3 +43,5 @@ Reporte final: resultado, instrucciones estables actualizadas (o ninguna), enlac
 ## Integración opcional con Desk
 
 Cuando Secretary esté disponible, reutiliza `close_context` para registrar avances, PR, bloqueos y decisiones pendientes mediante `secretary status`. No vuelvas a inspeccionar otros repos o worktrees. Actualiza desk-heartbeat según la política vigente si hubo cambios materiales. Las propuestas nuevas se registran sin habilitarlas; una preparación autónoma requiere la política `prepare-pr-v1` o autorización específica. Este cierre sigue funcionando sin Secretary. Brief-update publica el estado; wind-down no envía correos ni duplica el brief.
+
+El comentario de avance explica el resultado logrado, el estado actual, la evidencia y el siguiente paso o decisión. Usa `secretary status "<emoji>" "<ref>" "<resultado>" --state "<estado>" --evidence "<enlaces>" --next "<pendiente>"`. No repitas pendientes que ya tienen evidencia de cierre; conserva otros asuntos abiertos.

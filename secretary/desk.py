@@ -207,7 +207,7 @@ def publish_event(cfg: dict, text: str, routine: str) -> dict:
     issue = max(current,key=lambda i:i['createdAt']);digest = hashlib.sha256((routine+'\n'+text).encode()).hexdigest()
     marker = '<!-- desk:event '+digest+' -->'
     comments = json.loads(command(['gh','issue','view',str(issue['number']),'--repo',repo,'--json','comments']))['comments']
-    if any(marker in c.get('body','') for c in comments):return {'state':'already-published'}
+    if any(marker in c.get('body','') for c in comments):return {'state':'already-published','issue':issue['number']}
     signer = Path(os.environ.get('SECRETARY_SIGNATURE',str(Path.home()/'.claude/scripts/sec-signature.sh')))
     if not signer.is_file():raise ValueError('Helper de firma ausente; no publicar sin firma')
     body = command([str(signer),'brief-update','--mark'])+'\n'+marker+'\n'+text+'\n\n---\n'+command([str(signer),'brief-update','--footer'])
@@ -215,7 +215,7 @@ def publish_event(cfg: dict, text: str, routine: str) -> dict:
     p = subprocess.run(['gh','issue','comment',str(issue['number']),'--repo',repo,'--body-file','-'],
                        input=body,capture_output=True,text=True,timeout=90)
     if p.returncode:raise RuntimeError(p.stderr.strip())
-    return {'state':'published','url':p.stdout.strip()}
+    return {'state':'published','url':p.stdout.strip(),'issue':issue['number']}
 
 
 def main() -> None:

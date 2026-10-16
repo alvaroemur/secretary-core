@@ -40,3 +40,9 @@ La regla permite preparar código, pruebas, análisis y documentos reversibles e
 
 ---
 🤖 _Claude Code · sesion → skills/desk-reorganizacion · 2026-10-16_
+
+## Avances durante el día
+
+`secretary status` mantiene sus tres argumentos y añade `--state`, `--evidence` y `--next`. Publica un comentario firmado y deduplicado en el brief de la fecha local. Si no existe el brief de hoy, falla explícitamente: no escribe en el de ayer. Los consumidores toman el avance con evidencia más reciente para cada asunto, sin confundir preparación, PR abierto y merge. El reporte de la mañana conserva su fecha; los comentarios describen el avance posterior.
+
+Ejemplo: `secretary status "✅" "proyecto" "informe subido para revisión" --state "presentación pendiente" --evidence "<enlace>" --next "ajustar presentación"`.

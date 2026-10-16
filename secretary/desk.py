@@ -12,6 +12,12 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from secretary.config import load_config, instance_root
+try:
+    from secretary.brief_html import render as render_brief
+except ImportError:  # runtime desplegado: brief_html.py vive junto a desk.py
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from brief_html import render as render_brief
 
 
 def command(args: list[str]) -> str:
@@ -167,9 +173,15 @@ def notify(cfg: dict, repo: str, number: int, body_file: Path) -> dict:
     account = cfg.get('accounts', {}).get('personal')
     if setting.get('brief_email') is not True or not account:
         raise ValueError('Notificación al propietario no habilitada o cuenta ausente')
+    # Remitente opcional: cuenta que envía y dirección "Enviar como". El destinatario sigue siendo solo `account`.
+    sender_account = setting.get('send_account') or account
+    sender_from = setting.get('from')
+    known = set(cfg.get('accounts', {}).values())
+    if sender_account not in known:
+        raise ValueError('send_account debe ser una cuenta registrada en accounts')
     if repo != cfg.get('brief', {}).get('repo'):
         raise ValueError('Solo se notifica el repositorio del brief')
-    issue = json.loads(command(['gh', 'issue', 'view', str(number), '--repo', repo, '--json', 'title,url,createdAt,labels']))
+    issue = json.loads(command(['gh', 'issue', 'view', str(number), '--repo', repo, '--json', 'title,url,createdAt,labels,body,number']))
     today = datetime.now(ZoneInfo(cfg.get('timezone') or 'UTC')).date().isoformat()
     created = datetime.fromisoformat(issue['createdAt'].replace('Z', '+00:00')).astimezone(ZoneInfo(cfg.get('timezone') or 'UTC')).date().isoformat()
     if created != today or cfg.get('brief', {}).get('label') not in [l['name'] for l in issue['labels']]:
@@ -179,7 +191,7 @@ def notify(cfg: dict, repo: str, number: int, body_file: Path) -> dict:
     ledger = root/(today+'.json')
     with (root/(today+'.lock')).open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        sent = json.loads(command(['gog', '--account', account, '--json', 'gmail', 'search',
+        sent = json.loads(command(['gog', '--account', sender_account, '--json', 'gmail', 'search',
                                   f'in:sent to:{account} subject:"{subject}"', '--max', '5']))
         if sent.get('threads') or sent.get('messages') or (ledger.exists() and json.loads(ledger.read_text()).get('state') == 'sent'):
             return {'state': 'already-sent'}
@@ -187,8 +199,15 @@ def notify(cfg: dict, repo: str, number: int, body_file: Path) -> dict:
             raise ValueError('Envío previo incierto: revisar Enviados antes de reintentar')
         ledger.write_text(json.dumps({'state': 'sending', 'issue': issue['url']})+'\n')
         # Only the configured owner can receive this notification; no arbitrary recipients.
-        response = json.loads(command(['gog', '--account', account, '--json', '--no-input', 'gmail', 'send',
-                                      '--to', account, '--subject', subject, '--body-file', str(body_file)]))
+        send = ['gog', '--account', sender_account, '--json', '--no-input', 'gmail', 'send',
+                '--to', account, '--subject', subject, '--body-file', str(body_file)]
+        if sender_from:
+            send += ['--from', sender_from]
+        # Mismo contenido que el issue, con el estilo de los resúmenes de sesión; el texto plano queda de alternativa.
+        html_file = root/(today+'.html')
+        html_file.write_text(render_brief(issue.get('body') or '', issue.get('title') or 'Brief', issue['url'], today, repo, issue.get('number', number)))
+        send += ['--body-html-file', str(html_file)]
+        response = json.loads(command(send))
         if not (response.get('id') or response.get('messageId') or response.get('message', {}).get('id')):
             raise ValueError('Respuesta de envío sin ID; verificar Enviados')
         ledger.write_text(json.dumps({'state': 'sent', 'issue': issue['url'], 'response': response})+'\n')

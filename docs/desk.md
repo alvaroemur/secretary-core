@@ -19,7 +19,7 @@ Fuentes privadas en `skills/` y `playbooks/`, exports públicos sanitizados en `
 - `secretary-desk check --repo <repo> --issue <n>`: autoridad para el body actual. Una etiqueta no basta. Una autorización registrada desde una sesión exige recuperar y verificar el mensaje humano original.
 - `secretary-desk guard-diff --repo-path <worktree>`: detecta cambios protegidos, incluidos archivos nuevos, que exceden la regla de preparación. No reemplaza la revisión de efectos.
 - `secretary-desk publish-event --routine <id> --body-file <texto>`: comentario firmado e idempotente en el brief de hoy, sin otra corrida de modelo. Si falta el brief de hoy, no publica en el anterior; el issue/reporte original conserva el evento.
-- `secretary-desk notify-brief --repo <repo> --issue <n> --body-file <texto>`: correo habilitado explícitamente, solo a la cuenta personal y una vez por día. Un resultado incierto bloquea reintentos hasta reconciliar Enviados.
+- `secretary-desk notify-brief --repo <repo> --issue <n> --body-file <texto>`: correo habilitado explícitamente, solo a la cuenta personal y una vez por día. Puede enviarse desde otra cuenta registrada y una dirección "Enviar como" (`send_account`, `from`); el destinatario no cambia. Un resultado incierto bloquea reintentos hasta reconciliar Enviados.
 
 Configuración opcional de la instancia:
 
@@ -30,6 +30,8 @@ desk:
     enabled: true  # Solo tras aprobación del propietario.
   notifications:
     brief_email: true  # Solo tras aprobación del propietario.
+    send_account: your.work.email@company.com  # Opcional: email de una cuenta de `accounts`.
+    from: dest@example.com  # Opcional: alias verificado en esa cuenta.
 ```
 
 La regla permite preparar código, pruebas, análisis y documentos reversibles en un worktree y entregar un PR para revisión. No permite merge, main, despliegue, envíos, gastos, permisos ni ampliar objetivos. Cambios de contratos, skills, autoridad o credenciales requieren autorización específica. Las autorizaciones particulares de otras rutinas conservan sus límites.

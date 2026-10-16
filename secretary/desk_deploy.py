@@ -24,6 +24,7 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
             if origin.is_dir():
                 copies.extend((p, target/name/p.relative_to(origin)) for p in origin.rglob('*') if p.is_file())
     copies.append((source/'secretary/desk.py', runtime/'desk.py'))
+    copies.append((source/'secretary/brief_html.py', runtime/'brief_html.py'))
     if scheduled:
         # Preserve the existing audit; append the gated conditional-reorganization contract.
         tidy_contract = source/'routine-overlays/tidy-up/conditional.md'

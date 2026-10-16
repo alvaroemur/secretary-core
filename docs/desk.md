@@ -30,8 +30,8 @@ desk:
     enabled: true  # Solo tras aprobación del propietario.
   notifications:
     brief_email: true  # Solo tras aprobación del propietario.
-    send_account: trabajo@ejemplo.org  # Opcional: email de una cuenta de `accounts`.
-    from: secretary@ejemplo.org  # Opcional: alias verificado en esa cuenta.
+    send_account: your.work.email@company.com  # Opcional: email de una cuenta de `accounts`.
+    from: dest@example.com  # Opcional: alias verificado en esa cuenta.
 ```
 
 La regla permite preparar código, pruebas, análisis y documentos reversibles en un worktree y entregar un PR para revisión. No permite merge, main, despliegue, envíos, gastos, permisos ni ampliar objetivos. Cambios de contratos, skills, autoridad o credenciales requieren autorización específica. Las autorizaciones particulares de otras rutinas conservan sus límites.

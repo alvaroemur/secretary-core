@@ -31,7 +31,36 @@ class ConversationTests(unittest.TestCase):
                     'body':{'data':base64.urlsafe_b64encode(body.encode()).decode()}}}
 
     def add_question(self, key='project-report', due=''):
-        return self.store.question(key,'owner/repo',1,'Which scope? '+key,'a'*64,due)
+        question=self.store.question(key,'owner/repo',1,'Which scope? '+key,'a'*64,due)
+        self.store.publication(question,'synthetic:question-comment')
+        return question
+
+    def test_revocation_gate_blocks_only_its_issue_and_resume_is_not_authority(self):
+        event=self.store.capture('owner-stop',{'body':'Pause report'},True)
+        self.store.hold('owner/repo',1,event,'Pause report')
+        self.assertEqual(self.store.gate('owner/repo',1,'a'*64)['state'],'blocked')
+        self.assertEqual(self.store.gate('owner/repo',2,'b'*64)['state'],'clear')
+        resume=self.store.capture('owner-resume',{'body':'Resume report'},True)
+        self.store.hold('owner/repo',1,resume,'Resume report',False)
+        result=self.store.gate('owner/repo',1,'a'*64)
+        self.assertEqual(result['state'],'clear')
+        self.assertIn('no concede',result['meaning'])
+        self.add_question()
+        self.assertEqual(self.store.gate('owner/repo',1,'a'*64)['state'],'blocked')
+
+    def test_human_reply_with_quoted_agent_message_is_captured(self):
+        message=self.message('Solo informe.\nOn Friday Secretary wrote:\n<!-- agent-generated:notice -->')
+        def fake(account,*args):
+            return {'messages':[{'threadId':'thread'}]} if 'search' in args else {'thread':{'messages':[message]}}
+        with patch('secretary.conversations.gog',side_effect=fake),patch('secretary.conversations.verify_mail',return_value=True):
+            scan_mail(self.store,self.cfg)
+        self.assertEqual(self.store.pending()[0]['payload']['new_text_hint'],'Solo informe.')
+
+    def test_unpublished_question_blocks_email_until_reconciled(self):
+        question=self.store.question('unpublished','owner/repo',1,'Scope?','a'*64)
+        self.assertEqual(notification_plan(self.store,self.cfg)['state'],'blocked')
+        self.store.publication(question,'synthetic:published')
+        self.assertEqual(notification_plan(self.store,self.cfg)['state'],'ready')
 
     def test_deployment_preserves_private_procedures_and_is_repeatable(self):
         from secretary.conversation_deploy import deploy

@@ -76,11 +76,13 @@ class Store:
           payload TEXT NOT NULL, trusted INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
           outcome TEXT, evidence TEXT, captured_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS event_claims (event TEXT PRIMARY KEY, token TEXT NOT NULL, created_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS holds (repo TEXT, number INTEGER, event TEXT NOT NULL, reason TEXT NOT NULL, active INTEGER NOT NULL, PRIMARY KEY(repo,number));
         CREATE TABLE IF NOT EXISTS watches (repo TEXT, number INTEGER, PRIMARY KEY(repo,number));
         CREATE TABLE IF NOT EXISTS questions (
           id TEXT PRIMARY KEY, repo TEXT NOT NULL, number INTEGER NOT NULL,
           version INTEGER NOT NULL, text TEXT NOT NULL, scope_sha TEXT NOT NULL,
           state TEXT NOT NULL, event TEXT, answer TEXT, due TEXT, updated_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS question_publications (id TEXT, version INTEGER, url TEXT NOT NULL, PRIMARY KEY(id,version));
         CREATE TABLE IF NOT EXISTS deliveries (
           id TEXT PRIMARY KEY, state TEXT NOT NULL, kind TEXT NOT NULL,
           day TEXT NOT NULL, question_versions TEXT NOT NULL, response TEXT, created_at TEXT NOT NULL);
@@ -189,6 +191,31 @@ class Store:
                 raise ValueError('Falta interpretación concreta')
             self.db.execute("UPDATE questions SET state='answered',event=?,answer=?,updated_at=? WHERE id=?", (event,interpretation,stamp(),key))
 
+    def hold(self, repo: str, number: int, event: str, reason: str, active=True):
+        if not reason.strip() or not self.event(event)['trusted']:
+            raise ValueError('Bloqueo/reanudación requiere motivo y fuente verificada')
+        with self.transaction():
+            self.db.execute('INSERT OR REPLACE INTO holds VALUES (?,?,?,?,?)',(repo,number,event,reason,int(active)))
+            self.db.execute('INSERT OR IGNORE INTO watches VALUES (?,?)',(repo,number))
+
+    def gate(self, repo: str, number: int, scope_sha: str) -> dict:
+        reasons = []
+        hold = self.db.execute('SELECT * FROM holds WHERE repo=? AND number=? AND active=1',(repo,number)).fetchone()
+        if hold:
+            reasons.append({'kind':'owner-hold','event':hold['event'],'reason':hold['reason']})
+        for question in self.db.execute('SELECT * FROM questions WHERE repo=? AND number=?',(repo,number)):
+            if question['state']=='awaiting' or question['scope_sha']!=scope_sha:
+                reasons.append({'kind':'question','id':question['id'],'version':question['version'],
+                                'reason':'Esperando respuesta o alcance cambiado'})
+        return {'state':'blocked' if reasons else 'clear','reasons':reasons,
+                'meaning':'Ausencia de bloqueo registrado; no concede autorización'}
+
+    def publication(self, question: dict, url: str):
+        if not url:
+            raise ValueError('Pregunta sin referencia publicada')
+        self.db.execute('INSERT OR REPLACE INTO question_publications VALUES (?,?,?)', (question['id'],question['version'],url))
+        self.db.commit()
+
     def questions(self) -> list[dict]:
         return [dict(row) for row in self.db.execute("SELECT * FROM questions WHERE state='awaiting' ORDER BY updated_at")]
 
@@ -205,6 +232,13 @@ def plain(message: dict) -> str:
                 return base64.urlsafe_b64decode(data + '=' * (-len(data) % 4)).decode('utf-8', errors='replace')
         return '\n'.join(text for child in part.get('parts', []) if (text := extract(child)))
     return extract(message.get('payload', {})).replace('\r\n', '\n').strip()
+
+
+def unquoted(text: str) -> str:
+    # A hint for interpretation, never a substitute for reading the original.
+    markers = [r'^>', r'^On .+wrote:', r'^El .+escribi[oó]:', r'^From:', r'^De:']
+    positions = [m.start() for pattern in markers if (m := re.search(pattern,text,re.M | re.I))]
+    return text[:min(positions)].strip() if positions else text.strip()
 
 
 def addresses(value: str) -> set[str]:
@@ -251,12 +285,12 @@ def scan_mail(store: Store, cfg: dict) -> dict:
                 if addresses(h.get('from', '')) != {cfg['owner'].lower()}:
                     continue  # Mail from a third party never becomes owner instruction.
                 text = plain(message)
-                if not text or AGENT.search(text.split('\n>')[0]):
+                if not text or AGENT.match(text.lstrip().removeprefix('<!--').lstrip()):
                     continue
                 source = f'gmail:{cfg["mailbox"]}:{message["id"]}'
                 payload = {'kind':'mail','account':cfg['mailbox'],'thread':thread_id,'message':message['id'],
                            'rfc_message_id':h.get('message-id'),'subject':h.get('subject',''),
-                           'body':text,'from':h.get('from'),'to':h.get('to'),'received_at':message.get('internalDate')}
+                           'body':text,'new_text_hint':unquoted(text),'from':h.get('from'),'to':h.get('to'),'received_at':message.get('internalDate')}
                 captured.append(store.capture(source,payload,verify_mail(cfg,message)))
         except (RuntimeError,ValueError,KeyError) as exc:
             errors.append({'thread':thread_id,'error':str(exc)})
@@ -325,12 +359,18 @@ def signature(text: str) -> str:
 def publish_question(store: Store, question: dict) -> str:
     marker = f"<!-- desk:question {question['id']} v{question['version']} -->"
     pages = json.loads(run(['gh','api',f"repos/{question['repo']}/issues/{question['number']}/comments",'--paginate','--slurp']))
-    previous = [c for page in pages for c in page if marker in c['body']]
+    previous = [c for page in pages for c in page if marker in c['body'] and c['user']['login']==question['repo'].split('/')[0] and 'agent-generated:' in c['body']]
     if previous:
-        return previous[-1]['html_url']
+        if question['text'] not in previous[-1]['body']:
+            raise ValueError('Comentario de pregunta editado; reconciliar antes de publicar')
+        url = previous[-1]['html_url']
+        store.publication(question,url)
+        return url
     body = signature(marker+f"\n### Pregunta {question['id']} · v{question['version']}\n\n"+question['text']+
                      '\n\nResponde por correo a Secretary o en este issue, indicando el ID de pregunta. Solo el trabajo dependiente queda bloqueado.')
-    return run(['gh','issue','comment',str(question['number']),'--repo',question['repo'],'--body-file','-'],body)
+    url = run(['gh','issue','comment',str(question['number']),'--repo',question['repo'],'--body-file','-'],body)
+    store.publication(question,url)
+    return url
 
 
 def notification_plan(store: Store, cfg: dict, now: datetime | None = None) -> dict:
@@ -338,6 +378,8 @@ def notification_plan(store: Store, cfg: dict, now: datetime | None = None) -> d
     pending = store.questions()
     if not pending:
         return {'state':'no-op','reason':'Sin preguntas pendientes'}
+    if any(not store.db.execute('SELECT 1 FROM question_publications WHERE id=? AND version=?',(q['id'],q['version'])).fetchone() for q in pending):
+        return {'state':'blocked','reason':'Publicar/reconciliar preguntas en sus issues antes de avisar por correo'}
     deliveries = [dict(row) for row in store.db.execute('SELECT * FROM deliveries')]
     if any(d['state']=='sending' for d in deliveries):
         return {'state':'blocked','reason':'Envío previo incierto: reconciliar Enviados, no reintentar'}
@@ -423,17 +465,20 @@ def reconcile(store: Store, cfg: dict) -> list[dict]:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=['scan','pending','questions','watch','question','answer','ack','verify-source','receipt','notify','reconcile','claim-event','release-event'])
+    parser.add_argument('action',choices=['scan','pending','questions','watch','question','answer','ack','verify-source','receipt','notify','reconcile','claim-event','release-event','hold','resume','gate'])
     parser.add_argument('--repo'); parser.add_argument('--issue',type=int); parser.add_argument('--event')
     parser.add_argument('--id'); parser.add_argument('--version',type=int); parser.add_argument('--body-file',type=Path)
     parser.add_argument('--scope-sha'); parser.add_argument('--due',default=''); parser.add_argument('--outcome')
     parser.add_argument('--token'); parser.add_argument('--evidence'); parser.add_argument('--apply',action='store_true')
-    args = parser.parse_args(); config = load_config(); cfg = settings(config)
-    if cfg.get('enabled') is not True:
+    args = parser.parse_args(); config = load_config()
+    if config.get('desk',{}).get('conversations',{}).get('enabled') is not True:
         print(json.dumps({'state':'disabled','reason':'Circuito no activado'})); return
+    cfg = settings(config)
     path = Path(os.environ.get('SECRETARY_CONVERSATIONS_DB',str(Path.home()/'.local/state/secretary/conversations.sqlite3')))
+    if args.action in ['pending','questions'] and not path.is_file():
+        print(json.dumps({'state':'uninitialized','reason':'Sin registro inicializado; no demuestra ausencia de pendientes'})); return
     store = Store(path)
-    if args.action in ['watch','question','receipt']:
+    if args.action in ['watch','question','receipt','hold','resume','gate']:
         issue_ref(args.repo,args.issue,cfg)
     if args.action == 'scan':
         result = {'mail':scan_mail(store,cfg),'github':scan_github(store,cfg)}
@@ -443,6 +488,15 @@ def main():
     elif args.action == 'release-event':
         store.release(args.event,args.token); result = {'state':'released'}
     elif args.action == 'questions': result = store.questions()
+    elif args.action == 'gate':
+        issue = github_issue(args.repo,args.issue)
+        result = store.gate(args.repo,args.issue,digest(issue['body']))
+        if issue['state'] != 'OPEN':
+            result = {'state':'blocked','reasons':[{'kind':'closed-issue','reason':'Encargo cerrado'}]}
+    elif args.action in ['hold','resume']:
+        store.require_claim(args.event,args.token); verify_event(store,cfg,args.event)
+        store.hold(args.repo,args.issue,args.event,args.body_file.read_text(),args.action=='hold')
+        result = {'state':'held' if args.action=='hold' else 'hold-released-not-authorized'}
     elif args.action == 'watch':
         store.watch(args.repo,args.issue); result = {'state':'watching'}
     elif args.action == 'question':

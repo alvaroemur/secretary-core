@@ -35,6 +35,29 @@ class ConversationTests(unittest.TestCase):
         self.store.publication(question,'synthetic:question-comment')
         return question
 
+    def test_cli_holds_is_a_global_read_without_issue_arguments(self):
+        import io
+        from contextlib import redirect_stdout
+        from secretary.conversations import main
+        config={'accounts':{'personal':address('owner'),'work':address('work')},
+                'desk':{'conversations':{'enabled':True,'capture_since':self.cfg['capture_since']},
+                        'notifications':{'send_account':address('work'),'from':address('desk')}},
+                'brief':{'repo':'owner/repo','label':'brief'},'dispatch':{'executor':{'repos':[]}}}
+        output=io.StringIO()
+        with patch('secretary.conversations.load_config',return_value=config),patch('sys.argv',['conversations','holds']),patch.dict('os.environ',{'SECRETARY_CONVERSATIONS_DB':str(Path(self.tmp.name)/'state.sqlite3')}),redirect_stdout(output):
+            main()
+        self.assertEqual(json.loads(output.getvalue()),[])
+
+    def test_disabled_cli_does_not_require_sender_or_initialize_database(self):
+        import io
+        from contextlib import redirect_stdout
+        from secretary.conversations import main
+        path=Path(self.tmp.name)/'new.sqlite3';output=io.StringIO()
+        with patch('secretary.conversations.load_config',return_value={}),patch('sys.argv',['conversations','pending']),patch.dict('os.environ',{'SECRETARY_CONVERSATIONS_DB':str(path)}),redirect_stdout(output):
+            main()
+        self.assertEqual(json.loads(output.getvalue())['state'],'disabled')
+        self.assertFalse(path.exists())
+
     def test_closed_issue_stops_reminders_and_changed_scope_requires_new_question(self):
         self.add_question()
         with patch('secretary.conversations.github_issue',return_value={'state':'OPEN','body':'changed'}):

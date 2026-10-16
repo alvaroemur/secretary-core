@@ -490,7 +490,7 @@ def main():
     if args.action in ['pending','questions','holds'] and not path.is_file():
         print(json.dumps({'state':'uninitialized','reason':'Sin registro inicializado; no demuestra ausencia de pendientes'})); return
     store = Store(path)
-    if args.action in ['watch','question','receipt','hold','resume','gate','holds']:
+    if args.action in ['watch','question','receipt','hold','resume','gate']:
         issue_ref(args.repo,args.issue,cfg)
     if args.action == 'scan':
         result = {'mail':scan_mail(store,cfg),'github':scan_github(store,cfg)}

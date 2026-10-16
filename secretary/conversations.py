@@ -490,57 +490,60 @@ def main():
     if args.action in ['pending','questions','holds'] and not path.is_file():
         print(json.dumps({'state':'uninitialized','reason':'Sin registro inicializado; no demuestra ausencia de pendientes'})); return
     store = Store(path)
-    if args.action in ['watch','question','receipt','hold','resume','gate']:
-        issue_ref(args.repo,args.issue,cfg)
-    if args.action == 'scan':
-        result = {'mail':scan_mail(store,cfg),'github':scan_github(store,cfg)}
-        result['state'] = 'partial' if result['mail']['errors'] or result['github']['errors'] else 'observed'
-    elif args.action == 'pending': result = store.pending()
-    elif args.action == 'claim-event': result = store.claim_event(args.event)
-    elif args.action == 'release-event':
-        store.release(args.event,args.token); result = {'state':'released'}
-    elif args.action == 'questions': result = store.questions()
-    elif args.action == 'holds': result = [dict(row) for row in store.db.execute('SELECT * FROM holds WHERE active=1')]
-    elif args.action == 'gate':
-        issue = github_issue(args.repo,args.issue)
-        result = store.gate(args.repo,args.issue,digest(issue['body']))
-        if issue['state'] != 'OPEN':
-            result = {'state':'blocked','reasons':[{'kind':'closed-issue','reason':'Encargo cerrado'}]}
-    elif args.action in ['hold','resume']:
-        store.require_claim(args.event,args.token); verify_event(store,cfg,args.event)
-        store.hold(args.repo,args.issue,args.event,args.body_file.read_text(),args.action=='hold')
-        result = {'state':'held' if args.action=='hold' else 'hold-released-not-authorized'}
-    elif args.action == 'watch':
-        store.watch(args.repo,args.issue); result = {'state':'watching'}
-    elif args.action == 'question':
-        issue = github_issue(args.repo,args.issue)
-        if issue['state'] != 'OPEN': raise ValueError('Encargo cerrado; no crear pregunta')
-        q = store.question(args.id,args.repo,args.issue,args.body_file.read_text(),digest(issue['body']),args.due)
-        result = {**q,'url':publish_question(store,q)}
-    elif args.action == 'answer':
-        store.require_claim(args.event,args.token)
-        verify_event(store,cfg,args.event)
-        question = store.db.execute('SELECT * FROM questions WHERE id=?',(args.id,)).fetchone()
-        if not question or digest(github_issue(question['repo'],question['number'])['body']) != args.scope_sha:
-            raise ValueError('El alcance canónico cambió; revisar antes de responder')
-        store.answer(args.id,args.version,args.event,args.scope_sha,args.body_file.read_text()); result = {'state':'answered-not-executed'}
-    elif args.action == 'ack':
-        store.require_claim(args.event,args.token)
-        if args.outcome in ['routed','progress']: verify_event(store,cfg,args.event)
-        store.ack(args.event,args.outcome,args.evidence); store.release(args.event,args.token); result = {'state':'processed'}
-    elif args.action == 'verify-source': result = verify_event(store,cfg,args.event)
-    elif args.action == 'receipt':
-        store.require_claim(args.event,args.token)
-        event = verify_event(store,cfg,args.event); issue = github_issue(args.repo,args.issue)
-        if issue['state'] != 'OPEN': raise ValueError('Encargo cerrado')
-        result = {'scope_sha256':digest(issue['body']),'source':'desk-event:'+args.event,
-                  'owner_quote':event['payload']['body'],'effects':['read','local-edit','branch','open-pr'],
-                  'requires_source_verification':True,'meaning':'Evidencia original, no clasificación semántica ni autorización automática'}
-    elif args.action == 'reconcile': result = reconcile(store,cfg)
-    else:
-        refresh_questions(store,cfg)
-        result = send_notifications(store,cfg,args.apply)
-    print(json.dumps(result,ensure_ascii=False,indent=2))
+    try:
+        if args.action in ['watch','question','receipt','hold','resume','gate']:
+            issue_ref(args.repo,args.issue,cfg)
+        if args.action == 'scan':
+            result = {'mail':scan_mail(store,cfg),'github':scan_github(store,cfg)}
+            result['state'] = 'partial' if result['mail']['errors'] or result['github']['errors'] else 'observed'
+        elif args.action == 'pending': result = store.pending()
+        elif args.action == 'claim-event': result = store.claim_event(args.event)
+        elif args.action == 'release-event':
+            store.release(args.event,args.token); result = {'state':'released'}
+        elif args.action == 'questions': result = store.questions()
+        elif args.action == 'holds': result = [dict(row) for row in store.db.execute('SELECT * FROM holds WHERE active=1')]
+        elif args.action == 'gate':
+            issue = github_issue(args.repo,args.issue)
+            result = store.gate(args.repo,args.issue,digest(issue['body']))
+            if issue['state'] != 'OPEN':
+                result = {'state':'blocked','reasons':[{'kind':'closed-issue','reason':'Encargo cerrado'}]}
+        elif args.action in ['hold','resume']:
+            store.require_claim(args.event,args.token); verify_event(store,cfg,args.event)
+            store.hold(args.repo,args.issue,args.event,args.body_file.read_text(),args.action=='hold')
+            result = {'state':'held' if args.action=='hold' else 'hold-released-not-authorized'}
+        elif args.action == 'watch':
+            store.watch(args.repo,args.issue); result = {'state':'watching'}
+        elif args.action == 'question':
+            issue = github_issue(args.repo,args.issue)
+            if issue['state'] != 'OPEN': raise ValueError('Encargo cerrado; no crear pregunta')
+            q = store.question(args.id,args.repo,args.issue,args.body_file.read_text(),digest(issue['body']),args.due)
+            result = {**q,'url':publish_question(store,q)}
+        elif args.action == 'answer':
+            store.require_claim(args.event,args.token)
+            verify_event(store,cfg,args.event)
+            question = store.db.execute('SELECT * FROM questions WHERE id=?',(args.id,)).fetchone()
+            if not question or digest(github_issue(question['repo'],question['number'])['body']) != args.scope_sha:
+                raise ValueError('El alcance canónico cambió; revisar antes de responder')
+            store.answer(args.id,args.version,args.event,args.scope_sha,args.body_file.read_text()); result = {'state':'answered-not-executed'}
+        elif args.action == 'ack':
+            store.require_claim(args.event,args.token)
+            if args.outcome in ['routed','progress']: verify_event(store,cfg,args.event)
+            store.ack(args.event,args.outcome,args.evidence); store.release(args.event,args.token); result = {'state':'processed'}
+        elif args.action == 'verify-source': result = verify_event(store,cfg,args.event)
+        elif args.action == 'receipt':
+            store.require_claim(args.event,args.token)
+            event = verify_event(store,cfg,args.event); issue = github_issue(args.repo,args.issue)
+            if issue['state'] != 'OPEN': raise ValueError('Encargo cerrado')
+            result = {'scope_sha256':digest(issue['body']),'source':'desk-event:'+args.event,
+                      'owner_quote':event['payload']['body'],'effects':['read','local-edit','branch','open-pr'],
+                      'requires_source_verification':True,'meaning':'Evidencia original, no clasificación semántica ni autorización automática'}
+        elif args.action == 'reconcile': result = reconcile(store,cfg)
+        else:
+            refresh_questions(store,cfg)
+            result = send_notifications(store,cfg,args.apply)
+        print(json.dumps(result,ensure_ascii=False,indent=2))
+    finally:
+        store.db.close()
 
 
 if __name__ == '__main__':

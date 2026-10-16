@@ -426,6 +426,12 @@ def _sync_playbooks_and_skills() -> None:
                 Path.home()/".local/share/secretary/desk-runtime", True,
                 dst_pb, Path.home()/".local/bin")
     print("  ✓ Desk skills, compatibility aliases and routine contracts deployed")
+    from secretary.conversation_deploy import deploy as deploy_conversations
+    deploy_conversations(core_dir, dst_pb,
+                         [Path.home()/".agents/skills", dst_sk, Path.home()/".cursor/skills"],
+                         Path.home()/".local/share/secretary/desk-runtime", True)
+    print("  ✓ Conversation contracts deployed; activation follows instance config")
+
 
 
 def run_setup() -> int:

@@ -93,13 +93,15 @@ class DeskTests(unittest.TestCase):
         calls=[]
         def fake(args):
             calls.append(args)
-            if args[0]=='gh':return json.dumps({'createdAt':datetime.now(ZoneInfo('UTC')).isoformat(),'url':'issue','labels':[{'name':'brief'}]})
+            if args[0]=='gh':return json.dumps({'createdAt':datetime.now(ZoneInfo('UTC')).isoformat(),'url':'issue','title':'Brief','number':1,'body':'## ✅ Requiere tu decisión\n\n- [ ] ver #12\n','labels':[{'name':'brief'}]})
             if 'search' in args:return json.dumps({'threads':[]})
             return json.dumps({'id':'message'})
         with tempfile.TemporaryDirectory() as tmp, patch('secretary.desk.instance_root',return_value=Path(tmp)), patch('secretary.desk.command',side_effect=fake):
             body=Path(tmp)/'body';body.write_text('Reporte')
             self.assertEqual(notify(cfg,'owner/notes',1,body)['state'],'sent')
             send=[c for c in calls if 'send' in c][0]
+            html_path=Path(send[send.index('--body-html-file')+1])
+            self.assertIn('Requiere tu decisión',html_path.read_text())
             self.assertEqual(send[send.index('--account')+1],'work@example.com')
             self.assertEqual(send[send.index('--from')+1],'bot@example.com')
             self.assertEqual(send[send.index('--to')+1],'owner@example.com')

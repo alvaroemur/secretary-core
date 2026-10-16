@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from secretary.brief_html import render as render_brief
 from secretary.config import load_config, instance_root
 
 
@@ -175,7 +176,7 @@ def notify(cfg: dict, repo: str, number: int, body_file: Path) -> dict:
         raise ValueError('send_account debe ser una cuenta registrada en accounts')
     if repo != cfg.get('brief', {}).get('repo'):
         raise ValueError('Solo se notifica el repositorio del brief')
-    issue = json.loads(command(['gh', 'issue', 'view', str(number), '--repo', repo, '--json', 'title,url,createdAt,labels']))
+    issue = json.loads(command(['gh', 'issue', 'view', str(number), '--repo', repo, '--json', 'title,url,createdAt,labels,body,number']))
     today = datetime.now(ZoneInfo(cfg.get('timezone') or 'UTC')).date().isoformat()
     created = datetime.fromisoformat(issue['createdAt'].replace('Z', '+00:00')).astimezone(ZoneInfo(cfg.get('timezone') or 'UTC')).date().isoformat()
     if created != today or cfg.get('brief', {}).get('label') not in [l['name'] for l in issue['labels']]:
@@ -197,6 +198,10 @@ def notify(cfg: dict, repo: str, number: int, body_file: Path) -> dict:
                 '--to', account, '--subject', subject, '--body-file', str(body_file)]
         if sender_from:
             send += ['--from', sender_from]
+        # Mismo contenido que el issue, con el estilo de los resúmenes de sesión; el texto plano queda de alternativa.
+        html_file = root/(today+'.html')
+        html_file.write_text(render_brief(issue.get('body') or '', issue.get('title') or 'Brief', issue['url'], today, repo, issue.get('number', number)))
+        send += ['--body-html-file', str(html_file)]
         response = json.loads(command(send))
         if not (response.get('id') or response.get('messageId') or response.get('message', {}).get('id')):
             raise ValueError('Respuesta de envío sin ID; verificar Enviados')

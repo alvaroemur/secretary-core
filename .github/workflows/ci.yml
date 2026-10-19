@@ -22,6 +22,9 @@ jobs:
       - name: Leak guard (no sensitive literals in tracked files)
         run: python scripts/ci/check_no_leaks.py
 
+      - name: Codex rules installer regression
+        run: python -m unittest discover -s tests -p test_codex_rules.py -v
+
       # Drift check: the private playbooks/ and skills/ sources are gitignored and
       # not present in CI, so `export-examples --check` cannot run here. It is a
       # local / pre-commit gate. See cli/README.md.

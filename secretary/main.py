@@ -189,9 +189,9 @@ def config_show(
     """Dump resolved instance config (paths absolute)."""
     data = config_show_dict()
     if yaml_out:
-        console.print(yaml.dump(data, allow_unicode=True, default_flow_style=False))
+        typer.echo(yaml.dump(data, allow_unicode=True, default_flow_style=False), nl=False)
     else:
-        console.print(json.dumps(data, ensure_ascii=False, indent=2))
+        typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
 
 
 @config_app.command("path")
@@ -204,7 +204,7 @@ def config_path(
     except KeyError as exc:
         err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from exc
-    console.print(str(path))
+    typer.echo(str(path))
 
 
 @dispatch_app.command("locate")
@@ -287,12 +287,15 @@ def paths_list() -> None:
 def status_cmd(
     emoji: Annotated[str, typer.Argument(help="✅ 🔄 ⏳ 🚫")],
     ref: Annotated[str, typer.Argument(help="#N del brief o acc-id (vacío si no aplica)")],
-    note: Annotated[str, typer.Argument(help="Nota del avance")],
+    note: Annotated[str, typer.Argument(help="Resultado concreto del avance")],
+    state: Annotated[str, typer.Option(help="Estado actual del trabajo")] = "",
+    evidence: Annotated[str, typer.Option(help="PR, issue, archivo o comprobación")] = "",
+    next_step: Annotated[str, typer.Option("--next", help="Siguiente paso o decisión pendiente")] = "",
 ) -> None:
     """Persist progress on today's brief (atomic sec-status)."""
     try:
-        _, summary = post_status(emoji, ref, note)
-    except (RuntimeError, subprocess.CalledProcessError) as exc:
+        _, summary = post_status(emoji, ref, note, state=state, evidence=evidence, next_step=next_step)
+    except (RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
         err_console.print(f"[red]secretary status:[/red] {exc}")
         raise typer.Exit(1) from exc
     console.print(summary)
@@ -687,7 +690,7 @@ def modules_health(
 
     if out_fmt == OutputFormat.json:
         if module:
-            console.print(json.dumps(data, ensure_ascii=False, indent=2))
+            typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
         else:
             console.print(json.dumps(rows, ensure_ascii=False, indent=2))
         return

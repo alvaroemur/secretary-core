@@ -40,7 +40,7 @@ Also read, when present:
 - Active conversation artifacts
 - `docs/plans/*.md` or `_diseño/plans/*.md` with `status: active` (prefer `plan_ref`)
 - cwd `contract.yaml` if `kind: entity` (EDT activities — read-only)
-- `.cursor/tasks/` briefs in the repo
+- `<session-cwd>/.briefs/` briefs in the repo
 
 From an active plan: list nodes with `status` in `pending` | `blocked` | `running`.
 Prefer continuations anchored to those node ids.
@@ -75,7 +75,7 @@ Owner picks **per archetype** (not one global tier).
 2. Ask which rows to emit, and which tier per row (defaults in the table).
 3. Write only the chosen prompts — paste-ready, no narration inside them.
 4. Offer handoff per prompt:
-   - **Stay** — leave in chat (and optionally `.cursor/tasks/YYYYMMDD-<slug>.md`).
+   - **Stay** — leave in chat (and optionally `<session-cwd>/.briefs/YYYY-MM-DD-HHMM-<slug>.md`).
    - **Offload** — pass the prompt to the harness offload/restart playbook (issue +
      clean-context brief). Jump does not spawn sessions itself.
 
@@ -106,7 +106,7 @@ If jump is unavailable or the session had no material work, callers must not blo
 close. Two lines max:
 
 ```
-Continuity: local handover in .cursor/tasks/ <or> none.
+Continuity: local handover in <session-cwd>/.briefs/ <or> none.
 Open issues: <list or none>.
 ```
 

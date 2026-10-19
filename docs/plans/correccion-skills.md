@@ -27,5 +27,11 @@ Verificado: 21 pruebas del core pasan; YAML de los cuatro skills válido conserv
 
 Los cambios de la instancia se entregan en un PR complementario. No se fusionan automáticamente.
 
+## Reconciliación del 2026-10-18
+
+Se integró main conservando la migración Desk: los sec-* siguen siendo aliases y el procedimiento mejorado de sincronización vive en desk-project-sync. Los cuatro skills de cierre están en inglés. Desk instala desde skills/ o skills.example/, sin prioridad de portable/. Se conservaron los contratos de autorización de work-runner en la instancia y se corrigieron las rutas residuales de jump a .briefs/.
+
+Las 89 pruebas existentes pasan. Una regresión adicional comprueba que un cierre portable residual no sustituye la fuente vigente. Los PRs #64 y cowork-secretary #1402 permanecen abiertos para revisión; esta operación no los fusiona.
+
 ---
 🤖 _Claude Code · sesion → codex/skills/correccion-cierre · 2026-10-05_

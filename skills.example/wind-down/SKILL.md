@@ -62,8 +62,8 @@ Workspace/repo routing for handover destinations and offload context: **instance
 - **One sweep, one checklist, one confirmation.** Pre-resolve sub-skill inputs.
 - **"I don't know" parks.** Log open questions and continue.
 - **Session scope only.** Unrelated pre-existing dirt: mention once, no action.
-- **Refresh heartbeat before exit.** If close changed material state, run
-  heartbeat with **commit+push to `main`** when instance policy requires it.
+- **Refresh desk-heartbeat before exit.** If close changed material state, run
+  desk-heartbeat with **commit+push to `main`** when instance policy requires it.
 
 ## Skill chain
 
@@ -72,13 +72,13 @@ Workspace/repo routing for handover destinations and offload context: **instance
 | Loose idea | offload (blob or with-context) | One idea = one restart unit |
 | Thread continues elsewhere | handover + resume | Pre-fill title and destination |
 | Durable knowledge | offload (wiki vs issue triage) | Do not write wiki directly |
-| Project milestone / deliverable | `sec-write` (wiki theme) | One-line dated fact pending integrate |
-| Harness / system friction | `sec-learn` → offload (default ISSUE) | Not wiki facts |
+| Project milestone / deliverable | `desk-write` (wiki theme) | One-line dated fact pending integrate |
+| Harness / system friction | `desk-learn` → offload (default ISSUE) | Not wiki facts |
 | Branch / PR from session | push → PR → ready → **tier merge** | Low → merge in single Y; high → ask |
 | Chat-reported progress not persisted | `secretary status` | Sweep before close |
-| Memory consolidation | `sec-consolidate` | Only if explicit |
+| Memory consolidation | `desk-consolidate` | Only if explicit |
 | Open PR with unread comments | mention sync next session | Park, don't sync now |
-| Project hygiene | `sec-project-sync` | AGENTS.md, scratch, layout, entity-contract drift |
+| Project hygiene | `desk-project-sync` | AGENTS.md, scratch, layout, entity-contract drift |
 | Continuity prompts | **jump** | Archetypes + tiers; owner picks; optional offload |
 | Active work plan | `docs/plans/<slug>.md` or `_diseño/plans/<slug>.md` | Append node status + Log for nodes touched this session |
 
@@ -139,7 +139,7 @@ Render only sections with items:
 
 ### Memory and milestones
 - 🟡 **<topic>**: <milestone> → note in wiki theme? (Recommended: Y)
-- 🟡 **harness**: `<friction>` → record via sec-learn? (Recommended: N)
+- 🟡 **harness**: `<friction>` → record via desk-learn? (Recommended: N)
 - 🟢 **durable knowledge**: `<fact>` → offload → wiki
 
 ### Work plan
@@ -161,7 +161,7 @@ Render only sections with items:
 ```text
 <repo> (merge PR #<N>): Y
 <topic> (wiki milestone): Y
-harness (sec-learn): N
+harness (desk-learn): N
 plan node <id>: done
 ```
 ````
@@ -175,10 +175,10 @@ push code to `main` without a branch. On failure, park as issue and continue.
 `gh issue comment` this skill emits — use the instance signature helper with skill
 name `wind-down`.
 
-**Main checkout gate (blocking)** before declaring close or heartbeat, when instance
-policy requires the secretary checkout on `main` clean except heartbeat / untracked.
+**Main checkout gate (blocking)** before declaring close or desk-heartbeat, when instance
+policy requires the secretary checkout on `main` clean except desk-heartbeat / untracked.
 
-If Stage 2 produced material changes → heartbeat once per instance policy; note in close.
+If Stage 2 produced material changes → desk-heartbeat once per instance policy; note in close.
 
 #### Stage 2 template
 
@@ -199,7 +199,7 @@ If Stage 2 produced material changes → heartbeat once per instance policy; not
 ### Continuity
 - ✅ **jump**: prompts in chat and/or `<session-cwd>/.briefs/<date>-<slug>.md`
 - ⏸️ **jump**: fallback
-- ✅ **heartbeat**: updated
+- ✅ **desk-heartbeat**: updated
 
 Done.
 ```
@@ -208,12 +208,16 @@ Done.
 
 - **Use:** explicit close intent
 - **Not:** mid-session idea → offload; mid-session continuations without closing →
-  jump; harness learning mid-session → `sec-learn`; standalone handover; consolidation
+  jump; harness learning mid-session → `desk-learn`; standalone handover; consolidation
 
 ## Don't
 
 - Nag, leave PRs in draft by inertia, fold high-tier merge into blanket Y,
   reimplement capture, implement loose ideas, touch unrelated repos, force-push,
   or write motivational closes
-- Route harness friction to wiki by default — Stage 1 harness row → `sec-learn` on Y
+- Route harness friction to wiki by default — Stage 1 harness row → `desk-learn` on Y
 - Reshape `docs/plans` graphs without owner OK — status + Log only
+
+## Optional Desk integration
+
+When Secretary is available, reuse close_context to record progress, PRs, blockers and pending decisions with secretary status. Do not inspect other repos again. Update desk-heartbeat under the instance policy after material changes. New proposals do not enable execution; autonomous preparation requires prepare-pr-v1 or specific authorization. This close works without Secretary. Brief-update publishes status; wind-down sends no mail and creates no duplicate brief.

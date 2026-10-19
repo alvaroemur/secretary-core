@@ -1,5 +1,5 @@
 ---
-name: sec-heartbeat
+name: desk-heartbeat
 description: Consolidación programada de corto plazo. Escribe latest.md para briefing/pulse.
 ---
 
@@ -51,7 +51,6 @@ Generar un latido operativo en:
 - `subsystem/wip/`
 - Issue briefing abierto + comentarios `sec-status`
 - Calendario hoy ±1d (`gog calendar`, todas las cuentas registradas)
-- Salud de cuentas `gog`: `secretary gog-health --format markdown` (sonda de solo lectura del refresh token de cada cuenta; nunca abre OAuth). Copiar verbatim a `## gog accounts`; cada fila fallida va a "Notas operativas" como 🚧 `gog auth add <cuenta>`
 - Frescura extractoras + conflictos multi-fuente (spec 008 § Frescura / § Conflictos)
   - Script: `$REPO/scripts/routines/extractor-freshness.sh` (precomputado en `run.sh`; copiar verbatim a `## Frescura extractoras`)
 - **Git/PR:** `gh pr list` + branch/worktree/dirty scan por repo en allowlist (`.secretary.yml` → `dispatch.executor.repos`) **más** repos Cowork de acc abiertas (`workspace`)
@@ -83,3 +82,13 @@ git push origin main
 - No cerrar acciones automáticamente.
 - No escribir wiki.
 - No enviar mensajes a terceros.
+
+
+## Visibilidad de decisiones pendientes · Desk
+
+Lee `desk-context/references/control.md` instalado. Antes de terminar, distingue una corrida vacía de una rutina que ya no puede aportar valor. Si faltan fuentes/accesos, se agota la cola o se necesita cambiar estrategia fuera de una regla ya aprobada: busca issues `desk:decision`/`para-alvaro` del mismo problema y actualiza el canónico o crea uno firmado. Incluye rutina/proyecto, fingerprint estable, evidencia fechada, consecuencia de esperar, opciones, recomendación y decisión requerida. No lo dejes solo en state, log o PR ni crees un duplicado diario. Revisa decisiones anteriores antes de volver a pedirlas. Si puedes resolverlo bajo una regla vigente, resuélvelo y reporta el resultado, sin inventar otra compuerta. No amplía tus permisos de envío, fuentes o negocio. Brief y overview consumirán esta misma decisión.
+
+
+## Visibilidad de decisiones pendientes · Desk
+
+Lee `desk-context/references/control.md` instalado. Antes de terminar, distingue una corrida vacía de una rutina que ya no puede aportar valor. Si faltan fuentes/accesos, se agota la cola o se necesita cambiar estrategia fuera de una regla ya aprobada: busca issues `desk:decision`/`para-alvaro` del mismo problema y actualiza el canónico o crea uno firmado. Incluye rutina/proyecto, fingerprint estable, evidencia fechada, consecuencia de esperar, opciones, recomendación y decisión requerida. No lo dejes solo en state, log o PR ni crees un duplicado diario. Revisa decisiones anteriores antes de volver a pedirlas. Si puedes resolverlo bajo una regla vigente, resuélvelo y reporta el resultado, sin inventar otra compuerta. No amplía tus permisos de envío, fuentes o negocio. Brief y overview consumirán esta misma decisión.

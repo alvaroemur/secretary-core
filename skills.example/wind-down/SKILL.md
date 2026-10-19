@@ -1,5 +1,7 @@
 ---
 name: wind-down
+metadata:
+  close-contract: "2"
 description: >-
   End-of-session ritual that sweeps open loops and routes each to the skill that
   resolves it — loose ideas to offload, continuing threads to handover, code
@@ -172,8 +174,10 @@ Hard rules: Conventional Commits per instance `AGENTS.md`. Never force-push. Nev
 push code to `main` without a branch. On failure, park as issue and continue.
 
 **GitHub signature (mandatory)** before any `gh pr create`, `gh issue create`, or
-`gh issue comment` this skill emits — use the instance signature helper with skill
-name `wind-down`.
+`gh issue comment` this skill emits — prefer `secretary signature wind-down
+--runtime <actual-runtime>` (or its `--mark` / `--footer` outputs). When the CLI
+is unavailable, use the configured instance helper and verify its runtime label.
+Do not install a helper during close or claim another harness as the author.
 
 **Main checkout gate (blocking)** before declaring close or desk-heartbeat, when instance
 policy requires the secretary checkout on `main` clean except desk-heartbeat / untracked.

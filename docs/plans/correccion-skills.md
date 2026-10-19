@@ -33,5 +33,24 @@ Se integró main conservando la migración Desk: los sec-* siguen siendo aliases
 
 Las 89 pruebas existentes pasan. Una regresión adicional comprueba que un cierre portable residual no sustituye la fuente vigente. Los PRs #64 y cowork-secretary #1402 permanecen abiertos para revisión; esta operación no los fusiona.
 
+## Prevención del incidente #73 · 2026-10-19
+
+El despliegue reinstaló portable sobre una corrección local aún pendiente de integración.
+La fuente privada también puede conservar ese procedimiento antiguo. La corrección añade
+contratos de cierre versionados y comprueba fuentes privadas y destinos antes de escribir
+el lote. El manifiesto incluye commit, fuente, hash y contrato. Setup valida antes de sus
+copias heredadas y añade el destino Codex explícito. No modifica instalaciones existentes.
+
+Se corrige la ayuda del passthrough `efficiency` y se añade `secretary signature`, con
+runtime Codex explícito y fallback honesto. Los helpers de la instancia siguen intactos.
+Las pruebas cubren cuatro destinos, fuentes privadas presentes/ausentes, portable residual,
+rechazo sin escrituras, backups, idempotencia y ejecución real del CLI. La auditoría del
+resto de skills se registra aparte; no autoriza una traducción masiva ni otro despliegue.
+
+`export-examples` bloquea antes de borrar si la fuente privada perdería el contrato.
+`status` firma de forma nativa; el runtime desplegado incluye `signatures.py`. Un
+frontmatter inválido falla cerrado. 120 pruebas pasan; diff --check y leak guard, con
+los archivos nuevos incluidos, pasan. No se ejecutó setup, instalación ni despliegue.
+
 ---
 🤖 _Claude Code · sesion → codex/skills/correccion-cierre · 2026-10-05_

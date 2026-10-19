@@ -1,5 +1,7 @@
 ---
 name: desk-project-sync
+metadata:
+  close-contract: "2"
 description: >-
   Synchronize stable project instructions, source references and repository hygiene
   after session changes. Check entity-contract and layout drift without mutating

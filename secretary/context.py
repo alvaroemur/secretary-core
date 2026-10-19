@@ -240,6 +240,7 @@ def collect_skills(config: dict[str, Any] | None = None) -> list[SkillInfo]:
     """Scan and list all active skills across known directories."""
     skill_dirs: list[Path] = [
         Path.home() / ".agents" / "skills",
+        Path.home() / ".codex" / "skills",
         Path.home() / ".claude" / "skills",
         Path.home() / ".cursor" / "skills",
         Path.home() / ".gemini" / "config" / "skills",
@@ -357,7 +358,7 @@ def collect_git_policy(config: dict[str, Any] | None = None) -> dict[str, Any]:
         "worktree_discipline": "~/.secretary checkout principal permanece en main; ramas de trabajo en worktrees",
         "references": "Solo citar #N cuando corresponde a un issue/PR real de GitHub (nunca placeholders como #00 o #TBD)",
         "signatures": {
-            "generator": "~/.claude/scripts/sec-signature.sh <contexto>",
+            "generator": "secretary signature <contexto> --runtime <runtime>",
             "mark": "<!-- agent-generated:<contexto> runtime=<runtime> -->",
             "footer": "🤖 _Generado por <runtime> — <contexto> · <fecha>_",
         },

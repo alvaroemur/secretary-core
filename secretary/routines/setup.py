@@ -373,6 +373,14 @@ def _sync_playbooks_and_skills() -> None:
     import shutil
     print("\n  Syncing playbooks and skills to host (~/.claude/)...")
     core_dir = Path(__file__).resolve().parent.parent.parent
+
+    # Check close sources and installed contracts before the legacy copy phase
+    # can mutate any playbook or skill. Desk remains the final overlay.
+    from secretary.desk_deploy import deployment as preflight_desk
+    preflight_desk(core_dir,
+                   [Path.home()/'.agents/skills', Path.home()/'.codex/skills',
+                    Path.home()/'.claude/skills', Path.home()/'.cursor/skills'],
+                   Path.home()/'.local/share/secretary/desk-runtime')
     
     # Sync Playbooks
     src_pb = core_dir / "playbooks"
@@ -410,7 +418,7 @@ def _sync_playbooks_and_skills() -> None:
     # Desk is the final overlay: pilots and legacy sources must not restore the
     # old label-is-consent contract. Native scheduler IDs remain untouched.
     from secretary.desk_deploy import deployment as deploy_desk
-    deploy_desk(core_dir, [Path.home()/".agents/skills", dst_sk, Path.home()/".cursor/skills"],
+    deploy_desk(core_dir, [Path.home()/".agents/skills", Path.home()/".codex/skills", dst_sk, Path.home()/".cursor/skills"],
                 Path.home()/".local/share/secretary/desk-runtime", True,
                 dst_pb, Path.home()/".local/bin")
     print("  ✓ Desk skills, compatibility aliases and routine contracts deployed")

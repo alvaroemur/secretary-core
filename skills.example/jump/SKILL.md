@@ -1,5 +1,7 @@
 ---
 name: jump
+metadata:
+  close-contract: "2"
 description: >-
   From any in-progress session, propose continuation archetypes (replay, QA, next
   plan/EDT step, lateral fork) and emit paste-ready prompts at three context tiers

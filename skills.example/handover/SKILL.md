@@ -1,5 +1,7 @@
 ---
 name: handover
+metadata:
+  close-contract: "2"
 description: >-
   Write a self-contained handover with work state, decisions, blockers and how to
   resume. Reuse the single brief and close_context when called during wind-down.

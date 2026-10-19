@@ -48,3 +48,33 @@ La regla permite preparar código, pruebas, análisis y documentos reversibles e
 `secretary status` mantiene sus tres argumentos y añade `--state`, `--evidence` y `--next`. Publica un comentario firmado y deduplicado en el brief de la fecha local. Si no existe el brief de hoy, falla explícitamente: no escribe en el de ayer. Los consumidores toman el avance con evidencia más reciente para cada asunto, sin confundir preparación, PR abierto y merge. El reporte de la mañana conserva su fecha; los comentarios describen el avance posterior.
 
 Ejemplo: `secretary status "✅" "proyecto" "informe subido para revisión" --state "presentación pendiente" --evidence "<enlace>" --next "ajustar presentación"`.
+
+## Distribución del cierre
+
+Los cuatro procedimientos de cierre declaran `metadata.close-contract`. El distribuidor
+compara la fuente privada con el export revisado. Una fuente privada con un contrato
+anterior bloquea toda la operación antes de escribir; no se sustituye silenciosamente
+por el export. Reconcilia primero el procedimiento privado y regenera su export con
+el mecanismo de redacción del repo. No copies datos privados al repositorio público.
+`core export-examples` aplica la misma comprobación antes de borrar `skills.example/`:
+un export no puede perder ni bajar el contrato revisado.
+
+Una instalación con un contrato superior también bloquea el lote completo. El plan
+incluye fuente efectiva, commit de origen (o `null` fuera de Git), hash y contrato.
+La segunda aplicación no cambia los archivos. Los backups conservan el contenido anterior.
+Esta protección pertenece al distribuidor actualizado: un ejecutable antiguo no conoce
+el contrato. No mezcles versiones del motor ni despliegues desde ramas pendientes sin
+revisar su plan. `routines setup` comprueba el cierre antes de su fase de copia heredada
+y contempla `.agents`, `.codex`, `.claude` y `.cursor`.
+
+El snapshot sigue siendo opcional. `secretary efficiency --help` lista sus comandos;
+`secretary efficiency close-snapshot --help` muestra los argumentos reales.
+`secretary signature wind-down --runtime codex` genera una firma que identifica Codex.
+`--mark` y `--footer` permiten obtener cada parte. El runtime explícito prevalece;
+sin él se consulta `SECRETARY_RUNTIME` y después `CODEX_THREAD_ID`. Si no hay evidencia
+del harness, se identifica como sesión. Un runtime desconocido es un error.
+
+Este comando no reemplaza helpers instalados ni modifica las políticas de la instancia.
+`status` utiliza la misma firma nativa por defecto. Una configuración explícita de
+`SECRETARY_SIGNATURE` conserva el helper de la instancia y falla si este no existe.
+Desk copia `signatures.py` junto al runtime, como `brief_html.py`.

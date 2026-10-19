@@ -5,25 +5,27 @@ import hashlib
 import json
 import shutil
 import sys
+import subprocess
 from pathlib import Path
+
+from secretary.skill_sources import CLOSE_SKILLS, check_close_destination, close_contract, skill_source
 
 
 def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = False,
                scheduled: Path | None = None, bin_dir: Path | None = None) -> list[dict]:
     names = json.loads((source/'secretary/data/desk_names.json').read_text())
-    skills = source/'skills'
-    if not skills.is_dir():skills = source/'skills.example'
     playbooks = source/'playbooks'
     if not playbooks.is_dir():playbooks = source/'playbooks.example'
     copies = []
     overrides = {}
     for target in targets:
         for name in set(names['skills']) | set(names['skills'].values()) | {'wind-down', 'handover', 'jump'}:
-            origin = skills/name
+            origin = skill_source(source, name)
             if origin.is_dir():
                 copies.extend((p, target/name/p.relative_to(origin)) for p in origin.rglob('*') if p.is_file())
     copies.append((source/'secretary/desk.py', runtime/'desk.py'))
     copies.append((source/'secretary/brief_html.py', runtime/'brief_html.py'))
+    copies.append((source/'secretary/signatures.py', runtime/'signatures.py'))
     if scheduled:
         # Preserve the existing audit; append the gated conditional-reorganization contract.
         tidy_contract = source/'routine-overlays/tidy-up/conditional.md'
@@ -64,11 +66,20 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
                 overrides[str(dst)] = (original.decode().split(marker)[0] + common.read_text()).encode()
                 if dst not in copy_map:
                     copies.append((common, dst))
+    # Validate the whole batch before the first write, including stale private
+    # sources and newer installations. A failed preflight leaves every target intact.
+    for src, dst in copies:
+        check_close_destination(src, dst)
+    revision = subprocess.run(['git', '-C', str(source), 'rev-parse', 'HEAD'],
+                              capture_output=True, text=True)
+    source_commit = revision.stdout.strip() if revision.returncode == 0 else None
     plan = []
     for src, dst in copies:
         data = overrides.get(str(dst), src.read_bytes());changed = not dst.exists() or dst.read_bytes() != data
         plan.append({'source': str(src), 'destination': str(dst), 'changed': changed,
-                     'sha256': hashlib.sha256(data).hexdigest()})
+                     'sha256': hashlib.sha256(data).hexdigest(), 'source_commit': source_commit,
+                     **({'close_contract': close_contract(src)}
+                        if src.name == 'SKILL.md' and src.parent.name in CLOSE_SKILLS else {})})
         if apply and changed:
             dst.parent.mkdir(parents=True, exist_ok=True)
             if dst.exists():

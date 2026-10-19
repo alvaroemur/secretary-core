@@ -789,7 +789,28 @@ def gog_health_cmd(
 
 
 
-@app.command("efficiency", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@app.command("signature")
+def signature_command(
+    context: str = typer.Argument('sesion'),
+    runtime: Optional[str] = typer.Option(None, '--runtime'),
+    mark: bool = typer.Option(False, '--mark'),
+    footer: bool = typer.Option(False, '--footer'),
+):
+    """Genera la marca y la firma visible para el runtime indicado."""
+    from secretary.config import load_config
+    from secretary.signatures import signature
+    if mark and footer:
+        raise typer.BadParameter('Elige --mark o --footer')
+    try:
+        head, tail = signature(context, runtime=runtime,
+                               timezone=load_config().get('timezone') or 'UTC')
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(head if mark else tail if footer else head+'\n\n---\n'+tail)
+
+
+@app.command("efficiency", add_help_option=False,
+             context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 def efficiency_command(ctx: typer.Context):
     """Optional close snapshots and local usage metrics; experimental routine gates."""
     from secretary.efficiency import main

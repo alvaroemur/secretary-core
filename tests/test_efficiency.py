@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 from secretary import efficiency as e
-from secretary.portable_deploy import deployment
 
 NOW = datetime(2026, 10, 4, 12, tzinfo=timezone.utc)
 
@@ -101,14 +100,6 @@ class EfficiencyTests(unittest.TestCase):
             self.assertEqual(sum(r['tokens']['input'] for r in records),10)
             self.assertTrue(all(r['tokens']['cache_write'] is None for r in records))
 
-    def test_deployment_is_reproducible_and_dry_run_is_readonly(self):
-        source=Path(__file__).resolve().parents[1]
-        with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp);target=root/'skills';runtime=root/'runtime'
-            deployment(source,[target],runtime)
-            self.assertFalse(target.exists())
-            deployment(source,[target],runtime,True)
-            self.assertTrue(all(not x['changed'] for x in deployment(source,[target],runtime)))
 
     def test_existing_metrics_preserve_unknown_and_native_usage(self):
         path=Path(__file__).resolve().parents[1]/'secretary/routines/metrics/parse-routine-metrics.py'

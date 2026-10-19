@@ -1,30 +1,56 @@
 ---
 name: handover
-description: Escribe un único brief de continuidad para retomar en otro harness; reutiliza close_context cuando lo llama wind-down.
+metadata:
+  close-contract: "2"
+description: >-
+  Write a self-contained handover with work state, decisions, blockers and how to
+  resume. Reuse the single brief and close_context when called during wind-down.
+  Use for explicit handovers, not durable memory or AGENTS.md updates.
 ---
 
-# handover
+# handover — session, repo or person handoff
 
-Un cierre produce un solo brief. Si recibes `close_context`, úsalo sin volver a consultar git ni releer la conversación. Si te invocan por separado, recoge una sola vez el contexto del repo activo y las decisiones de la conversación.
+Produce a Markdown brief that another session or person can resume from without chat history. Do not run tests, builds or linters to write it.
 
-## Destino e identidad
+## Shared context
 
-- En wind-down: `<checkout-real>/.briefs/YYYY-MM-DD-HHMM-<slug>.md`. El cierre fija la ruta en `close_context`; las llamadas posteriores de esa sesión actualizan ese mismo archivo.
-- Invocación independiente: respeta el destino explícito; por defecto usa `.briefs/` del repo activo. Un handover para otra persona puede usar `docs/handovers/` si se solicita.
-- No escribas briefs de Cowork/Dev en la instancia. Respeta rutas absolutas del checkout real y las políticas de firma.
-- Si falta una decisión necesaria, pregunta una sola vez. No vuelvas a pedir los datos ni autorización ya aportados por wind-down o el usuario.
+When given `close_context`, use its checkout, branch, commit, files, decisions, result, blockers, next action, references and chosen brief path. Do not collect git or conversation state again. Update that same brief if called again during the close.
 
-## Contenido mínimo
+For a standalone invocation, collect current checkout status, branch, commit, relevant session changes and decisions once. Do not use recent commits as proof that this session touched a file. Without git, state that fact and continue.
 
-1. Identidad: sesión, repo, rama, commit y fecha con zona horaria.
-2. Objetivo y resultado observable de la sesión.
-3. Estado actual de los archivos afectados y decisiones confirmadas con su motivo.
-4. Bloqueos y preguntas pendientes.
-5. Siguiente acción, criterio de terminación y primer archivo a leer.
-6. Referencias canónicas, PRs/issues y comprobaciones ya realizadas o pendientes.
+## Destination and identity
 
-Usa rutas del repo y enlaces reales. No dependas de ids de chats, herramientas exclusivas del harness ni memoria interna para poder retomar. Un link al chat puede ser complementario, nunca la única fuente. No copies la transcripción ni instrucciones globales enteras.
+Infer a short title and destination from the request. Ask once if a material choice cannot be inferred. Do not ask again for inputs or permission already provided.
 
-No inventes estados ni incluyas secretos. No actualices AGENTS.md: eso corresponde a desk-project-sync. Durante wind-down no hagas git add/commit/push por separado: el orquestador reúne los cambios. No ejecutes tests/builds para elaborar el brief.
+- During wind-down: use its chosen `<actual-checkout>/.briefs/YYYY-MM-DD-HHMM-<slug>.md`.
+- Standalone: respect an explicit destination; otherwise use the active repo's `.briefs/`. A person-facing handover may use `docs/handovers/` when requested.
+- Keep briefs for work repos in those repos. Never place them in the instance brief tree.
+- Use a lowercase slug, strip diacritics, collapse punctuation to hyphens and limit it to 60 characters.
+- Update the known brief for this session. For an unrelated name collision, use a numeric suffix; do not overwrite or delete another handover.
 
-Devuelve la ruta y el resumen al orquestador. `jump` usa ese resultado; no crea otro brief.
+## Required content
+
+Keep sections that carry information. Explain missing material facts instead of inventing them.
+
+1. **Identity:** session, repo, branch, commit and timestamp with timezone.
+2. **Context and result:** objective, why the handover is needed, work completed and partial work.
+3. **Current state:** affected files or components, what works, what is broken or missing.
+4. **Prioritized next steps:** action, inputs and observable completion criterion; include active todos.
+5. **Decisions:** choice, reason and rejected paths that matter for continuation.
+6. **Risks and blockers:** pending questions and mitigation.
+7. **References:** actual file paths, source links, PRs/issues and checks completed or pending.
+8. **How to resume:** first file to read, first action or command and next open question.
+
+Write the handover in the user's configured language. Do not copy global instructions or a transcript. A chat link is supplemental, never the only context. Redact secrets.
+
+## Preview and write
+
+For a standalone handover, show the proposed Markdown and destination before writing when not already approved. Write only after approval. During wind-down, include the destination and summary in its single proposal; do not introduce another confirmation after the owner approved that proposal.
+
+Write to the actual checkout or explicit absolute destination. Return its path and a short summary. Follow the configured signature policy.
+
+## Git and boundaries
+
+Do not change AGENTS.md or harness memory. Do not push. During wind-down, leave git add/commit/push to its orchestrator. A standalone commit is optional and requires authorization; follow the repo's commit conventions.
+
+Jump consumes this brief and does not create a second one.

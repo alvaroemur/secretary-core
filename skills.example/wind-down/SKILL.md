@@ -1,46 +1,227 @@
 ---
 name: wind-down
-description: Cierra la sesión con una sola recogida de estado, instrucciones estables y un brief de continuidad portable. Resuelve solo los pendientes de esta sesión.
+metadata:
+  close-contract: "2"
+description: >-
+  End-of-session ritual that sweeps open loops and routes each to the skill that
+  resolves it — loose ideas to offload, continuing threads to handover, code
+  branches/PRs to push + draft PR (advanced to ready-for-review when nothing of
+  yours blocks). Continuity prompts via jump (two-line fallback if jump is
+  missing). Refreshes status on touched docs/plans nodes. Triggers: "/wind-down",
+  "let's wrap up", "close this". NOT for mid-session ideas, mid-session
+  continuations without closing, standalone handover, or memory consolidation.
 user-invocable: true
 ---
 
-# wind-down
+# wind-down — end-of-session ritual
 
-Al cerrar una sesión, reutiliza su contexto. No abras una sesión auxiliar ni un subagente para reconstruirlo. No implementes ideas nuevas durante el cierre.
+Orchestrator, not executor. Detects open loops from the current session, routes
+each to the resolving skill, reports in tables. No coaching, no nagging.
 
-## Una sola recogida
+Doctrine: `rules/skills-contract.md` · related issues doctrine · GitHub signatures
 
-1. Identifica los repos y archivos que esta sesión tocó. Recoge decisiones, trabajo terminado, bloqueos y siguiente acción de la conversación. Si el historial no permite identificar un archivo, declara la incertidumbre; no atribuyas cambios ajenos.
-2. Para cada repo, crea una sola instantánea temporal mediante `secretary-portable close-snapshot --repo <checkout-real> --session-id <id> --path <archivo> --decision <decisión> --next <acción> --output <temporal.json>`. Repite las opciones según haga falta. En instalaciones del core que ya incluyan el comando, `secretary efficiency` es equivalente. Sin archivos tocados, omite `--path`; nunca uses el último commit como sustituto.
-3. Consulta una vez el PR de la rama y los commits sin publicar. No recorras otros worktrees ni repos ajenos a la sesión. Menciona cambios ajenos conocidos una vez, sin modificarlos.
-4. Entrega el mismo objeto `close_context` a `desk-project-sync`, `handover` y `jump`. No deben volver a recopilar git ni la conversación.
+## Shared close context
 
-`close_context` contiene: id de sesión, checkout real, rama, commit, archivos tocados con estado, decisiones, resultado, bloqueos, siguiente acción, PR, ruta del brief y referencias. El snapshot mecánico aporta git; el agente agrega la información de la sesión. No contiene transcripciones ni credenciales.
+Collect session state once. Identify only the repos and files touched by this session; do not infer them from the last commit or inspect unrelated worktrees. State uncertainty rather than attributing another session's edits to this one.
 
-## Propuesta única
+Build one `close_context`: session id, actual checkout, branch, commit, touched files and their status, decisions and reasons, result, blockers, next action, PR, references, and one brief path. Query the branch PR and unpublished commits once. No auxiliary session or reflection agent is needed.
 
-- `desk-project-sync`: revisar solo archivos tocados y decisiones estables; actualizar `AGENTS.md` cuando cambie una regla, comando, fuente canónica o convención.
-- `handover`: escribir o actualizar un único brief para la continuidad. `jump` reutiliza ese brief para ofrecer una continuación; no crea otro.
-- Ideas sueltas: capturar mediante el skill disponible de delegate/offload. No ejecutarlas.
-- Hechos durables y hitos: enrutar a memoria/wiki mediante el skill correspondiente; no incorporarlos como estado transitorio en `AGENTS.md`.
-- Avance comunicado por el usuario: persistir lo pendiente con `secretary status`.
-- Issues afectados: comprobar las relaciones en ambas direcciones antes de declarar cierre.
+Pass this object to project sync, handover and jump. They reuse it instead of repeating git or conversation collection. Handover is the only brief writer; jump uses that brief. Keep Cowork/Dev briefs in the actual checkout's `.briefs/`, never in the instance brief tree.
 
-Muestra una lista breve de acciones concretas y bloqueos. Si el usuario ya autorizó una acción, no pidas otra confirmación. Para las decisiones pendientes, reúne las preguntas en una sola propuesta. Un cierre sin trabajo material no necesita un brief vacío.
+An optional `secretary efficiency close-snapshot` can supply mechanical git state when available. It is not required: normal git tools and the current conversation suffice. Do not install a runtime to close a session.
 
-## Git y cierre
+## Instance setup
 
-- Sigue las convenciones del `AGENTS.md` aplicable. No fuerces pushes ni escribas código en main. Respeta la política de worktrees de la instancia.
-- Avanza los PRs de esta sesión: push, crear PR si falta y pasar a revisión cuando el trabajo esté listo. Aplica la firma de agente configurada antes de crear o comentar artefactos de GitHub.
-- Merge de datos/prosa: puede integrarse en la confirmación única del cierre. Merge de código/configuración ejecutable: requiere decisión específica sobre el cambio concreto. Cambios mixtos cuentan como ejecutables. No mergees con conflictos, comentarios humanos pendientes ni fallos reales de CI.
-- Si un PR necesita atención, usa el skill de mantenimiento configurado. Comentarios generados por agentes no cuentan como feedback humano.
-- Fallos: registra el bloqueo y continúa con las acciones independientes.
-- Si cambió el estado material, actualiza heartbeat una sola vez según la política de la instancia.
-- Mantén el brief de esta sesión en el repo correspondiente. Para Cowork/Dev usa `<checkout>/.briefs/`; nunca la carpeta de briefs de la instancia.
+```bash
+CFG=$(secretary config show)
+export SECRETARY_INSTANCE="${SECRETARY_INSTANCE:-$(echo "$CFG" | jq -r .instance)}"
+BRIEF_REPO=$(echo "$CFG" | jq -r '.brief.repo // empty')
+```
 
-Reporte final: resultado, instrucciones estables actualizadas (o ninguna), enlace al brief único, PR/issue y bloqueos. Omite secciones vacías. No declares verificaciones que no se ejecutaron.
+Workspace/repo routing for handover destinations and offload context: **instance
+`AGENTS.md`** (Cowork/Dev layout, client map). Do not embed absolute cwd tables.
 
+## Principles
 
-## Integración opcional con Desk
+- **No nagging.** Never close with reproach about unpushed commits. Each loop is
+  resolved (signal created) or parked (logged decision).
+- **Advance, don't park by default.** Session PRs should not sit in draft by
+  inertia. Push as far as possible without owner input — push, draft PR if
+  missing, update body if drifted, mark ready when nothing of yours blocks.
+  Owner-dependent items become named blockers.
+- **Close the loop to merge — tier-gated.** For each mergeable session PR,
+  classify tier by touched files:
+  - **Low tier** (data/prose only: `*.md`, `*/memory/`, `wiki/`, summaries,
+    notes): folds into the **single Stage 2 confirmation**.
+  - **High tier** (executable: code, `.github/`, `package.json`, instance YAML,
+    build scripts): **never** fold into blanket Y. Show diff/summary and ask a
+    dedicated question before merge.
+  - **Mixed → high wins. Unclear → high.** Block merge on conflicts, unresolved
+    human comments, or code-failure CI. When CI is infra-blocked, local validation
+    on PR head may satisfy the gate (same suite as merge skill). Run the available PR maintenance skill first
+    for conflicts, human comments, or real test failures.
+- **Capture, don't execute.** Loose ideas → offload, not implementation now.
+- **One sweep, one checklist, one confirmation.** Pre-resolve sub-skill inputs.
+- **"I don't know" parks.** Log open questions and continue.
+- **Session scope only.** Unrelated pre-existing dirt: mention once, no action.
+- **Refresh desk-heartbeat before exit.** If close changed material state, run
+  desk-heartbeat with **commit+push to `main`** when instance policy requires it.
 
-Cuando Secretary esté disponible, reutiliza `close_context` para registrar avances, PR, bloqueos y decisiones pendientes mediante `secretary status`. No vuelvas a inspeccionar otros repos o worktrees. Actualiza desk-heartbeat según la política vigente si hubo cambios materiales. Las propuestas nuevas se registran sin habilitarlas; una preparación autónoma requiere la política `prepare-pr-v1` o autorización específica. Este cierre sigue funcionando sin Secretary. Brief-update publica el estado; wind-down no envía correos ni duplica el brief.
+## Skill chain
+
+| Loop | Routes to | Friction reduction |
+|------|-----------|-------------------|
+| Loose idea | offload (blob or with-context) | One idea = one restart unit |
+| Thread continues elsewhere | handover + resume | Pre-fill title and destination |
+| Durable knowledge | offload (wiki vs issue triage) | Do not write wiki directly |
+| Project milestone / deliverable | `desk-write` (wiki theme) | One-line dated fact pending integrate |
+| Harness / system friction | `desk-learn` → offload (default ISSUE) | Not wiki facts |
+| Branch / PR from session | push → PR → ready → **tier merge** | Low → merge in single Y; high → ask |
+| Chat-reported progress not persisted | `secretary status` | Sweep before close |
+| Memory consolidation | `desk-consolidate` | Only if explicit |
+| Open PR with unread comments | mention sync next session | Park, don't sync now |
+| Project hygiene | `desk-project-sync` | AGENTS.md, scratch, layout, entity-contract drift |
+| Continuity prompts | **jump** | Archetypes + tiers; owner picks; optional offload |
+| Active work plan | `docs/plans/<slug>.md` or `_diseño/plans/<slug>.md` | Append node status + Log for nodes touched this session |
+
+When calling handover, pre-fill inputs from Stage 1 — no re-interrogation.
+
+## Procedure — two stages (Proposal & Close)
+
+Ultra-compact bullets with decision traffic lights. **Zero boilerplate:** omit empty
+sections.
+
+### Stage 1 — Proposal
+
+Scan repos touched, loose ideas, handovers, milestones, friction:
+
+```bash
+git -C <repo> status -sb
+git -C <repo> branch --show-current
+git -C <repo> log --oneline @{u}..HEAD
+gh pr list --repo <owner/repo> --head <branch>
+```
+
+**Issues touched this session.** If the session closed, commented substantially on,
+or merged a PR resolving an issue, run bidirectional related-issues check before
+reporting.
+
+**Project sync (Cowork/Dev).** Run project sync for AGENTS.md, scratch purge, layout,
+entity-contract / EDT drift.
+
+**Work plan status.** If `docs/plans/` or `_diseño/plans/` has an `active` plan
+(or `plan_ref` in session): for each node touched this session, propose status
+updates (`running`→`done` / `blocked`) and Log rows. Do **not** reshape the graph
+without owner OK.
+
+**Continuity (jump).** If the session produced material work, run jump (scan →
+archetype table → owner picks → emit prompts). Do not reimplement prompt generation.
+
+**Fallback** if jump is missing or there was no material work — two lines only:
+
+```
+Continuity: local handover in <session-cwd>/.briefs/ <or> none.
+Open issues: <list or none>.
+```
+
+**Status sweep (blocking).** Persist chat-reported progress not yet recorded
+(`secretary status`).
+
+#### Stage 1 template
+
+Render only sections with items:
+
+````markdown
+## Close proposal
+
+### Code and PRs
+- 🟢 **<repo>** (`<branch>`): <N> commits unpushed → push + draft PR
+- 🟢 **<repo>** (PR #<N>, `.md` only): low-tier → push + ready + squash merge
+- 🔴 **<repo>** (PR #<N>, executable): high-tier → merge with squash? (Recommended: Y)
+
+### Memory and milestones
+- 🟡 **<topic>**: <milestone> → note in wiki theme? (Recommended: Y)
+- 🟡 **harness**: `<friction>` → record via desk-learn? (Recommended: N)
+- 🟢 **durable knowledge**: `<fact>` → offload → wiki
+
+### Work plan
+- 🟢 **<plan_ref> node <id>**: <pending status change> → append Log
+
+### Continuity
+- 🟢 **<thread>**: jump → <archetype> / tier <surgical|operational|autonomous>
+- 🟢 **loose idea**: `<idea>` → offload blob
+- 🟢 **no material**: fallback — local handover or open issues
+
+---
+
+**Shortcuts:**
+- **`1` / `All`** — execute recommended (🟢, accept 🟡 milestones, merge 🔴 after ask)
+- **`2` / `Code only`** — push/PRs only
+- **`3` / `Minimum`** — WIP commit + local handover, no remote
+
+**Or adjust:**
+```text
+<repo> (merge PR #<N>): Y
+<topic> (wiki milestone): Y
+harness (desk-learn): N
+plan node <id>: done
+```
+````
+
+### Stage 2 — Execution & close report
+
+Hard rules: Conventional Commits per instance `AGENTS.md`. Never force-push. Never
+push code to `main` without a branch. On failure, park as issue and continue.
+
+**GitHub signature (mandatory)** before any `gh pr create`, `gh issue create`, or
+`gh issue comment` this skill emits — prefer `secretary signature wind-down
+--runtime <actual-runtime>` (or its `--mark` / `--footer` outputs). When the CLI
+is unavailable, use the configured instance helper and verify its runtime label.
+Do not install a helper during close or claim another harness as the author.
+
+**Main checkout gate (blocking)** before declaring close or desk-heartbeat, when instance
+policy requires the secretary checkout on `main` clean except desk-heartbeat / untracked.
+
+If Stage 2 produced material changes → desk-heartbeat once per instance policy; note in close.
+
+#### Stage 2 template
+
+```markdown
+## Session closed
+
+### Code and PRs
+- ✅ **<repo>**: branch `<branch>` pushed; PR #<N> created / squash-merged
+
+### Memory and milestones
+- ✅ **<topic>**: milestone noted
+- ⏸️ **harness**: skipped by owner
+
+### Work plan
+- ✅ **<plan_ref>**: nodes <ids> status + Log updated
+- ⏸️ **plan**: none active
+
+### Continuity
+- ✅ **jump**: prompts in chat and/or `<session-cwd>/.briefs/<date>-<slug>.md`
+- ⏸️ **jump**: fallback
+- ✅ **desk-heartbeat**: updated
+
+Done.
+```
+
+## When to use / not use
+
+- **Use:** explicit close intent
+- **Not:** mid-session idea → offload; mid-session continuations without closing →
+  jump; harness learning mid-session → `desk-learn`; standalone handover; consolidation
+
+## Don't
+
+- Nag, leave PRs in draft by inertia, fold high-tier merge into blanket Y,
+  reimplement capture, implement loose ideas, touch unrelated repos, force-push,
+  or write motivational closes
+- Route harness friction to wiki by default — Stage 1 harness row → `desk-learn` on Y
+- Reshape `docs/plans` graphs without owner OK — status + Log only
+
+## Optional Desk integration
+
+When Secretary is available, reuse close_context to record progress, PRs, blockers and pending decisions with secretary status. Do not inspect other repos again. Update desk-heartbeat under the instance policy after material changes. New proposals do not enable execution; autonomous preparation requires prepare-pr-v1 or specific authorization. This close works without Secretary. Brief-update publishes status; wind-down sends no mail and creates no duplicate brief.

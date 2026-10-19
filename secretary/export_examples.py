@@ -207,6 +207,14 @@ def export_examples(*, check: bool = False) -> tuple[int, list[str]]:
             "Sin la fuente no se puede regenerar — abortando para no crear basura.",
         ]
 
+    # Close contracts are checked before the wipe: a stale private source must
+    # not replace the reviewed export or lower its minimum version.
+    from secretary.skill_sources import check_export_sources
+    try:
+        check_export_sources(root / "skills", root / "skills.example")
+    except ValueError as exc:
+        return 2, [str(exc)]
+
     if check:
         drift = False
         with tempfile.TemporaryDirectory() as tmp:

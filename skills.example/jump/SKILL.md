@@ -1,40 +1,121 @@
 ---
 name: jump
-description: Propone continuaciones de la sesión y genera prompts para otro harness, reutilizando el brief único de wind-down cuando exista.
+metadata:
+  close-contract: "2"
+description: >-
+  From any in-progress session, propose continuation archetypes (replay, QA, next
+  plan/EDT step, lateral fork) and emit paste-ready prompts at three context tiers
+  (surgical, operational, autonomous). Owner picks which prompts to generate. May
+  hand a prompt to offload/restart elsewhere. Triggers: "/jump", "where next",
+  "continuation prompts". NOT for session hygiene, scope grilling, or work-graph
+  design.
 user-invocable: true
 ---
 
-# jump
+## Integration with wind-down
 
-Ofrece próximos pasos; no cierra la sesión ni hace push/merge. No crea chats ni delega sin autorización.
+When given `close_context`, reuse its state, decisions, active plan and brief. Do not repeat git scans, read other worktrees or create another brief. The restart prompt names its objective, first file to read and completion criterion. It does not depend on chat history or a harness-specific tool. This rule overrides the collection and writing steps below.
 
-## Contexto
+# jump — continuation prompts from live session state
 
-Si recibes `close_context`, usa su estado, decisiones, plan y brief. No repitas git ni la conversación, no leas otros worktrees y no generes otro brief.
+Generate **where next** options and prompts. Does not close the session, push, or merge.
 
-Invocado por separado, consulta una vez el estado y rama del checkout activo, el plan activo (`docs/plans/` o `_diseño/plans/`), contrato de entidad y brief pertinente. No inventes nodos del plan ni actividades EDT.
+Doctrine: `rules/skills-contract.md`
 
-## Opciones
+## When to use / not use
 
-Propón solo las opciones que tengan fundamento, con intención y nivel recomendado:
+- **Use:** mid-session continuations; owner wants replay/QA/next-step prompts;
+  end-of-session continuity when there was material work.
+- **Not:** git/PR hygiene; designing a work graph; locking scope; parking a single
+  already-named idea verbatim (use offload/restart for that).
 
-| Opción | Cuándo aplica |
-|---|---|
-| Replicar | Aplicar el método a otro dataset, cliente o tema |
-| Revisar | Validar un artefacto producido o contrastar evidencia |
-| Siguiente paso | Continuar un nodo listo del plan o una actividad EDT |
-| Hilo lateral | Capturar una idea que pertenece a otro trabajo |
+## Scan (read, don't ask)
 
-El usuario elige qué prompts generar y su nivel. No repitas una elección ya aportada por wind-down.
+```bash
+git status -sb
+git diff --stat
+git branch --show-current
+```
 
-- Breve: acción y destino, una o dos líneas; la siguiente sesión lee el repo.
-- Operativo: objetivo, nodo/actividad, fuentes, entregable y criterio de terminación.
-- Autónomo: contexto autocontenido, destino, decisiones, límites, fuentes y aceptación. No depende del historial del chat.
+Also read, when present:
 
-## Continuación portable
+- Active conversation artifacts
+- `docs/plans/*.md` or `_diseño/plans/*.md` with `status: active` (prefer `plan_ref`)
+- cwd `contract.yaml` if `kind: entity` (EDT activities — read-only)
+- `<session-cwd>/.briefs/` briefs in the repo
 
-Durante wind-down, apunta al brief existente y al primer archivo a leer. El prompt indica objetivo y criterio de terminación; no copia las instrucciones globales ni presupone herramientas exclusivas de un harness.
+From an active plan: list nodes with `status` in `pending` | `blocked` | `running`.
+Prefer continuations anchored to those node ids.
 
-Invocado por separado, deja el prompt en chat; escribir un brief es opcional y requiere autorización. Mantén briefs de Cowork/Dev en su repo. Para offload, usa el flujo disponible de issue y contexto limpio tras la elección del usuario.
+## Archetypes
 
-No cambies contract.yaml ni el grafo de un plan para elaborar una continuación. Si no hay trabajo material, reporta continuidad y pendientes en dos líneas; no bloquees el cierre ni produzcas un brief vacío.
+Propose only archetypes that fit. Omit empty ones.
+
+| Id | Name | When |
+|----|------|------|
+| replay | Replay / transfer | Methodology just used; another dataset, client, or subject exists |
+| qa | Deep review / QA | Artifacts were produced; worth audit, tests, or consistency pass |
+| next | Next plan / EDT step | Active plan has a ready node, or entity contract has next pending activity |
+| fork | Lateral fork | Adjacent idea that should not derail this thread |
+
+Each row: one-line intent + suggested default tier. When anchoring to a plan node,
+cite `node:<id>` in the intent line.
+
+## Context tiers
+
+Owner picks **per archetype** (not one global tier).
+
+| Tier | Contents |
+|------|----------|
+| **Surgical** | 1–2 lines. Verb + target. Assumes the next agent reads the repo. |
+| **Operational** | Plan node id and/or EDT id, input paths, expected deliverable. No full contract dump. |
+| **Autonomous** | Self-contained: goal, plan_ref excerpt or contract excerpt, acceptance, no-goals, constraints. Fit for a clean session or offload. |
+
+## Loop
+
+1. Scan. Build the archetype table with a recommended tier each.
+2. Ask which rows to emit, and which tier per row (defaults in the table).
+3. Write only the chosen prompts — paste-ready, no narration inside them.
+4. Offer handoff per prompt:
+   - **Stay** — leave in chat (and optionally `<session-cwd>/.briefs/YYYY-MM-DD-HHMM-<slug>.md`).
+   - **Offload** — pass the prompt to the harness offload/restart playbook (issue +
+     clean-context brief). Jump does not spawn sessions itself.
+
+## Prompt shapes
+
+**Surgical**
+
+```
+<imperative one-liner>. Repo is already the cwd.
+```
+
+**Operational**
+
+```
+Do <action> for plan node <id> (mode <mode>) — <title>.
+Inputs: <paths>.
+Output: <deliverable path or artifact>.
+Do not reshape docs/plans graph or mutate contract.yaml without owner OK.
+```
+
+**Autonomous** — prose block, no headings inside, ~120–200 words. Include: destination
+cwd or repo, plan_ref and/or EDT id, acceptance, explicit no-goals, "do not mutate
+contract.yaml; append plan Log only".
+
+## Continuity fallback (callers)
+
+If jump is unavailable or the session had no material work, callers must not block
+close. Two lines max:
+
+```
+Continuity: local handover in <session-cwd>/.briefs/ <or> none.
+Open issues: <list or none>.
+```
+
+## Don't
+
+- Close the session, push, or merge
+- Invent EDT activities or plan nodes
+- Mutate `contract.yaml` or reshape a plan graph
+- Emit all three tiers for every archetype unless asked
+- Offload without owner pick

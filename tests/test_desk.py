@@ -58,6 +58,20 @@ class DeskTests(unittest.TestCase):
             self.assertTrue((target/'pulse/SKILL.md').exists())
             self.assertTrue(all(not x['changed'] for x in deployment(source,[target],runtime)))
 
+    def test_deploy_uses_existing_sources_even_when_legacy_portable_is_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); source = root/'source'; target = root/'installed'
+            data = source/'secretary/data'; data.mkdir(parents=True)
+            (data/'desk_names.json').write_text('{"skills": {}}')
+            for name in ['desk.py', 'brief_html.py', 'signatures.py']:
+                (source/'secretary'/name).write_text('# runtime fixture\n')
+            current = '---\nname: wind-down\nmetadata:\n  close-contract: "2"\n---\ncurrent close'
+            for folder, text in [('skills.example', current), ('portable/skills', 'obsolete close')]:
+                skill = source/folder/'wind-down/SKILL.md'
+                skill.parent.mkdir(parents=True); skill.write_text(text)
+            deployment(source, [target], root/'runtime', True)
+            self.assertEqual((target/'wind-down/SKILL.md').read_text(), current)
+
     def test_reporting_overlay_preserves_private_procedure_and_is_repeatable(self):
         source = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as tmp:

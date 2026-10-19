@@ -227,9 +227,21 @@ def publish_event(cfg: dict, text: str, routine: str) -> dict:
     marker = '<!-- desk:event '+digest+' -->'
     comments = json.loads(command(['gh','issue','view',str(issue['number']),'--repo',repo,'--json','comments']))['comments']
     if any(marker in c.get('body','') for c in comments):return {'state':'already-published','issue':issue['number']}
-    signer = Path(os.environ.get('SECRETARY_SIGNATURE',str(Path.home()/'.claude/scripts/sec-signature.sh')))
-    if not signer.is_file():raise ValueError('Helper de firma ausente; no publicar sin firma')
-    body = command([str(signer),'brief-update','--mark'])+'\n'+marker+'\n'+text+'\n\n---\n'+command([str(signer),'brief-update','--footer'])
+    custom_signer = os.environ.get('SECRETARY_SIGNATURE')
+    if custom_signer:
+        signer = Path(custom_signer)
+        if not signer.is_file():raise ValueError('Helper de firma ausente; no publicar sin firma')
+        mark = command([str(signer),'brief-update','--mark'])
+        footer = command([str(signer),'brief-update','--footer'])
+    else:
+        try:
+            from secretary.signatures import signature
+        except ImportError:  # runtime desplegado con un paquete anterior
+            import sys
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from signatures import signature
+        mark, footer = signature('brief-update', timezone=cfg.get('timezone') or 'UTC')
+    body = mark+'\n'+marker+'\n'+text+'\n\n---\n'+footer
     # Send the body through stdin to avoid shell quoting or a durable duplicate.
     p = subprocess.run(['gh','issue','comment',str(issue['number']),'--repo',repo,'--body-file','-'],
                        input=body,capture_output=True,text=True,timeout=90)

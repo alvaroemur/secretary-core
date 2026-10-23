@@ -264,7 +264,7 @@ personas/proyectos/organizaciones** en `extractors/drive/memory/`, **NO proponer
 sobre ellas.
 
 Carpetas conocidas con esta naturaleza: lista de la instancia en
-`$SECRETARY_INSTANCE/extractors/drive/espejos-wip.md` (léela al empezar y mantenla al día ahí,
+`$SECRETARY_INSTANCE/extractors/drive/memory/espejos-wip.md` (léela al empezar y mantenla al día ahí,
 nunca en este playbook).
 
 **Cómo detectar espejos nuevos en futuras corridas**: antes de leer contenido de una carpeta

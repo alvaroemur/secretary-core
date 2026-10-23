@@ -31,9 +31,9 @@ WT="$(mktemp -d)/secretary-$SCOPE"
 # ¿Hay un PR de drive abierto de una corrida previa? → continuar sobre él (chaining).
 PREV=$(gh pr list --label hilo:drive --state open --json number,headRefName,createdAt \
     --jq 'map(select(.headRefName|test("^drive/(auto|consolidado)-")))
-          | sort_by(.createdAt) | last | ((.number|tostring)+" "+.headRefName)' 2>/dev/null || true)
+          | sort_by(.createdAt) | last | select(. != null) | ((.number|tostring)+" "+.headRefName)' 2>/dev/null || true)
 PREV_NUM="${PREV%% *}"; PREV_BRANCH="${PREV#* }"
-if [ -n "$PREV_NUM" ] && [ "$PREV_NUM" != "$PREV_BRANCH" ]; then
+if [ -n "$PREV" ] && [ -n "$PREV_NUM" ] && [ "$PREV_NUM" != "$PREV_BRANCH" ]; then
   git fetch origin "$PREV_BRANCH"
   BASE="origin/$PREV_BRANCH"
   echo "Continuando sobre PR de drive #$PREV_NUM ($PREV_BRANCH)"
@@ -263,8 +263,9 @@ como fuentes externas contamina la wiki con borradores. Para estas carpetas: reg
 personas/proyectos/organizaciones** en `extractors/drive/memory/`, **NO proponer reorganización** del Drive
 sobre ellas.
 
-Carpetas conocidas con esta naturaleza (mantener esta lista al día):
-- `Mentoría Adultos Imparables — Andre Pantoja/` (espejo de `~/.secretary/mentoria/adultos-imparables/andre/`)
+Carpetas conocidas con esta naturaleza: lista de la instancia en
+`$SECRETARY_INSTANCE/extractors/drive/espejos-wip.md` (léela al empezar y mantenla al día ahí,
+nunca en este playbook).
 
 **Cómo detectar espejos nuevos en futuras corridas**: antes de leer contenido de una carpeta
 del root del Drive cuyo nombre no esté en el inventario previo, hacer `ls ~/Cowork/` y
@@ -347,7 +348,7 @@ Para proyectos e iniciativas descubiertos en documentos:
 
 ## 4. PROPUESTAS DE ORGANIZACIÓN DEL DRIVE
 
-En cada corrida, además de indexar, analizar la estructura del Drive y proponer mejoras concretas. Escribir las propuestas en `$WT/extractors/drive/organizacion.md` (archivo acumulativo, no reescribir — añadir sección con fecha).
+En cada corrida, además de indexar, analizar la estructura del Drive y proponer mejoras concretas. Escribir las propuestas en `$WT/extractors/drive/organization.md` (archivo acumulativo, no reescribir — añadir sección con fecha). **Nombre en inglés, sin tilde** — es el nombre canónico ya establecido (`scripts/ci/validate_ordenamiento.py` solo permite `organization.md` bajo `extractors/drive/`); escribir a `organizacion.md` rompe el validador de CI en main (ver dream-20260827, 3 corridas consecutivas con este slip).
 
 ### Qué detectar
 
@@ -394,7 +395,7 @@ compartir. El hecho de estar sueltos en el root es señal de que probablemente s
 
 ### Formato del reporte
 
-En `$WT/extractors/drive/organizacion.md`, añadir una sección por corrida:
+En `$WT/extractors/drive/organization.md`, añadir una sección por corrida:
 
 ```markdown
 ## YYYY-MM-DD — Propuestas de organización
@@ -457,9 +458,22 @@ Para estos, solo registrar: título, carpeta, tipo, fecha de modificación. Nada
 
 Después de escribir todos los archivos:
 
+`scripts/ci/update_contract_freshness.py` no existe (verificado 2026-08-27) — el único
+script vivo es `scripts/ci/contract_health.py`, y su `--sync-contract` solo escribe
+`success_criteria[].current` para `job-search`, no toca `freshness.last_success_at` de
+extractors. Para drive, actualizar `extractors/drive/contract.yaml` a mano:
+
 ```bash
 cd "$WT"
-git add drive/
+NOW=$(TZ=America/Lima date +"%Y-%m-%dT%H:%M:%S-05:00")
+python3 - "$NOW" <<'PYEOF'
+import sys, re
+p = "extractors/drive/contract.yaml"
+s = open(p).read()
+s = re.sub(r'last_success_at: ".*"', f'last_success_at: "{sys.argv[1]}"', s, count=1)
+open(p, "w").write(s)
+PYEOF
+git add extractors/drive/
 git status
 ```
 

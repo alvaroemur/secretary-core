@@ -59,23 +59,19 @@ This run does **not** write to the main working copy. Work in an ephemeral workt
 > when a later `ls`/`tail` on the path returned "No such file or directory". Nothing was lost
 > permanently only because nothing had been pushed yet, but the 3 subagents' work had to be
 > manually reconstructed from their JSON results + re-reading the transcripts. **Fix: put `WT`
-> under a path that survives the whole session — the scratchpad directory given in the
-> orchestrator's own system prompt (`/private/tmp/claude-<uid>/<project>/<session>/scratchpad`),
-> not bare `mktemp -d`.** `/tmp` itself (not `$TMPDIR`) also survived in the same incident, so a
-> literal `/tmp/secretary-reuniones-$TS` is an acceptable fallback if the scratchpad path is
-> unknown to the orchestrator.
+> under a path that survives the whole session.** `routine-pr.sh open` already does this: it
+> creates `WT` under `${ROUTINE_WT_ROOT:-/tmp}` (never `$TMPDIR` or `mktemp -d`). The block below
+> sets `ROUTINE_WT_ROOT` to the orchestrator's scratchpad (`SECRETARY_SCRATCHPAD`, i.e.
+> `/private/tmp/claude-<uid>/<project>/<session>/scratchpad`) when known; `/tmp` itself (not
+> `$TMPDIR`) also survived in the same incident, so it stays as the fallback.
 
 ```bash
 set -euo pipefail
 REPO="$SECRETARY_INSTANCE"
-cd "$REPO"
-git worktree prune
-git fetch origin main
-TS=$(date +%Y%m%d-%H%M)
-SCOPE=reuniones
-BRANCH="$SCOPE/auto-$TS"
-WT="${SECRETARY_SCRATCHPAD:-/tmp}/secretary-$SCOPE-$TS"
-git worktree add -b "$BRANCH" "$WT" origin/main
+ROUTINE_PR="${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/routine-pr.sh"
+# Common prelude: worktree prune + fetch + `reuniones/auto-YYYYMMDD-HHMM` from origin/main.
+OPEN="$(ROUTINE_WT_ROOT="${SECRETARY_SCRATCHPAD:-/tmp}" "$ROUTINE_PR" open --repo "$REPO" --scope reuniones)"
+eval "$OPEN"   # sets WT, BRANCH, BASE, PREV_PR
 MEETINGS_MEMORY="$WT/extractors/meetings/memory"
 TACTIQ_ROOT=$(jq -r '.tactiq_root_id // empty' "$MEETINGS_MEMORY/_drive_layout.json" 2>/dev/null || true)
 if [ -z "$TACTIQ_ROOT" ]; then
@@ -589,33 +585,38 @@ Esto consulta `distribution.yaml`, renderiza el HTML enriquecido desde `template
 
 ### Phase 7 — Close: Commit + Pull Request (this PR is the report)
 
-**PR body signature:** `_firma.md` → `sec-signature.sh reuniones-update`.
+**PR body signature:** `routine-pr.sh close` adds it (`sec-signature.sh reuniones-update`, see
+`_firma.md`): first line mark, footer after `---`. Do **not** write the mark or footer into the body.
 
 ```bash
+# Each Bash call starts a fresh shell: carry WT and BRANCH from the prelude output.
+REPO="$SECRETARY_INSTANCE"
+ROUTINE_PR="${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/routine-pr.sh"
 cd "$WT"
-if [ -z "$(git status --porcelain)" ]; then
-  echo "No new meetings / no versioned changes — no PR opened."
-  cd "$REPO" && git worktree remove "$WT" --force && git branch -D "$BRANCH" 2>/dev/null || true
-else
+if [ -n "$(git status --porcelain)" ]; then
   python3 "$WT/scripts/ci/contract_health.py" --sync-contract || true
   # contract_health --sync-contract only bumps last_success_at on modules it judges
   # healthy; validated 2026-08-28 it left extractors/meetings/contract.yaml untouched
   # (stuck at 2026-06-30, SLA window too tight for a stub). If still stale after the
   # call above, patch last_success_at by hand in extractors/meetings/contract.yaml.
-  git add -A
-  git commit -m "docs(reuniones): corrida automática $(date +%Y-%m-%d)"
-  git push -u origin "$BRANCH"
-  gh label create "hilo:reuniones" --description "Hilo de trabajo: reuniones" --color D4C5F9 2>/dev/null || true
-  # Write report (Markdown) with Write tool to /tmp/pr-reuniones.md
-  gh pr create --title "docs(reuniones): corrida automática $(date +%Y-%m-%d)" \
-    --label "hilo:reuniones" --body-file /tmp/pr-reuniones.md
-  cd "$REPO" && git worktree remove "$WT" --force
 fi
+# Write report (Markdown) with Write tool to /tmp/pr-reuniones.md before this call
+# (always: close requires --body-file even when it ends with no changes).
+# Common close: git add -A, commit, push, signed PR with label, worktree cleanup.
+# No versioned changes → RESULT=no-changes (no PR; worktree and branch removed).
+CLOSE="$("$ROUTINE_PR" close --repo "$REPO" --wt "$WT" --branch "$BRANCH" \
+  --title "docs(reuniones): corrida automática $(date +%Y-%m-%d)" \
+  --body-file /tmp/pr-reuniones.md \
+  --routine reuniones-update --label hilo:reuniones)" \
+  || echo "routine-pr close exit $? (3 = branch pushed, PR failed: do not revert). Report the error."
+echo "$CLOSE"
 ```
 
 - Create report (`/tmp/pr-reuniones.md`) with Write tool, not `echo`/heredoc.
 - Drive moves (Phase 4) and `_procesados.jsonl` already happened in the worktree before this close.
-- If `gh pr create` fails, do not revert: branch is pushed; report error.
+- If the PR fails (`RESULT=push-only`, exit 3), do not revert: branch is pushed; report error.
+- The final report states the `RESULT=` line from `routine-pr.sh close` (validation of the
+  first runs on the common close).
 - Return **PR URL** at the end.
 
 ## Golden rules

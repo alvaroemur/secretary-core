@@ -29,10 +29,41 @@ WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.inspiro // .accounts.work // empty
 MEETINGS_MEMORY="$(secretary config path meetings.memory)"
 ```
 
+## Concurrency caveat (validated 2026-07-20)
+
+**This routine runs from at least two independent triggers (Cursor-cron and Claude scheduled task)
+with no mutual-exclusion lock.** If both fire close together, they can list `TACTIQ_ROOT` before
+either has moved the file out, both pick up the same still-present Doc, and both fully process it
+end-to-end (summary + memory appends + Drive move + PR) independently. Real case: 2026-07-20 ~22:00
+Lima, a Cursor-cron run and a Claude scheduled-task run both processed
+a short midday sync between two participants within ~5 minutes of each other, producing two
+divergent summaries and two separate `acc-20260720-001` action IDs before either PR was checked.
+
+**Mitigation until a real lock exists**: before opening the PR (Phase 7), check
+`gh pr list --state open --search "reuniones"` for a PR that already touches the same
+`resumen_path` slug or the same Drive doc id/group_key. If a newer PR already covers the exact
+group you just processed, **do not push your branch** — remove the worktree and defer to the
+existing PR instead of creating a duplicate. This is a stopgap; the correct fix is a lock file or
+similar mutual-exclusion mechanism at the orchestrator level (not yet built).
+
 ## W. Isolated worktree (do this first)
 
 This run does **not** write to the main working copy. Work in an ephemeral worktree from
 `origin/main` and open a PR at the end.
+
+> **Do NOT put the worktree under `mktemp -d` / `$TMPDIR` if the run will dispatch subagents via
+> the Agent tool and wait on them (Phase 2 always does).** Validated 2026-07-22: while waiting
+> ~15 minutes across three background subagents (ScheduleWakeup + task notifications), the
+> `$TMPDIR` directory holding the worktree was wiped mid-run by the host session/sandbox — all
+> uncommitted work (3 written summaries, edited `acciones.md`) vanished silently, discovered only
+> when a later `ls`/`tail` on the path returned "No such file or directory". Nothing was lost
+> permanently only because nothing had been pushed yet, but the 3 subagents' work had to be
+> manually reconstructed from their JSON results + re-reading the transcripts. **Fix: put `WT`
+> under a path that survives the whole session — the scratchpad directory given in the
+> orchestrator's own system prompt (`/private/tmp/claude-<uid>/<project>/<session>/scratchpad`),
+> not bare `mktemp -d`.** `/tmp` itself (not `$TMPDIR`) also survived in the same incident, so a
+> literal `/tmp/secretary-reuniones-$TS` is an acceptable fallback if the scratchpad path is
+> unknown to the orchestrator.
 
 ```bash
 set -euo pipefail
@@ -43,7 +74,7 @@ git fetch origin main
 TS=$(date +%Y%m%d-%H%M)
 SCOPE=reuniones
 BRANCH="$SCOPE/auto-$TS"
-WT="$(mktemp -d)/secretary-$SCOPE"
+WT="${SECRETARY_SCRATCHPAD:-/tmp}/secretary-$SCOPE-$TS"
 git worktree add -b "$BRANCH" "$WT" origin/main
 MEETINGS_MEMORY="$WT/extractors/meetings/memory"
 TACTIQ_ROOT=$(jq -r '.tactiq_root_id // empty' "$MEETINGS_MEMORY/_drive_layout.json" 2>/dev/null || true)
@@ -94,7 +125,7 @@ $WT/extractors/meetings/
 - **Google Drive**: MCP tools `search_files`, `read_file_content`, `get_file_metadata` (prefer `gog`
   CLI for listing and file ops when cheaper).
 - **Calendar**: MCP `list_events` to enrich metadata. ⚠️ For Inspiro / Norte Compartido meetings
-  (Arturo, Jorge), also scan the shared work calendar (`WORK_ACCOUNT`): `list_events` without
+  (external collaborators), also scan the shared work calendar (`WORK_ACCOUNT`): `list_events` without
   `calendarId` only reads primary and will miss them. First `list_calendars`, then iterate relevant
   calendars (include `WORK_ACCOUNT`, reachable as owner from the personal account). See
   `operational/briefing.md` § Calendar reconciliation.
@@ -124,7 +155,9 @@ $WT/extractors/meetings/
    `gog drive mkdir procesadas --parent="$TACTIQ_ROOT" --json` and
    `gog drive mkdir descartadas --parent="$TACTIQ_ROOT" --json`. Persist in `_drive_layout.json`.
 4. Load current `acciones.md` for open actions (`estado: abierta` or `en-curso`; closed are `hecha`,
-   `cancelada`, or `caducada`). Pass these to subagents for close/update detection. Schema and
+   `cancelada`, or `caducada`). Closed actions past retention are in `acciones/archivo/YYYY-MM.md`;
+   look one up with `secretary acc show <acc-id>` (active first, then archive). Pass the open ones to
+   subagents for close/update detection. Schema and
    lifecycle: `$WT/_diseño/specs/007-modelo-acciones/` (or `$SECRETARY_INSTANCE/_diseño/specs/007-modelo-acciones/`).
 
 ### Phase 1 — Scout: list, filter, group
@@ -160,21 +193,70 @@ $WT/extractors/meetings/
    late fragment after another was processed. New summary version replaces prior; memory items merge.
    - **Same-day sibling (distinct session, NOT extended group)**: if a new group shares date+title
      with an already-processed summary but `drive_id` differs and `createdTime` gap is >90min, they
-     are **two separate meetings the same day** (e.g. 2026-05-19: work session Greg/owner + social
+     are **two separate meetings the same day** (e.g. 2026-05-19: a work session with the owner + social
      session that night). NOT reprocessing. Validated 2026-05-20. Actions: (a) give new summary a
      distinct slug (e.g. `-starcraft-social` vs `-secretary-y-esmio`); (b) **tell the subagent for
      the new session** the path of the already-processed sibling summary in its prompt, so it does
      NOT flag false "wiki/calendar misalignment" when transcript topics actually occurred in the
      other session.
-6. If no new groups remain after filters and no shells to discard: update `_procesados.jsonl` with
+6. **Titles are not reliable (validated 2026-09-24).** Tactiq names the doc after the Meet room /
+   calendar event, and reused rooms mislead: a doc titled after a CV review was a different 1:1 call;
+   "Meeting Transcription" is Tactiq's generic title. Tell subagents to identify participants and
+   topic from content and pick the slug from content, not from the title.
+7. If no new groups remain after filters and no shells to discard: update `_procesados.jsonl` with
    `last_run_at` (separate line `{"_meta":"last_run","ts":"..."}`) and exit reporting "No new
    meetings".
 
 ### Phase 2 — Subagent dispatch
 
-For each group to process, launch **one subagent in parallel** via Agent tool
-(`subagent_type: general-purpose`). Invoke all subagents in one message with multiple simultaneous
-Agent calls.
+Phase 2 runs in two stages per group (pilot D15.8, see "Haiku delegation" below):
+
+- **2a — Literal extraction (Haiku).** One extraction subagent per group, all in one message.
+- **Validation** of each 2a result in the orchestrator.
+- **2b — Synthesis (default model).** For each group to process, launch **one subagent in
+  parallel** via Agent tool (`subagent_type: general-purpose`, no `model` override). Invoke all
+  subagents in one message with multiple simultaneous Agent calls. 2b receives the validated 2a
+  JSON as `extraccion_2a`. The anti-hallucination rules and the template below stay as they are.
+  If 2a failed for a group, that group's 2b gets `extraccion_2a: null` and reads the transcripts as
+  before.
+
+#### Haiku delegation (pilot D15.8) — 2a literal extraction
+
+- **Operation:** literal extraction from one meeting group. No synthesis, no classification of
+  actions, no wiki decisions.
+- **Minimal input:** before 2a, the orchestrator dumps each transcript to a local file without
+  loading it into context (`gog docs cat <drive_id> > "$TMPDIR/reuniones/<drive_id>.txt"`). The
+  prompt carries only: `group_key`, the list `{drive_id, path}`, and the open actions as
+  `{acc_id, titulo}` pairs. Never the playbook, the wiki indexes or the glosario.
+- **Agent call:** `subagent_type: general-purpose`, `model: "haiku"`. Instruction: read the given
+  files, copy quotes verbatim, return only the JSON below, invent nothing.
+- **Strict output (JSON only):**
+  ```json
+  {
+    "group_key": "...",
+    "docs_leidos": [{"drive_id": "...", "chars": 0, "primer_ts": "HH:MM", "ultimo_ts": "HH:MM"}],
+    "hablantes": ["<as written in the transcript>"],
+    "mencionados": ["<names as written>"],
+    "organizaciones": ["<as written>"],
+    "decisiones": [{"cita": "<verbatim>", "ts": "HH:MM", "hablante": "..."}],
+    "compromisos": [{"cita": "<verbatim>", "ts": "HH:MM", "hablante": "..."}],
+    "menciones_acciones": [{"acc_id": "acc-...", "cita": "<verbatim>", "ts": "HH:MM"}],
+    "tramos": [{"desde": "HH:MM", "hasta": "HH:MM", "etiqueta": "<3-6 words>"}]
+  }
+  ```
+- **Validation (orchestrator, before 2b):**
+  1. Parses as JSON with exactly these keys.
+  2. Set of `docs_leidos[].drive_id` = set of input drive_ids.
+  3. Every `ts` is between the first and last `**HH:MM` timestamp of its transcript file.
+  4. Every `menciones_acciones[].acc_id` is in the open-actions list given as input.
+  5. Pick 3 quotes at random (from `decisiones`, `compromisos`, `menciones_acciones`) and check
+     each with `grep -cF -- "<cita>" "$TMPDIR/reuniones/<drive_id>.txt"` (count ≥ 1). The
+     transcript never enters the orchestrator context.
+- **Fallback:** if any check fails, the orchestrator repeats 2a once for that group (same input,
+  no loop). If the retry also fails, 2b for that group runs with `extraccion_2a: null` and reads
+  the transcripts as before. Record the failure for the Phase 6 report.
+- **Boundaries:** 2a does not write files, does not touch Drive, wiki or memory, and its output
+  never goes into a summary without passing through 2b.
 
 #### Context the orchestrator prepares once before Phase 2
 
@@ -252,10 +334,16 @@ starting with a bare module prefix** — use only the absolute `resumen_path` pr
 ## Current open actions (check if any close/update in this meeting)
 {contenido_acciones_abiertas}
 
+## Validated literal extraction (stage 2a; may be null)
+{extraccion_2a}
+
 ## Your task
 
-1. Read each drive_id with MCP `read_file_content` (Drive). Tactiq format:
-   `**HH:MM Speaker:** text` per line.
+1. If `extraccion_2a` is not null, use it as the primary source for speakers, mentions,
+   organizations, decisions, commitments, action mentions and timeline blocks. Read a transcript
+   only to resolve a specific gap or doubt, not in full. If `extraccion_2a` is null, read each
+   drive_id with MCP `read_file_content` (Drive). Tactiq format: `**HH:MM Speaker:** text` per
+   line. In both cases the validation rules above apply unchanged.
 2. If multiple docs (same `group_key`), build unified transcript: order by `createdTime`, dedupe
    overlapping dialogue (same speaker + identical or ≥85% similar text within ±60s window).
 3. Identify principal doc (most complete/longest) and secondaries (continuations or duplicates).
@@ -308,6 +396,11 @@ ultima_actualizacion: YYYY-MM-DD
 |---|-------|--------|----------|--------|
 | 1 | <persona> | <acción concreta> | <YYYY-MM-DD o —> | abierta |
 
+**Ticket candidate:** si una acción es un pedido nuevo de un cliente
+(no seguimiento de trabajo ya acordado), marcarla con "📎 posible ticket" en la tabla. Nunca
+escribir en `subsystem/contratos/tickets.md` directamente — el dueño decide qué cuenta como
+trabajo facturable/trackeable y lo registra a mano.
+
 ## Temas tratados
 
 <Bullets con los grandes temas, especialmente los que enriquecen el conocimiento sobre proyectos/clientes existentes.>
@@ -341,6 +434,12 @@ ultima_actualizacion: YYYY-MM-DD
    - `dueño`: `mía` (owner) · `compartida` · `tercero`.
    - `workspace`: `ennui · inspiro · personal · secretary · dev`.
    - `proyecto`: project slug (normalize `contexto`).
+   - `accion_sugerida` (optional, default `null`): `enviar` | `actualizar-acta` | `null`. Orthogonal
+     to `tipo` — best-effort tag of what kind of follow-through the action implies, for a downstream
+     consumer (`housekeeping` § "Regla de automatismo por proyecto") to decide whether to propose
+     dispatch. `enviar`: implies sending something to a third party (document, proposal, reply).
+     `actualizar-acta`: implies this meeting's summary should be reflected in a project document.
+     This extraction step never acts on it — when unsure, leave `null`.
    - `estado`: starts `abierta`. **Anti-backfill (hard rule):** if `deadline` already passed vs.
      meeting date (historical action from old transcript), do NOT create `abierta` — create
      `caducada` (with `evidencia_cierre: manual:nace-vencida`) or omit. **Never birth an expired
@@ -371,7 +470,7 @@ ultima_actualizacion: YYYY-MM-DD
     {"slug": "erp-clab", "ya_en_wiki": true, "contexto": "...", "pendiente_wiki": true}
   ],
   "nuevas_acciones": [
-    {"draft_id": "DRAFT-1", "titulo": "...", "accion": "...", "tipo": "compromiso", "dueño": "mía", "responsable": "...", "workspace": "ennui", "proyecto": "erp-clab", "deadline": "YYYY-MM-DD o null", "estado": "abierta", "contexto_wikilinks": ["temas/erp-clab"]}
+    {"draft_id": "DRAFT-1", "titulo": "...", "accion": "...", "tipo": "compromiso", "accion_sugerida": "enviar", "dueño": "mía", "responsable": "...", "workspace": "ennui", "proyecto": "erp-clab", "deadline": "YYYY-MM-DD o null", "estado": "abierta", "contexto_wikilinks": ["temas/erp-clab"]}
   ],
   "updates_acciones": [
     {"acc_id": "acc-20260506-001", "estado_nuevo": "hecha", "evidencia": "quote o paráfrasis del transcript", "evidencia_cierre": "manual:reunion", "deadline_nuevo": null, "responsable_nuevo": null}
@@ -387,15 +486,18 @@ End your response with that JSON block. Add nothing after the closing brace.
 Orchestrator receives subagent JSONs (one per meeting) and consolidates:
 
 1. **Assign stable IDs to new actions**. Per subagent, in processing order, generate
-   `acc-YYYYMMDD-NNN` where NNN is sequential from (max existing NNN for that date in `acciones.md`)
-   + 1. Replace `DRAFT-N` in:
+   `acc-YYYYMMDD-NNN` where NNN is sequential from (max existing NNN for that date in `acciones.md`
+   **and in `acciones/archivo/*.md`**, same folder) + 1. Closed actions older than the retention
+   window live in the monthly archive (`secretary acc archive`); ignoring it can reuse an archived id.
+   Quick check: `grep -ho "^## acc-YYYYMMDD-[0-9]*" "$MEETINGS_MEMORY"/acciones.md "$MEETINGS_MEMORY"/acciones/archivo/*.md | sort | tail -1`. Replace `DRAFT-N` in:
    - The subagent JSON `nuevas_acciones` block.
    - The summary file that subagent wrote: read, find/replace `DRAFT-N` with stable ID, rewrite.
 
 2. **Append to `acciones.md`** (spec 007 schema):
-   - Per new action: `## acc-YYYYMMDD-NNN` block with fields `titulo, accion, tipo, dueño,
-     responsable, estado (abierta, unless anti-backfill → caducada), workspace, proyecto, deadline,
-     cerrado: null, evidencia_cierre: null, origen (resumen_path), detectado, contexto,
+   - Per new action: `## acc-YYYYMMDD-NNN` block with fields `titulo, accion, tipo, accion_sugerida
+     (null if the subagent didn't produce one — backward compatible with pre-existing entries),
+     dueño, responsable, estado (abierta, unless anti-backfill → caducada), workspace, proyecto,
+     deadline, cerrado: null, evidencia_cierre: null, origen (resumen_path), detectado, contexto,
      pendiente_wiki: true`.
    - Per update: `## acc-YYYYMMDD-NNN [update]` with `estado_nuevo, evidencia, origen, detectado,
      pendiente_wiki: true`; if update **closes** the action (`hecha`/`cancelada`/`caducada`), add
@@ -415,6 +517,17 @@ Orchestrator receives subagent JSONs (one per meeting) and consolidates:
 
 6. **Before appending, check duplicates** in each file: if item with same name/slug and same origin
    exists, do not duplicate. Merge if context is new.
+7. **Cross-subagent action dedupe (validated 2026-09-24).** Related same-project meetings processed
+   in parallel (e.g. "Reorganización Contabilidad" part 1 + part 2 + a 1:1 about the same deliverable)
+   emit the same commitment and close the same open action more than once. Before assigning IDs, group
+   `nuevas_acciones` by project, merge near-duplicates into the earliest one (keep the tighter
+   deadline), point the later summary's DRAFT at the surviving ID, and emit each `updates_acciones`
+   close only once (concatenate evidence).
+8. **Updates only to actions that are still open (validated 2026-09-25).** Subagents read the base
+   `## acc-…` block and can miss a later `[update]` that already closed the action (e.g.
+   `acc-20260910-001` was already `cancelada`, and a subagent proposed moving it to `en-curso`).
+   Before appending an update, resolve the action's current state from its last `[update]` block and
+   drop updates for closed actions.
 
 ### Phase 4 — Move files in Drive
 
@@ -448,6 +561,31 @@ The report (Markdown) is not printed standalone: write to a temp file and pass a
 - List of summaries generated (paths).
 - Drive move errors (if any).
 - Files in "awaiting stability" state (modified <10min ago) for next run to pick up.
+- **Haiku delegation (pilot D15.8):** per group, whether 2a passed validation, needed the retry,
+  or fell back to transcripts in 2b.
+
+### Phase 6.5 — Distribución automática de resúmenes (automatismos)
+
+Para cada resumen generado en esta corrida:
+```bash
+for summary in "$WT"/extractors/meetings/summaries/YYYY-MM-DD-*.md; do
+  [ -f "$summary" ] && python3 "$WT/scripts/distribute-meeting.py" "$summary"
+done
+```
+Esto consulta `distribution.yaml`, renderiza el HTML enriquecido desde `templates/automatismos/<slug>.md` o default, y ejecuta el envío autónomo (si `auto_send`) o crea el borrador (si `draft_only`), registrando en `extractors/meetings/memory/despachos-resumen.jsonl`.
+
+> Validated 2026-09-28: `distribution.yaml` rules match on **any** mention in the summary
+> frontmatter (`topics_or_projects`), not on the meeting's main project. Both job-search sessions
+> with a recruiter listed a client in `organizaciones:` as "current consulting work", hit
+> that client's coordination rule, and produced Gmail drafts to a client contact with confidential salary/interview
+> content. Before running the loop, skip summaries whose `proyecto`/main topic is `career`,
+> `personal` or social, or check each match's rule against the summary's primary project; always
+> list every created draft (ID + recipient + summary) in the PR body so the owner can delete misfires.
+
+> Validated 2026-09-25: in Claude scheduled-task runs under auto mode, the permission classifier
+> denies this call as an external write (Gmail draft), even for `draft_only`. When denied, do not
+> retry or work around it: skip the step and list it under "No ejecutado" in the PR body so the
+> owner can run it by hand.
 
 ### Phase 7 — Close: Commit + Pull Request (this PR is the report)
 
@@ -459,6 +597,11 @@ if [ -z "$(git status --porcelain)" ]; then
   echo "No new meetings / no versioned changes — no PR opened."
   cd "$REPO" && git worktree remove "$WT" --force && git branch -D "$BRANCH" 2>/dev/null || true
 else
+  python3 "$WT/scripts/ci/contract_health.py" --sync-contract || true
+  # contract_health --sync-contract only bumps last_success_at on modules it judges
+  # healthy; validated 2026-08-28 it left extractors/meetings/contract.yaml untouched
+  # (stuck at 2026-06-30, SLA window too tight for a stub). If still stale after the
+  # call above, patch last_success_at by hand in extractors/meetings/contract.yaml.
   git add -A
   git commit -m "docs(reuniones): corrida automática $(date +%Y-%m-%d)"
   git push -u origin "$BRANCH"

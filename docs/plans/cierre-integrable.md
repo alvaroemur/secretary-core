@@ -105,6 +105,8 @@ flowchart LR
 | 2026-10-23 | n7 (prep) | sesion | copias privadas de `skills/` y `playbooks/` del checkout principal movidas a `Dev/_archive/secretary-core-privado-2026-10-23/`; `main` local con fast-forward |
 | 2026-10-23 | n6 | sesion | `.wt/` en el gitignore global; instrucciones globales (Claude Code y Codex): sección de git reemplazada por referencia a `canon/rules/git/`, 4 rutas rotas corregidas, fuente de skills actualizada; checkout de la instancia con fast-forward |
 | 2026-10-23 | n4 | sesion | workspaces#4 sigue abierto (mergeable) |
+| 2026-10-23 | n7 (prep) | sesion | conciliación de playbooks instalados con core: #82 (core) e instancia#1522 (repos de housekeeping, espejos WIP) integrados |
+| 2026-10-23 | D15 | sesion aparte | #81 (Haiku) integrado tras probar el merge sobre #82 sin conflictos |
 | 2026-10-23 | D15 | sesion aparte | auditoría en instancia#1516; decisiones D15.1–D15.6 para el owner |
 | 2026-10-23 | n2 | sesion | hallazgo: los 3 pilotos instalados = `SKILL.md` corto + `procedure.md` más nuevo que el playbook de core |
 

@@ -57,6 +57,30 @@ Generar un latido operativo en:
 
 Tabla match: columnas `acc-id | título | repo | ref | estado | evidencia | match | nota` con `match` ∈ `linked | loose-acc | loose-git | —`. Ver doctrina `canon/operational/routines/heartbeat-match-model.md`.
 
+## Delegación a Haiku (piloto D15.8)
+
+Si el runtime no ofrece subagentes con `model`, la sesión principal hace ambas operaciones y lo anota como "no delegada" en "Notas operativas".
+
+**1. Inventario git/PR por repo**
+
+- **Operación:** `gh pr list` + rama/worktrees/dirty de cada repo de la allowlist y de los repos Cowork de acc abiertas.
+- **Entrada mínima:** la lista de repos (`{repo, path}`) y los comandos a correr. Sin este playbook ni acciones.
+- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
+- **Salida estricta (JSON):** `[{"repo": "…", "rama": "…", "worktrees": ["…"], "dirty": n, "prs": [{"number": n, "headRefName": "…", "title": "…", "body_acc_ids": ["acc-…"]}]}]`.
+- **Validación:** filas = repos de entrada; spot-check de 1 repo al azar reejecutando sus comandos.
+- **Fallback:** si falla, la sesión principal hace el inventario una vez y lo anota en "Notas operativas".
+
+**2. Tabla de correspondencia acc ↔ git**
+
+- **Operación:** armar la tabla match de arriba a partir del inventario validado.
+- **Entrada mínima:** acc abiertas como `{acc_id, titulo, workspace}` y el JSON del inventario validado.
+- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
+- **Salida estricta:** la tabla match en Markdown con las columnas de arriba.
+- **Validación:** cada acc-id de entrada aparece exactamente una vez; cada fila `linked` tiene el acc-id literal en el nombre de rama o en el body del PR citado (comprobado contra el inventario). Las filas que no cumplen bajan a `loose-acc`/`loose-git`.
+- **Fallback:** si falla, la sesión principal arma la tabla una vez y lo anota.
+
+Ninguna operación delegada escribe en `subsystem/heartbeat/`, cierra acciones ni hace commit. El latido incluye en "Notas operativas" una línea por operación delegada con su resultado de validación.
+
 ## Reglas de persistencia
 
 1. Escribir `latest.md` con plantilla completa (match acc↔git, delta, huérfanos, pendiente humano).

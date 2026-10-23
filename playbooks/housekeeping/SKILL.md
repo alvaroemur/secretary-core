@@ -14,25 +14,9 @@ Rutina que corre 1×/día (06:00 Lima) y revisa el estado de higiene de todos lo
 ## Repos a revisar
 
 ```bash
-REPOS=(
-    # Productos técnicos (Dev/)
-    "$HOME/Dev/doc2struct"
-    "$HOME/Dev/doc2struct/doc2struct-go"
-    "$HOME/Dev/doc2struct/aliantza-compras-python"
-    "$HOME/Dev/doc2struct/doc2struct_eval"
-    "$HOME/Dev/inspiro-agents-web"
-    "$HOME/Dev/ennui-agents/ennui-agents-core"
-    "$HOME/Dev/ennui-agents/ruta-web"
-    "$HOME/Dev/secretary-core"
-    "$HOME/Dev/clab-erp"
-    "$HOME/Dev/workwatch"
-    "$HOME/Dev/cowork-drivesync"
-
-    # Workspaces de gestión (Cowork/)
-    "$HOME/.secretary"
-    "$HOME/Cowork/inspiro"
-    "$HOME/Cowork/ennui"
-)
+# Lista de la instancia (`.secretary.yml` → housekeeping.repos); `$HOME` se expande aquí.
+REPOS=()
+while IFS= read -r r; do REPOS+=("${r/\$HOME/$HOME}"); done < <(secretary config get housekeeping.repos | jq -r '.[]')
 ```
 
 ## W. WORKTREE AISLADO (hacer ANTES que nada)
@@ -45,40 +29,47 @@ REPO=~/.secretary
 cd "$REPO"
 git worktree prune
 git fetch origin main
+# Checkout principal al día (playbook versionado, symlinks y lecturas vivas dependen de él).
+# Solo si está en main y sin cambios en archivos rastreados; si no, seguir sin tocarlo.
+if [ "$(git branch --show-current)" = "main" ] && [ -z "$(git status --porcelain --untracked-files=no)" ]; then
+  git merge --ff-only origin/main || echo "⚠️ checkout principal no avanzó (ff-only falló)"
+fi
 TS=$(date +%Y%m%d-%H%M)
 SCOPE=housekeeping
 BRANCH="$SCOPE/auto-$TS"
 WT="$(mktemp -d)/secretary-$SCOPE"
 git worktree add -b "$BRANCH" "$WT" origin/main
-echo "WT=$WT  BRANCH=$BRANCH"
+SCRATCH="$(dirname "$WT")"          # scratch de esta corrida (no /tmp compartido)
+HK="$WT/subsystem/housekeeping/scripts"
+echo "WT=$WT  BRANCH=$BRANCH  SCRATCH=$SCRATCH"
 ```
 
-## Fase 1 — Recopilar estado de todos los repos
+## Fase 1 — Recopilar estado de todos los repos (una sola pasada paralela)
 
-Para cada repo en `$REPOS`:
+Las Fases 1.1, 1.2, 4.2 y 4.4 comparten **una** recolección paralela (8 repos a la vez, ~20 s en total
+en vez de ~5 min en serie). No iterar repo por repo con `gh pr view` / `git cherry`.
+
+```bash
+"$HK/hk-scan.sh" "$SCRATCH/scan" "$WT/subsystem/housekeeping/memory/comentarios-vistos.jsonl"
+# por repo en $SCRATCH/scan/<slug>/ (slug = ruta relativa a $HOME con / → __):
+#   git.tsv          rama, ahead, behind, dirty, stashes
+#   prs.json         PRs open + cerrados (una llamada gh por repo, --limit 200)
+#   gone.tsv         ramas [gone] ya clasificadas (subsumida | wip | revisar)   → Fase 4.2
+#   comentarios.json comentarios humanos NUEVOS vs ledger, desde la última corrida → Fase 4.4
+```
+
+**Contar siempre desde los JSON, nunca a ojo:** p. ej. PRs abiertos =
+`jq '[.[]|select(.state=="OPEN")]|length' "$SCRATCH"/scan/*/prs.json .../.secretary/prs.json`
+(el glob `*/` no incluye `.secretary`; pasar esa ruta explícita). En el reporte, cada número sale de
+un comando; si un dato no se pudo medir, escribir "no medido", no una cifra aproximada.
 
 ### 1.1 Estado git
 
-```bash
-cd "$dir"
-git fetch --quiet 2>/dev/null
-AHEAD=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo "?")
-BEHIND=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo "?")
-DIRTY=$(git status --short 2>/dev/null | wc -l | tr -d ' ')
-BRANCH_NAME=$(git branch --show-current 2>/dev/null)
-STASH_COUNT=$(git stash list 2>/dev/null | wc -l | tr -d ' ')
-```
-
-Registrar: nombre del repo, rama actual, ahead/behind, dirty count, stashes.
+Sale de `git.tsv` (rama, ahead/behind, dirty, stashes). Con `git fetch --prune` ya hecho por el script.
 
 ### 1.2 PRs abiertos
 
-Para repos con remote en GitHub:
-
-```bash
-cd "$dir"
-gh pr list --state open --json number,title,headRefName,updatedAt,createdAt,labels,reviewDecision 2>/dev/null
-```
+Sale de `prs.json`, filtrando `state=="OPEN"`.
 
 Clasificar cada PR:
 - **PRs automáticos** (rama matchea `^(correo|reuniones|whatsapp|wiki|housekeeping)/auto-`): ¿tiene comentarios sin resolver? ¿está listo para merge? ¿hace cuánto se creó?
@@ -92,6 +83,18 @@ Verificar si existe `CLAUDE.md` en la raíz del repo. Si no existe y el repo tie
 ### 1.4 `.gitignore` existente
 
 Verificar si existe `.gitignore` en la raíz. Detectar si hay directorios típicos de build artifacts sin ignorar (`build/`, `dist/`, `output/`, `node_modules/`, `__pycache__/`, `*.pyc`, binarios Go).
+
+### Delegación a Haiku (piloto D15.8) — inventario de la Fase 1
+
+- **Operación:** correr 1.1–1.4 en cada repo de `$REPOS` y devolver los datos crudos. No clasifica urgencia ni toca nada.
+- **Entrada mínima:** la lista `$REPOS` y los comandos de 1.1–1.4 tal cual.
+- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
+- **Salida estricta (JSON):** `[{"repo": "<ruta>", "rama": "…", "ahead": "n|?", "behind": "n|?", "dirty": n, "stashes": n, "prs_abiertos": [<salida de gh pr list>], "claude_md": true|false, "gitignore": true|false, "artifacts_sin_ignorar": ["…"]}]`.
+- **Validación (sesión principal):**
+  1. Filas = repos de `$REPOS`, uno por fila.
+  2. Elige 2 repos al azar y reejecuta 1.1 y 1.2: rama, ahead/behind, dirty y número de PRs deben coincidir.
+- **Fallback:** si falla, la sesión principal hace la Fase 1 ella misma una vez y lo registra.
+- **Límites:** la clasificación de PRs (auto/manual/stale) y todo lo que sigue queda en la sesión principal.
 
 ## Fase 2 — Procesar CLAUDE.md reviews
 
@@ -121,7 +124,9 @@ Solo aplicar cambios que sean claramente correctos. Reportar los ambiguos.
 
 ## Fase 3.5 — Reconciliación de acciones (spec 007)
 
-Barrido diario de `extractors/*/memory/acciones.md` contra evidencia externa. **No mutar `acciones.md` desde housekeeping** (dominio de reuniones/whatsapp + `wiki-update`) — reportar propuestas en el PR y, si aplica, en `subsystem/housekeeping/memory/acc-reconciliation-YYYYMMDD.md`.
+Barrido diario de `extractors/*/memory/acciones.md` contra evidencia externa. **Solo se aplican por sí mismos los tres casos de "Aplicación automática acotada" (abajo), vía `secretary acc fold` en el worktree del PR de housekeeping — nunca directo a `main`.** Todo lo demás se reporta como propuesta en el PR y, si aplica, en `subsystem/housekeeping/memory/acc-reconciliation-YYYYMMDD.md`.
+
+> No hardcodear la ruta ni la forma de `acciones.md`: resolverla con `secretary config path` / `secretary acc fold` (el archivo se está partiendo en piezas más pequeñas y su layout cambiará). Las cerradas fuera de retención viven en `acciones/archivo/YYYY-MM.md`: para consultar un id que no está en el activo usa `secretary acc show <acc-id>`; `secretary acc fold` sobre un id archivado falla a propósito.
 
 ### Alcance
 
@@ -134,6 +139,50 @@ Acciones con `estado` ∈ `{abierta, en-curso, pendiente}` y `dueño` ∈ `{mía
 | `deadline` < hoy − 14 días, sin `[update]` ni `sec-status` en brief reciente | `manual:housekeeping-caducidad` |
 | `deadline` < `detectado` (nació muerta) | `manual:housekeeping-nacio-muerta` |
 | `tipo: idea` con deadline vencido >30d | `manual:housekeeping-idea-stale` |
+
+### Aplicación automática acotada
+
+Housekeeping **aplica** (no solo propone) exactamente estos tres casos, dentro de su PR diario:
+
+| Caso | Condición |
+|------|-----------|
+| **Nació muerta** | `deadline` < `detectado` |
+| **Idea vencida** | `tipo: idea` con `deadline` vencido >30 días |
+| **Evento-sesión vencido** | Acción atada a una sesión/reunión/entrevista con `deadline` vencido >30 días, sin `[update]` ni `sec-status` en ningún brief |
+
+Antes de aplicar un **evento-sesión**, verificar que el evento **no ocurrió**: carpeta en
+`Cowork/*/proyectos/**/entrevistas/` o resumen en `extractors/meetings/summaries/` (±2 días del
+deadline). Si hay rastro de que ocurrió → no caducar; pasa a "Proponer cerrar".
+
+Si una acción cita un PR como evidencia (cualquier regla), **comprobar que el título del PR
+corresponde a la acción** (`gh pr view <n> --json title`). Un número de PR que aparece en un brief no
+prueba nada si el tema es otro (error real del 2026-09-20: una acción citaba el número de un PR de otro tema).
+
+**Guard (obligatorio, por acción):** leer el `estado:` actual del bloque canónico en el worktree y
+llamar a `fold` **solo** si es `abierta`, `en-curso` o `pendiente`. Si ya está cerrada, saltarla sin
+error (no es un candidato).
+
+**Tope: máximo 10 aplicaciones por corrida.** Del candidato 11 en adelante no se aplica: pasa a
+"Proponer caducar" con la nota `tope de 10 alcanzado`, y el tope alcanzado va a "🔴 Atención primero"
+como 🟡. Si `fold` devuelve error, no cuenta para el tope y la acción se reporta como "Conflicto".
+
+```bash
+# desde $WT; una llamada por acc-id; candidatos ya verificados
+export SECRETARY_INSTANCE="$WT" SEC_ACC_ESTADO=caducada
+ACC="$(secretary config path meetings.memory)/acciones.md"   # no hardcodear: el layout cambiará
+APLICADAS=0
+for entry in "<acc-id> <etiqueta-evidencia> [YYYY-MM-DD]" ...; do
+  set -- $entry; id=$1
+  actual=$(awk -v h="## $id" '$0==h{f=1;next} f&&/^- estado:/{sub(/^- estado: */,"");print;exit} /^## /{f=0}' "$ACC")
+  case "$actual" in abierta|en-curso|pendiente) ;; *) continue ;; esac      # guard
+  [ "$APLICADAS" -ge 10 ] && { echo "tope alcanzado: $id → propuesta"; continue; }   # tope
+  if secretary acc fold "$@"; then APLICADAS=$((APLICADAS+1)); else echo "fold falló: $id → conflicto"; fi
+done
+#   etiquetas: manual:housekeeping-nacio-muerta | manual:housekeeping-idea-stale | manual:housekeeping-evento-vencido
+```
+
+Todo lo demás (caducidad por deadline >14d en acciones que no son evento-sesión, cierres `hecha`,
+conflictos) **sigue como propuesta**. Lo aplicado se lista en el reporte como "Aplicado".
 
 ### Reglas de cierre (proponer `hecha`)
 
@@ -149,12 +198,18 @@ Acciones con `estado` ∈ `{abierta, en-curso, pendiente}` y `dueño` ∈ `{mía
 
 Sección **🔄 Reconciliación acciones (007)** con tablas:
 
+- **Aplicado** (acc-id, caso, evidencia) — lo de "Aplicación automática acotada"
 - **Proponer caducar** (acc-id, motivo, deadline)
 - **Proponer cerrar** (acc-id, evidencia path)
 - **Conflicto** (acc-id, fuente A vs fuente B — para heartbeat/briefing)
 
+**Solo delta:** listar únicamente las acciones que entraron a "vencidas" desde el último
+`acc-reconciliation-*.md` (comparar acc-id contra el más reciente). Las que ya estaban en ese
+archivo se resumen en una línea con el conteo y el enlace al archivo previo; no repetir la tabla
+completa cada día. Si el delta es 0, el bloque queda en una línea y no cuenta como "algo que decidir".
+
 Álvaro o una sesión de `reuniones-update` / `sec-status` / **`sec-acc-fold`** (post-merge en
-`sec-merge`) aplica los cierres. Housekeeping solo propone.
+`sec-merge`) aplica el resto de cierres. Housekeeping aplica solo el bloque acotado de arriba.
 
 > **Nota (2026-07-27):** el automatismo de `knowledge/catalog/automatismos.md` (proyecto+persona,
 > enviar/actualizar-acta/enviar-resumen/compartir-transcripcion) vivió acá brevemente por
@@ -197,28 +252,33 @@ Para `.secretary`, `Cowork/inspiro`, `Cowork/ennui`:
 
 ### 4.2 Ramas huérfanas
 
-Para cada repo, listar ramas locales que:
-- No tienen remote tracking (`gone`)
-- Fueron mergeadas a main
-- Tienen >30 días sin commits
+Ya clasificadas por `hk-scan.sh` → `gone.tsv` de cada repo (rama \t clase \t detalle). No reimplementar
+con `git cherry` (el squash cambia el SHA y los shas multilínea rompían el bucle).
 
-**Clasificar cada rama `[gone]` por CONTENIDO, no por SHA** — `git branch --merged` miente cuando el PR se mergeó por *squash* (el commit aplastado tiene otro SHA, así que la rama parece "no mergeada" aunque su contenido ya esté en main). Para cada rama `[gone]`:
+Cómo clasifica `hk-gone.py`:
+1. PR **mergeado** cuyo `headRefOid` == tip local → **subsumida** (definitivo, sin diff).
+2. PR mergeado con otro tip → un archivo cuenta como WIP solo si difiere de `main` **y** `main` no lo
+   modificó después de `mergedAt` (los archivos de estado —`state.md`, `latest.json`, `_procesados.jsonl`—
+   los reescribe cada rutina; que difieran es evolución, no WIP).
+3. Sin PR / PR cerrado sin merge → comparación por contenido de todos los archivos.
 
-```bash
-# Commits de la rama que NO están en main por contenido (no por SHA):
-git cherry -v origin/main <rama>          # '-' = contenido ya en main; '+' = revisar
-# Para los '+', verificar por contenido real (el squash deja '+' aunque esté en main):
-for c in <shas-con-+>; do
-  git show --name-only --format="" "$c" | while read -r f; do
-    [ -n "$f" ] && git diff --quiet origin/main <rama> -- "$f" || echo "WIP no en main: $f"
-  done
-done
-```
+- **subsumida** → segura de podar. Dar el comando listo: `git branch -D <rama>` (force, porque el squash impide `-d`).
+- **wip** → hay contenido que `main` no tiene. Reportar con el detalle de `gone.tsv`; acción: abrir rama nueva desde `origin/main` + PR para ese WIP ANTES de podar. Es "candidata a revisar", no urgencia, salvo que el archivo sea de trabajo manual de Álvaro.
+- **revisar** → sin merge-base u otro caso raro; mirar a mano.
 
-- **Subsumida** (todo `-`, o los `+` resultan idénticos a main por contenido) → segura de podar. Dar el comando listo: `git branch -D <rama>` (force, porque el squash impide `-d`).
-- **Con WIP sin salvar** (algún archivo difiere de main) → **reportar con urgencia**: hay trabajo huérfano sobre una rama muerta. Acción: abrir rama nueva desde `origin/main` + PR para ese WIP ANTES de podar. Nunca proponer borrarla sin rescatar.
+Reportar **conteos por clase y por repo** + solo las `wip`; listar las subsumidas como un bloque `git branch -D` (o el `.tsv` en `subsystem/housekeeping/memory/ramas-podables-YYYYMMDD.tsv`), no una a una en el cuerpo.
 
 No borrar automáticamente en ningún caso — solo clasificar y proponer (las ramas con WIP pueden tener trabajo no pusheado).
+
+#### Delegación a Haiku (piloto D15.8) — clasificar ramas `[gone]`
+
+- **Operación:** correr el bloque `git cherry` + `git diff --quiet` de arriba sobre cada rama `[gone]` y clasificarla.
+- **Entrada mínima:** pares `{repo, rama}` y el bloque de comandos de arriba.
+- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
+- **Salida estricta (JSON):** `[{"repo": "…", "rama": "…", "clase": "subsumida|wip", "archivos_wip": ["…"]}]`.
+- **Validación (sesión principal):** filas = pares de entrada; **toda** rama `subsumida` se reverifica con `git diff --quiet origin/main <rama> -- <archivo>` sobre los archivos de sus commits `+`. Si alguna difiere, pasa a `wip`.
+- **Fallback:** si falla, la sesión principal clasifica todas las ramas ella misma una vez y lo registra.
+- **Límites:** el subagente no borra ramas ni crea ramas de rescate. El comando `git branch -D` solo aparece en el reporte, como propuesta.
 
 ### 4.3 PRs auto acumulados
 
@@ -226,26 +286,40 @@ Si hay PRs automáticos (correo/reuniones/whatsapp) con >3 días sin mergear y s
 
 ### 4.4 Comentarios sueltos en PRs (sobre todo cerrados/mergeados)
 
-Los comentarios en PRs **ya mergeados o cerrados** se pierden de vista, y a veces contienen feedback para mejorar una rutina o trabajo pendiente que hay que continuar en ese repo. Escanearlos.
+Los comentarios en PRs **ya mergeados o cerrados** se pierden de vista y a veces contienen feedback para
+mejorar una rutina o trabajo pendiente. `hk-scan.sh` ya los trajo: 2 llamadas por repo
+(`issues/comments?since=` + `pulls/comments?since=`), no 2 por PR. `since` = última corrida − 2 días
+(tope 45 días), excluye marcas del agente (`agent-generated`, `claude-generated`, footers `🤖 _Generado por`
+/ `🤖 _Secretary —`) y ya descuenta lo que está en el ledger → `comentarios.json` de cada repo es la lista
+de **nuevos**.
 
-Para cada repo GitHub:
+Sobre esa lista, **surfacear** los que parezcan feedback accionable (`TODO`, `FIXME`, `pendiente`, `falta`,
+`continuar`, `mejorar`, `revisar`, `ojo`, `para la próxima`, pregunta sin responder, o cualquier comentario
+sustantivo en un PR **mergeado/cerrado**). Los que son notas de sesión sin marca ("Rebase sobre origin/main…",
+"Superado por #N") no son feedback: registrarlos en el ledger sin reportarlos.
+
+**Ledger** `subsystem/housekeeping/memory/comentarios-vistos.jsonl` (`{"id","pr","repo","fecha_visto"}`):
+tras reportar, **agregar** los IDs nuevos y **podar a 60 días** (la ventana de escaneo es ≤45 d, así que
+más antiguo no vuelve a aparecer). Va en el commit del PR de housekeeping.
 
 ```bash
-cd "$dir"
-# PRs cerrados/mergeados de los últimos 45 días + PRs abiertos
-gh pr list --state all --limit 60 --json number,state,title,closedAt,url --jq \
-  '.[] | select(.state=="OPEN" or (.closedAt and (.closedAt | fromdateiso8601) > (now - 45*86400)))'
-# Para cada PR, traer comentarios de issue y de review:
-gh pr view <N> --json comments --jq '.comments[] | {author:.author.login, body:.body, url:.url}'
-gh api repos/{owner}/{repo}/pulls/<N>/comments --jq '.[] | {author:.user.login, body:.body, url:.html_url}'
+jq -c --arg c "$(date -v-60d +%Y-%m-%d)" 'select(.fecha_visto>=$c)' "$LEDGER" > "$LEDGER.tmp" && mv "$LEDGER.tmp" "$LEDGER"
 ```
 
-Reglas de filtrado:
-1. **Excluir los comentarios generados por el agente**: marcas `<!-- agent-generated:... -->` o legacy `<!-- claude-generated:... -->`, o footers `🤖 _Generado por` / `🤖 _Secretary —`. No son feedback humano (ver `_firma.md` y `~/.claude/CLAUDE.md`).
-2. De los humanos restantes, **surfacear** los que parezcan feedback accionable: contienen señales como `TODO`, `FIXME`, `pendiente`, `falta`, `continuar`, `mejorar`, `revisar`, `ojo`, `para la próxima`, una pregunta sin responder, o cualquier comentario sustantivo en un PR **mergeado/cerrado** (donde ya nadie lo va a ver).
-3. **No repetir**: cruzar contra el ledger `~/.secretary/subsystem/housekeeping/memory/comentarios-vistos.jsonl` (un objeto por línea: `{"id":<comment_id>,"pr":<n>,"repo":"...","fecha_visto":"..."}`). Reportar solo los que no estén en el ledger; tras reportar, **agregar sus IDs al ledger** (ese archivo sí va en el commit del PR de housekeeping).
-
 Reportar los nuevos en la sección correspondiente de Fase 5. Si encuentras feedback claramente sobre una rutina, indicarlo (`→ feedback para rutina X`).
+
+#### Delegación a Haiku (piloto D15.8) — filtrar comentarios nuevos
+
+- **Operación:** correr los comandos de arriba y aplicar las reglas de filtrado 1 y 3 (excluir agente, excluir ledger). La regla 2 (qué es accionable) la decide la sesión principal.
+- **Entrada mínima:** la lista de repos GitHub, los comandos de arriba, los marcadores a excluir y la ruta del ledger `comentarios-vistos.jsonl` (solo lectura).
+- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
+- **Salida estricta (JSON):** `[{"repo": "…", "pr": n, "id": <comment_id>, "autor": "…", "url": "…", "body": "<literal>"}]`.
+- **Validación (sesión principal):**
+  1. Cada `id` existe: aparece en la salida de `gh pr view`/`gh api` de su PR (spot-check de todos si son ≤5; si no, 5 al azar).
+  2. Ningún `body` contiene `agent-generated`, `claude-generated`, `🤖 _Generado por` ni `🤖 _Secretary —`.
+  3. Ningún `id` está en el ledger (`grep -F '"id":<id>,'`).
+- **Fallback:** si falla, la sesión principal filtra ella misma una vez y lo registra.
+- **Límites:** el subagente no escribe el ledger ni comenta en PRs. Agregar IDs al ledger es de la sesión principal.
 
 ## Fase 5 — Reporte como PR
 
@@ -261,7 +335,7 @@ se abre con lo que requiere decisión tuya y recién después el detalle escanea
 
 **Firma:** antes de escribir el reporte, genera marca y footer con `_firma.md` / `sec-signature.sh housekeeping`.
 
-Escribir el reporte a `/tmp/pr-housekeeping.md` con esta estructura:
+Escribir el reporte a `$SCRATCH/pr-housekeeping.md` con esta estructura:
 
 ```markdown
 <!-- primera línea: salida de sec-signature.sh housekeeping --mark -->
@@ -369,6 +443,7 @@ Candidatos detectados en Fase 3.6 — spec cambió después del último update d
 - X repos revisados · X PRs pendientes (Y 🔴 urgentes)
 - X cambios de CLAUDE.md aplicados, Z pendientes de decisión
 - X memorias consolidadas
+- Delegación a Haiku (piloto D15.8): inventario Fase 1 · ramas `[gone]` · comentarios → ✅ validado / ⚠️ fallback (motivo)
 - Próxima corrida: mañana 06:00
 
 ---
@@ -399,7 +474,7 @@ cd "$WT"
 REPO=~/.secretary
 HAY_DECIDIR=0
 # Heurística: el body ya generado marca decisión
-if ! grep -q '🟢 Nada urgente — todo en verde' /tmp/pr-housekeeping.md 2>/dev/null; then
+if ! grep -q '🟢 Nada urgente — todo en verde' "$SCRATCH/pr-housekeeping.md" 2>/dev/null; then
   HAY_DECIDIR=1
 fi
 # O hay archivos versionables más allá de scratch
@@ -420,14 +495,14 @@ if [ -z "$(git status --porcelain)" ]; then
   # Solo reporte (cambios fuera de secretary, p. ej. CLAUDE.md ajenos) pero SÍ hay decisión
   # Escribe el body al worktree para que el PR tenga diff:
   mkdir -p subsystem/housekeeping/memory
-  cp /tmp/pr-housekeeping.md "subsystem/housekeeping/memory/housekeeping-$(date +%Y%m%d).md"
+  cp "$SCRATCH/pr-housekeeping.md" "subsystem/housekeeping/memory/housekeeping-$(date +%Y%m%d).md"
   git add subsystem/housekeeping/memory/
 fi
 git commit -m "chore(housekeeping): revisión diaria $(date +%Y-%m-%d)"
 git push -u origin "$BRANCH"
 gh label create "hilo:housekeeping" --description "Mantenimiento diario del ecosistema" --color E6E6FA 2>/dev/null || true
 gh pr create --title "chore(housekeeping): revisión diaria $(date +%Y-%m-%d)" \
-  --label "hilo:housekeeping" --body-file /tmp/pr-housekeeping.md
+  --label "hilo:housekeeping" --body-file "$SCRATCH/pr-housekeeping.md"
 cd "$REPO" && git worktree remove "$WT" --force
 ```
 

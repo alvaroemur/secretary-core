@@ -15,15 +15,43 @@ Lee contexto en `~/.secretary/CLAUDE.md`, la spec `~/.secretary/_diseño/specs/0
 
 Si existe manifiesto central de scheduler (por ejemplo en `.cursor/routines/manifest.yaml`), debe reflejar exactamente esta cadencia.
 
-## Procedimiento runtime (main-only)
+## Modo vigente: `validación`
+
+- `validación` (hoy): la sesión hace el latido con el procedimiento actual y además corre el script en `--dry-run` para compararlo (decisión N6, 3 corridas).
+- `script`: la sesión corre el script, lee su salida y escribe solo la lectura.
+
+El propietario decide la activación (nodo m8 del plan n5). Al activar: cambiar el encabezado de esta sección a `script`, borrar la sección "Procedimiento actual" y la "Delegación a Haiku".
+
+## Comando único
+
+`run.sh` (junto a este archivo) ejecuta `secretary/routines/ops/sec-heartbeat-state.sh` de secretary-core. **Ejecútalo; no lo leas con `cat` ni repitas sus pasos a mano.**
+
+```bash
+RUN=~/.claude/scheduled-tasks/sec-heartbeat/run.sh
+bash "$RUN"             # sincroniza main y escribe subsystem/heartbeat/latest.md + state.json
+bash "$RUN" --dry-run   # igual, pero en un directorio temporal (imprime la ruta); sin tocar subsystem/heartbeat/ ni git
+bash "$RUN" --close     # añade latest.md al diario YYYY-MM-DD.md, commit y push a main
+```
+
+Sesión interactiva: anteponer `HEARTBEAT_SLOT=session HEARTBEAT_SOURCE=session`.
+
+La salida trae todo el estado determinista: tabla acc ↔ git con su validación, inventario git/PR por repo (allowlist `dispatch.executor.repos` + repos Cowork de acc abiertas), delta contra el snapshot anterior (`state.json`), huérfanos, pendiente humano por deadline, calendario hoy ±1 d, brief abierto y `## Frescura extractoras` tal cual sale de `extractor-freshness.sh`. Deja `## Lectura` con un comentario `<!-- lectura: pendiente … -->`.
+
+## Procedimiento con script (modo `script`)
+
+1. `bash "$RUN"`. Si sale con error (p. ej. main con cambios fuera de `subsystem/heartbeat/`), no hay latido: repórtalo y termina.
+2. Lee `subsystem/heartbeat/latest.md`. No corras otros comandos de inventario.
+3. Reemplaza el comentario de `## Lectura` por 3–5 líneas: qué cambió, qué bloquea, qué espera al humano. No edites las demás secciones; si un dato está mal, dilo en la lectura.
+4. `bash "$RUN" --close`. Main-only: sin worktree, sin PR.
+
+## Procedimiento actual (modo `validación`)
 
 El heartbeat es **main-only** — no worktree, no PR. Scheduled y manual usan el mismo flujo.
 
-**Scheduled (launchd):** `~/.secretary/scripts/routines/run-routine.sh sec-heartbeat` → delega a
-`~/.claude/scheduled-tasks/sec-heartbeat/run.sh`.
-
-**Manual / sesión interactiva:** invocar el skill operativo (`~/.claude/skills/sec-heartbeat/SKILL.md`)
-y al cerrar ejecutar el bloque de cierre abajo (o `run.sh` con `HEARTBEAT_SLOT=session`).
+1. Al empezar: `bash "$RUN" --dry-run`. Anota la ruta que imprime.
+2. Haz el latido como hasta ahora (pasos de abajo). Para `## Frescura extractoras`, copia tal cual la sección del archivo del dry-run (mismo script, `secretary/routines/ops/extractor-freshness.sh` de core; no existe en `scripts/routines/` de la instancia).
+3. Antes de cerrar, compara tu latido con el archivo del dry-run en: PRs abiertos por repo, filas `linked`, filas `loose-acc` y frescura. Agrega en "Notas operativas" una línea:
+   `- dry-run script (<ruta>): coincide` o `- dry-run script (<ruta>): difiere — <qué y en qué dirección>`.
 
 ```bash
 set -euo pipefail
@@ -38,26 +66,27 @@ git push origin main
 
 Todas las rutas de escritura cuelgan de `$REPO/subsystem/heartbeat/` (no de un worktree).
 
-## Objetivo
+### Objetivo
 
 Generar un latido operativo en:
 - `$REPO/subsystem/heartbeat/latest.md` (overwrite, verdad actual)
 - `$REPO/subsystem/heartbeat/YYYY-MM-DD.md` (append por corrida)
 
-## Inputs mínimos
+### Inputs mínimos
 
 - `extractors/*/memory/` + `acciones.md`
 - `extractors/mail/state.md` (batch ~18:00)
 - `subsystem/wip/`
 - Issue briefing abierto + comentarios `sec-status`
 - Calendario hoy ±1d (`gog calendar`, todas las cuentas registradas)
-- Frescura extractoras + conflictos multi-fuente (spec 008 § Frescura / § Conflictos)
-  - Script: `$REPO/scripts/routines/extractor-freshness.sh` (precomputado en `run.sh`; copiar verbatim a `## Frescura extractoras`)
+- Frescura extractoras + conflictos multi-fuente (spec 008 § Frescura / § Conflictos): copiar del dry-run (paso 2)
 - **Git/PR:** `gh pr list` + branch/worktree/dirty scan por repo en allowlist (`.secretary.yml` → `dispatch.executor.repos`) **más** repos Cowork de acc abiertas (`workspace`)
 
 Tabla match: columnas `acc-id | título | repo | ref | estado | evidencia | match | nota` con `match` ∈ `linked | loose-acc | loose-git | —`. Ver doctrina `canon/operational/routines/heartbeat-match-model.md`.
 
-## Delegación a Haiku (piloto D15.8)
+### Delegación a Haiku (piloto D15.8)
+
+> **Se retira al activar el script (decisión N5, nodo m8):** `run.sh` hace el inventario git/PR y la tabla acc ↔ git con su validación. Mientras el modo sea `validación`, sigue vigente.
 
 Si el runtime no ofrece subagentes con `model`, la sesión principal hace ambas operaciones y lo anota como "no delegada" en "Notas operativas".
 
@@ -81,13 +110,15 @@ Si el runtime no ofrece subagentes con `model`, la sesión principal hace ambas 
 
 Ninguna operación delegada escribe en `subsystem/heartbeat/`, cierra acciones ni hace commit. El latido incluye en "Notas operativas" una línea por operación delegada con su resultado de validación.
 
-## Reglas de persistencia
+### Reglas de persistencia
 
 1. Escribir `latest.md` con plantilla completa (match acc↔git, delta, huérfanos, pendiente humano).
 2. Append en el diario `YYYY-MM-DD.md` bajo `## Latido HH:MM (slot)`.
 3. Si faltan fuentes, anotarlo en "Notas operativas" sin inventar estado.
 
 ## Cierre (commit + push a main)
+
+Modo `script`: `bash "$RUN" --close`. Modo `validación`:
 
 ```bash
 cd "$REPO"

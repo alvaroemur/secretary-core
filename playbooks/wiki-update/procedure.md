@@ -24,6 +24,18 @@ Lee `secretary/knowledge/wiki/README.md` antes de modificar nada para respetar e
 
 **Antes de mergear hay que revisar comentarios sin resolver.** Un PR auto puede tener feedback de Álvaro (ej. "renombrá esto", "corregí ese dato"). NO se mergea a ciegas: primero se atiende el comentario; si no se puede atender con seguridad, se deja abierto para Álvaro. Mergear pisando un comentario sin resolver pierde su feedback — eso no debe pasar.
 
+### Scripts sin LLM — validación N6 (temporal)
+
+Tres scripts de `~/Dev/secretary-core/secretary/routines/ops/` reemplazarán pasos mecánicos de esta rutina (D15.8, n5). Hasta que el propietario los active (nodo m8), corren en `--dry-run` **además** del camino actual. No reemplazan ningún paso ni cambian lo que haces.
+
+| Script (`--dry-run`) | Cuándo | Coincide si |
+|---|---|---|
+| `wiki-w0.py --dry-run --prov-out /tmp/wiki-w0-prov.tsv > /tmp/wiki-w0.json` | Antes del Paso 1 de W0, antes de mergear nada | Su `merged` ⊆ tu `$MERGED`; cada PR que mergeaste fuera de su `merged` está en su `needs_llm` (comentarios o conflicto que atendiste); su `closed_superseded` = los que cerraste por superados; su TSV de procedencia ⊆ tu `$PROV` |
+| `wiki-pending.py --wt "$WT" --prov "$PROV" --dry-run > /tmp/wiki-pending.json` | Al inicio del Paso 1 | Mismo conjunto `(archivo, header)` que el inventario de Haiku o el tuyo. El script ignora `pendiente_wiki: true` dentro de fences y en prosa: un `grep -c` puede dar más |
+| `wiki-close.sh --wt "$WT" --branch "$BRANCH" --body-file /tmp/pr-wiki.md --dry-run` | Justo antes del Paso 7.5 | Su `BUILD_ARTICLES` = los artículos de tu build del Paso 6, y su `RESULT` = lo que hace el Paso 7.5 (PR o sin cambios) |
+
+En el reporte (Paso 7) añade una línea: `Validación N6: W0 sí/no · inventario sí/no · cierre sí/no` y, si algo no coincide, la diferencia en una línea. Si un script falla, anótalo y sigue con el camino actual. Al activar, el propietario reemplaza los pasos 1–3 de W0 por `wiki-w0.py --prov-out "$PROV"` (el LLM atiende solo `needs_llm` y `failed`), el inventario de Haiku del Paso 1 por `wiki-pending.py` y los Pasos 6, 6.5 y 7.5 por `wiki-close.sh`, y borra esta sección.
+
 **Paso 1 — listar candidatos** (ramas auto; nada manual matchea el patrón):
 
 ```bash
@@ -184,15 +196,11 @@ git -C "$WT" log -1 --format='%h %s' -S "$H" -- "$F"
 Tras mergear, crea un worktree efímero desde `origin/main` (ya actualizado), **despliega el HTML de inmediato** y al final abre un PR que sirve de reporte.
 
 ```bash
-git worktree prune
-git fetch origin main
-TS=$(date +%Y%m%d-%H%M)
-SCOPE=wiki
-BRANCH="$SCOPE/auto-$TS"
-WT="$(mktemp -d)/secretary-$SCOPE"
-git worktree add -b "$BRANCH" "$WT" origin/main
+eval "$(~/Dev/secretary-core/secretary/routines/ops/routine-pr.sh open --scope wiki)"
 echo "WT=$WT  BRANCH=$BRANCH"
 ```
+
+`routine-pr.sh open` poda worktrees, trae `origin/main` y crea `wiki/auto-<timestamp>` en `${ROUTINE_WT_ROOT:-/tmp}` (ver `secretary/routines/README.md` en el core).
 
 **Mapa de rutas:** donde el documento dice `secretary/...`, interprétalo como `$WT/...`. Todas las escrituras —artículos en `$WT/knowledge/wiki/`, la limpieza de consolidados integrados en `$WT/{mail,meetings,whatsapp}/memory/`, y el marcado de items de `$WT/extractors/drive/memory/` como `pendiente_wiki: false` (no se borran, ver sección 1.6)— van al worktree. Lees los consolidados de las fuentes desde `$WT/...`: como el worktree parte de `origin/main` **tras el merge del Paso W0**, ves la evidencia de los extractores que se acaba de mergear (sin lag). Lo único que no ves es lo de PRs que W0 no pudo mergear (conflicto/checks).
 
@@ -258,6 +266,7 @@ Lleva, por fuente, dos contadores separados (extractor-de-hoy vs pre-existente) 
   1. Por archivo, filas = `grep -c 'pendiente_wiki: true' <archivo>` (descontando las que estén dentro de fences, si las hay).
   2. Cada `header` existe tal cual: `grep -Fxq -- "<header>" <archivo>`.
 - **Fallback:** si falla, la sesión principal hace el inventario ella misma una vez y lo registra.
+- **Retiro (N5):** al activar `wiki-pending.py` (ver «Scripts sin LLM — validación N6» en W0) se quita esta delegación.
 - **Límites:** la clasificación por procedencia (`$PROV`), los barridos de items `false` sin artículo y de `[update]` sin campo (aprendizajes de W0), la integración y los flips siguen en la sesión principal.
 
 ### 1.1 Correo (`secretary/extractors/mail/`)
@@ -774,6 +783,7 @@ Este reporte (resumen + "Dudas para Álvaro") se escribe a un archivo temporal e
 - Cualquier dato dudoso que quedó como `[por rellenar]` y por qué.
 - Confirmación del deploy (Paso 6.5): si se publicó HTML nuevo o quedó idéntico.
 - Dudas resueltas esta corrida y backlog vigente (Paso 7.4).
+- **Validación N6:** la línea de la sección «Scripts sin LLM — validación N6» (W0), mientras esa sección exista.
 - **Delegación a Haiku (piloto D15.8):** una línea por operación delegada (inventario de pendientes, escaneo del tidy-up, métricas/PRs por módulo) con resultado de la validación y si hubo fallback.
 
 ### Dudas para Álvaro (acumuladas — ver Paso 7.4)

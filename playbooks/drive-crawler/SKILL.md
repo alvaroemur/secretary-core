@@ -273,6 +273,29 @@ subdirectorios buscando un equivalente por nombre o tema (mentoría, propuestas,
 Si lo hay → tratar como espejo (solo metadata) y añadir la carpeta a esta lista. La regla
 general: **si el contenido lo está produciendo Álvaro mismo, no es fuente — es WIP**.
 
+### Delegación a Haiku (piloto D15.8) — clasificación de paths
+
+- **Operación:** clasificar cada path detectado por los `find` de este paso contra el mapa de zonas
+  y el filtro de tipos. No lee contenido ni decide qué indexar.
+- **Antes de delegar:** la sesión principal excluye en el propio `find` las zonas sensibles y las
+  `skip` (`-not -path`). Esos paths nunca llegan al subagente.
+- **Entrada mínima:** la lista de paths (relativos a su raíz), la tabla de zonas reducida a
+  `{patrón de zona, política}` y la tabla de extensiones → clase. Nunca este playbook completo.
+- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
+- **Salida estricta (JSON):** `[{"path": "...", "zona": "<patrón de la tabla>", "politica":
+  "delta|backfill|mapa", "clase": "indexar|solo-metadata|espejo-wip"}]`, una fila por path de
+  entrada.
+- **Validación (sesión principal):**
+  1. Conteo de filas = conteo de paths de entrada, y cada path de entrada aparece una vez.
+  2. `politica` y `clase` solo toman los valores enumerados; `zona` existe en la tabla.
+  3. Ningún path que matchee un patrón sensible (§6: password, contraseña, credential, token, key)
+     quedó con `clase: indexar`.
+  4. Muestra de 5 filas al azar reclasificada a mano por la sesión principal: deben coincidir.
+- **Fallback:** si falla un chequeo, la sesión principal clasifica ella misma una vez, sin
+  reintentar en bucle, y lo registra en el reporte.
+- **Límites:** la salida solo ordena el trabajo del paso 2. La sesión principal elige qué leer,
+  respeta el límite de 20 archivos y escribe todo.
+
 ## 2. LECTURA SELECTIVA (fase contenido — gasto controlado)
 
 Para cada archivo que pasó el filtro y es nuevo/modificado:
@@ -427,6 +450,30 @@ En `$WT/extractors/drive/organization.md`, añadir una sección por corrida:
 - No analizar todo en una sola corrida. Procesar **~50 archivos sueltos del root por día** (vía filesystem: rápido y sin tokens). En ~7 corridas se cubre todo el root.
 - En corridas posteriores, rotar hacia subcarpetas que parezcan desordenadas.
 - Las propuestas son SOLO propuestas — Álvaro las revisa en el PR y decide. La rutina **NUNCA mueve, renombra ni elimina archivos del Drive**.
+
+### Delegación a Haiku (piloto D15.8) — preclasificación de archivos sueltos del root
+
+- **Operación:** preclasificar el lote de ~50 archivos sueltos del root de esta corrida.
+- **Entrada mínima:** nombres de archivo (con extensión y fecha de modificación), la lista cerrada
+  de destinos de "Qué detectar" y la lista de regex de residuo de esa misma sección. Sin contenido
+  de archivos.
+- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
+- **Salida estricta (JSON):** `[{"archivo": "...", "propuesta": "mover|residuo|renombrar|duda",
+  "destino": "<de la lista cerrada o null>", "patron_residuo": "<regex o null>", "motivo": "<una
+  línea>"}]`.
+- **Validación (sesión principal):**
+  1. Conteo de filas = archivos del lote, sin repetidos ni faltantes.
+  2. Todo `destino` no nulo está en la lista cerrada.
+  3. Todo `residuo` trae un `patron_residuo` de la lista y el nombre matchea esa regex.
+- **Fallback:** si falla un chequeo, la sesión principal preclasifica el lote ella misma una vez y
+  lo registra.
+- **Límites:** es solo un borrador. La sesión principal decide cada propuesta y escribe
+  `organizacion.md`. Nada se mueve, renombra ni borra en Drive.
+
+### Reporte de la delegación
+
+El body del PR (W2) incluye una línea por operación delegada (clasificación de paths,
+preclasificación del root): si pasó la validación, si hizo falta el fallback y por qué.
 
 ## 5. ACTUALIZACIÓN DE ESTADO
 

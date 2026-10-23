@@ -248,6 +248,18 @@ Antes de integrar/borrar un item de cualquier `*/memory/*.md`, clasifícalo con 
 
 Lleva, por fuente, dos contadores separados (extractor-de-hoy vs pre-existente) y, para acciones, las listas de IDs `acc-*` de cada grupo. Esto alimenta el bucket de "items integrados por procedencia" del Paso 7.
 
+### Delegación a Haiku (piloto D15.8) — inventario de pendientes
+
+- **Operación:** inventariar los items con `pendiente_wiki: true` de `$WT/*/memory/*.md` (y `$WT/extractors/*/memory/*.md`). Solo lista; no integra ni flipea.
+- **Entrada mínima:** la lista de archivos de memory a recorrer. Sin este procedimiento ni artículos de la wiki.
+- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
+- **Salida estricta (JSON):** `[{"archivo": "<ruta relativa a $WT>", "header": "<línea ## tal cual>", "linea": <n>}]`. Excluye bloques dentro de fences.
+- **Validación (sesión principal):**
+  1. Por archivo, filas = `grep -c 'pendiente_wiki: true' <archivo>` (descontando las que estén dentro de fences, si las hay).
+  2. Cada `header` existe tal cual: `grep -Fxq -- "<header>" <archivo>`.
+- **Fallback:** si falla, la sesión principal hace el inventario ella misma una vez y lo registra.
+- **Límites:** la clasificación por procedencia (`$PROV`), los barridos de items `false` sin artículo y de `[update]` sin campo (aprendizajes de W0), la integración y los flips siguen en la sesión principal.
+
 ### 1.1 Correo (`secretary/extractors/mail/`)
 
 App externa que procesa Gmail y mantiene memorias consolidadas en:
@@ -491,6 +503,18 @@ Chequeos a ejecutar:
 
 Criterio general: **arregla sin preguntar lo que sea puramente cosmético/consistencia** (titulo desactualizado, frontmatter con typo, enlace a slug con prefijo incorrecto). **Reporta y no toques** lo que implique juicio (recategorizar, rebautizar slugs, inventar datos). Cada arreglo automático debe loguearse en `indices/YYYY-MM.md` igual que los del Paso 4.
 
+### Delegación a Haiku (piloto D15.8) — escaneo mecánico del tidy-up
+
+- **Operación:** escaneo de los chequeos 1, 4, 5 y 6 sobre todos los artículos. Solo detecta; no edita.
+- **Entrada mínima:** ruta de `$WT/knowledge/wiki/articulos/`, la fecha de hoy y el enunciado de esos cuatro chequeos (una línea cada uno).
+- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
+- **Salida estricta (JSON):** `{"articulos_escaneados": <n>, "hallazgos": [{"articulo": "<ruta>", "chequeo": 1|4|5|6, "detalle": "<texto literal del campo o línea>"}]}`.
+- **Validación (sesión principal):**
+  1. `articulos_escaneados` = `ls $WT/knowledge/wiki/articulos/*/*.md | wc -l` (sin `_index.md` si el escaneo los excluye; usa el mismo criterio en ambos lados).
+  2. 3 hallazgos al azar se confirman con `grep` sobre el artículo citado.
+- **Fallback:** si falla, la sesión principal corre esos chequeos ella misma una vez y lo registra.
+- **Límites:** el chequeo 2 sigue en el validator (Paso 3.7) y el 3 en la sesión principal. Todo arreglo cosmético y todo lo que requiere juicio lo decide y escribe la sesión principal.
+
 ## Paso 3.7 — Auto-mejora de wikilinks rotos (consume el validator de CI)
 
 La política de wikilinks (introducida 2026-05-29) tolera 1-off pero exige que cualquier slug con **≥2 referencias** rotas o tenga artículo, o esté registrado como `pendiente_wiki: true` en un `*/memory/entidades.md`. La rutina es la responsable de ir achicando esta deuda — el validator sólo señala.
@@ -663,6 +687,19 @@ Escribe/actualiza la sección:
 **Último mergeado**: PR #N (`rama`, mergeado YYYY-MM-DD) — o "sin mergeados registrados".
 ```
 
+### Delegación a Haiku (piloto D15.8) — métricas y PRs por módulo (4.2 y 4.3)
+
+- **Operación:** ejecutar los comandos `jq` de 4.2 y `gh pr list` de 4.3 para cada fila de la tabla 4.1 y devolver los resultados crudos. No escribe artículos.
+- **Entrada mínima:** las filas de la tabla 4.1 (`slug`, `routine_id`, prefijo, repo), `$REPO`, `$OWNER/$NAME`, el mes (`YYYY-MM`) y los comandos de 4.2/4.3 tal cual.
+- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
+- **Salida estricta (JSON):** `[{"modulo": "<slug>", "ultima_corrida": {…}|null, "acumulado_mes": {…}|null, "pr_abiertos": [{"number": n, "headRefName": "…", "createdAt": "…"}], "ultimo_mergeado": {…}|null, "nota": "<sin meta | N/A | error literal>"}]`.
+- **Validación (sesión principal):**
+  1. Filas = módulos de la tabla 4.1, uno por fila.
+  2. Elige un módulo al azar y reejecuta sus comandos `jq` y `gh`: el resultado debe coincidir.
+  3. El chequeo de meta stale (aprendizaje 2026-07-25) lo aplica la sesión principal sobre los datos devueltos.
+- **Fallback:** si falla, la sesión principal corre 4.2 y 4.3 ella misma una vez y lo registra.
+- **Límites:** la sesión principal redacta y escribe las secciones `auto:metrics` y `auto:branches`.
+
 ### Paso 4.4 — Última sincronización con la wiki
 
 Cierra las tres secciones con la línea de sincronización de **esta** corrida (formato ya usado en `correo.md`/`reuniones.md`, ahora aplicado a todos los artículos de `modulos/`):
@@ -737,6 +774,7 @@ Este reporte (resumen + "Dudas para Álvaro") se escribe a un archivo temporal e
 - Cualquier dato dudoso que quedó como `[por rellenar]` y por qué.
 - Confirmación del deploy (Paso 6.5): si se publicó HTML nuevo o quedó idéntico.
 - Dudas resueltas esta corrida y backlog vigente (Paso 7.4).
+- **Delegación a Haiku (piloto D15.8):** una línea por operación delegada (inventario de pendientes, escaneo del tidy-up, métricas/PRs por módulo) con resultado de la validación y si hubo fallback.
 
 ### Dudas para Álvaro (acumuladas — ver Paso 7.4)
 

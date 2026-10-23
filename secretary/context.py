@@ -330,7 +330,8 @@ def collect_routines(config: dict[str, Any] | None = None) -> dict[str, Any]:
         if not isinstance(r, dict):
             continue
         rid = r.get("id", "")
-        status = "disabled" if rid in disabled_list else "active"
+        # `enabled: false` in the manifest and dispatch.routines.disabled both turn a routine off.
+        status = "disabled" if rid in disabled_list or r.get("enabled") is False else "active"
         routines_list.append(
             RoutineInfo(
                 id=rid,
@@ -764,7 +765,9 @@ def format_compact(context_data: dict[str, Any]) -> str:
     host = context_data.get("host_context", {})
     user = context_data.get("user_doctrine", {})
     skills_count = len(context_data.get("skills", []))
-    routines_count = len(context_data.get("routines", {}).get("routines", []))
+    routines_count = sum(
+        1 for r in context_data.get("routines", {}).get("routines", []) if r.get("status") == "active"
+    )
     cursor_rules_count = len(host.get("cursor_rules", []))
     claude_mem = host.get("claude_memory")
     mem_str = f" | Claude Memory: {len(claude_mem.get('bullets', []))} bullets" if claude_mem else ""

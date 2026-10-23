@@ -7,9 +7,17 @@ description: Publica el reporte diario del sistema y sus decisiones pendientes; 
 
 Lee AGENTS, la política de briefing y `desk-context/references/control.md`. El brief reporta; no detecta y ejecuta trabajo nuevo, crea drafts ni habilita issues. Sus salidas son el brief y la notificación al propietario habilitada en config. No cambia permisos de otras rutinas.
 
+En corridas programadas no uses las herramientas de seguimiento de la app (lista de tareas ni cuadro de cierre): nadie las ve y cuestan tokens. Reporta solo en el issue y en el mensaje final.
+
+## Entradas recolectadas
+
+Primero corre `python3 "${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/briefing-collect.py" --dry-run`. Solo lee: escribe un JSON en un directorio temporal, imprime su ruta y nunca publica ni notifica. Trae config relevante, briefs recientes (el de hoy y el anterior abierto, con comentarios), decisiones de `secretary-desk decisions`, señales, conversaciones, PR abiertos y fusionados por repo habilitado, heartbeat, frescura de extractores, corridas de rutinas, loops, commits de la instancia y agenda personal del día. Trabaja sobre ese JSON. Consulta a mano solo lo que falte o figure en `failed_sources`.
+
+Validación (3 corridas, decisión N6): en el mensaje final anota si el JSON cubrió lo que necesitaste y qué consultaste aparte, con comando y motivo.
+
 ## Fuentes y reconciliación
 
-Resuelve instance, timezone, brief.repo/label desde `secretary config show`. Lee heartbeat con fecha/frescura; últimos briefs y comentarios sec-status; PR abiertos y recién fusionados; reportes existentes de captura y loops. Si falta una fuente, informa el hueco y la rutina responsable; no dispara extractores desde este reporte. Usa `secretary-desk decisions` y `secretary-desk signals` como inventario, luego comprueba las fuentes originales.
+Toma instance, timezone y brief.repo/label de `config` del JSON (respaldo: `secretary config get <clave>`). Lee heartbeat con fecha/frescura; últimos briefs y comentarios sec-status; PR abiertos y recién fusionados; reportes existentes de captura y loops. Si falta una fuente, informa el hueco y la rutina responsable; no dispara extractores desde este reporte. Usa `decisions` y `signals` del JSON (salida de `secretary-desk`) como inventario, luego comprueba las fuentes originales.
 
 Incluye decisiones que una rutina necesita para seguir siendo útil: fuentes agotadas, rachas sin resultado, estrategia, accesos y cola de ventas sin reposición. Consulta `para-alvaro`, `secretary:proponer` y `desk:decision`. Deduplica por issue/fingerprint, comprueba posposiciones y decisiones ya resueltas. No sustituye una decisión previa de cambiar feeds por otra pregunta de pausar. Las señales históricas contradictorias se presentan con fecha y fuente actual, sin inventar urgencia.
 

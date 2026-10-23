@@ -107,6 +107,16 @@ class ConversationTests(unittest.TestCase):
         deploy(source,scheduled,[],root/'runtime',True)
         self.assertEqual(first,target.read_text())
 
+    def test_dream_gates_work_orders_without_capturing_the_circuit(self):
+        from secretary.conversation_deploy import deploy
+        source=Path(__file__).resolve().parents[1];root=Path(self.tmp.name)
+        scheduled=root/'scheduled';target=scheduled/'sec-dream/SKILL.md'
+        target.parent.mkdir(parents=True);target.write_text('Dream procedure.\n')
+        deploy(source,scheduled,[],root/'runtime',True)
+        text=target.read_text()
+        self.assertIn('gate --repo',text)
+        self.assertNotIn('claim-event --event',text)
+
     def test_two_workers_cannot_claim_same_event_or_release_others_claim(self):
         event = self.store.capture('source', {'body':'Prepare'}, True)
         first = self.store.claim_event(event)

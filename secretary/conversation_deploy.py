@@ -11,7 +11,7 @@ MARKER = '\n\n## Conversaciones del propietario · Desk'
 
 def deploy(source: Path, scheduled: Path, skills: list[Path], runtime: Path, apply=False) -> list[dict]:
     destinations = []
-    for name in ['dispatch-executor','revision-correo','pulse-headless','secretary-briefing']:
+    for name in ['sec-dream','revision-correo','pulse-headless','secretary-briefing']:
         destinations.append((source/'routine-overlays/conversations'/f'{name}.md',scheduled/name/'SKILL.md'))
     for target in skills:
         destinations.append((source/'routine-overlays/conversations/desk-overview.md',target/'desk-overview/SKILL.md'))

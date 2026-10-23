@@ -7,7 +7,7 @@ Los issues existentes son el registro durable. Usa `desk:decision` y conserva la
 1. Específica: aprobación explícita del propietario para el alcance actual. Calcula SHA-256 del body del issue. Un comentario humano `desk:authorize <sha256>` autoriza ese body; `desk:reject <sha256>` lo rechaza. Excluye marcas de agente al interpretar comentarios como humanos.
 2. Regla previa `prepare-pr-v1`: si está habilitada en `.secretary.yml` → `desk.autonomy`, permite preparar un único entregable aislado por corrida en un repo de la allowlist, abrir un PR y esperar revisión. Incluye código, pruebas, análisis y documentos reversibles. No permite merges, tocar main, publicar, desplegar, cambiar permisos, gastar, enviar mensajes, acceder a credenciales ni ampliar un objetivo comercial. Solo ejecuta comprobaciones locales conocidas; no instala dependencias ni ejecuta scripts no revisados. Un cambio de contratos, políticas de autonomía, skills, workflows o credenciales exige autorización específica. Comprueba efectos antes de actuar y diff completo, incluidos untracked, antes de publicar. Duda → decisión.
 
-Dream u otro productor puede proponer la clasificación; work-runner la verifica de nuevo. Una propuesta elegible incluye en el body:
+Cualquier productor puede proponer la clasificación; la corrida de desk-dream que ejecuta el encargo (contrato absorbido de work-runner) la verifica de nuevo. Una propuesta elegible incluye en el body:
 
 `<!-- desk:proposal {"kind":"prepare-pr","policy":"prepare-pr-v1","effects":["local-edit","branch","open-pr"],"requires_decision":false} -->`
 

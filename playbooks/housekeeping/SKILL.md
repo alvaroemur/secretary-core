@@ -27,19 +27,17 @@ Trabaja en un worktree de `~/.secretary` (es donde vive el reporte). Los cambios
 set -euo pipefail
 REPO=~/.secretary
 cd "$REPO"
-git worktree prune
-git fetch origin main
+git fetch origin main   # para el ff del checkout principal; routine-pr.sh hace prune y su propio fetch
 # Checkout principal al día (playbook versionado, symlinks y lecturas vivas dependen de él).
 # Solo si está en main y sin cambios en archivos rastreados; si no, seguir sin tocarlo.
 if [ "$(git branch --show-current)" = "main" ] && [ -z "$(git status --porcelain --untracked-files=no)" ]; then
   git merge --ff-only origin/main || echo "⚠️ checkout principal no avanzó (ff-only falló)"
 fi
-TS=$(date +%Y%m%d-%H%M)
-SCOPE=housekeeping
-BRANCH="$SCOPE/auto-$TS"
-WT="$(mktemp -d)/secretary-$SCOPE"
-git worktree add -b "$BRANCH" "$WT" origin/main
-SCRATCH="$(dirname "$WT")"          # scratch de esta corrida (no /tmp compartido)
+ROUTINE_PR="${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/routine-pr.sh"
+# Preludio común: worktree prune + fetch + rama `housekeeping/auto-YYYYMMDD-HHMM` desde origin/main.
+OPEN="$("$ROUTINE_PR" open --repo "$REPO" --scope housekeeping)"
+eval "$OPEN"                        # define WT, BRANCH, BASE, PREV_PR
+SCRATCH="$(mktemp -d)"              # scratch de esta corrida (no /tmp compartido)
 HK="$WT/subsystem/housekeeping/scripts"
 echo "WT=$WT  BRANCH=$BRANCH  SCRATCH=$SCRATCH"
 ```
@@ -301,12 +299,11 @@ se abre con lo que requiere decisión tuya y recién después el detalle escanea
   🟢 ok/activo · ⚠️ stale/cuidado · 🔎 gap/falta · ✅ hecho · → acción sugerida
 - **Un marcador por fila como máximo.** El emoji marca, no decora.
 
-**Firma:** antes de escribir el reporte, genera marca y footer con `_firma.md` / `sec-signature.sh housekeeping`.
+**Firma:** la agrega `routine-pr.sh close` al abrir el PR (`sec-signature.sh housekeeping`, ver `_firma.md`): marca en la primera línea, footer tras `---`. No escribas marca ni footer en el reporte.
 
 Escribir el reporte a `$SCRATCH/pr-housekeeping.md` con esta estructura:
 
 ```markdown
-<!-- primera línea: salida de sec-signature.sh housekeeping --mark -->
 🩺 **Housekeeping — YYYY-MM-DD** · salud del ecosistema
 
 ## 🔴 Atención primero
@@ -412,9 +409,6 @@ Candidatos detectados en Fase 3.6 — spec cambió después del último update d
 - X cambios de CLAUDE.md aplicados, Z pendientes de decisión
 - X memorias consolidadas
 - Próxima corrida: mañana 06:00
-
----
-<!-- última línea: salida de sec-signature.sh housekeeping --footer -->
 ```
 
 **Reglas del reporte expresivo:**
@@ -439,6 +433,7 @@ Si el único diff es un store de higiene ambient (p. ej. ledger `comentarios-vis
 ```bash
 cd "$WT"
 REPO=~/.secretary
+ROUTINE_PR="${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/routine-pr.sh"
 HAY_DECIDIR=0
 # Heurística: el body ya generado marca decisión
 if ! grep -q '🟢 Nada urgente — todo en verde' "$SCRATCH/pr-housekeeping.md" 2>/dev/null; then
@@ -457,26 +452,26 @@ if [ "$HAY_DECIDIR" = "0" ]; then
   exit 0
 fi
 
-git add -A
 if [ -z "$(git status --porcelain)" ]; then
   # Solo reporte (cambios fuera de secretary, p. ej. CLAUDE.md ajenos) pero SÍ hay decisión
   # Escribe el body al worktree para que el PR tenga diff:
   mkdir -p subsystem/housekeeping/memory
   cp "$SCRATCH/pr-housekeeping.md" "subsystem/housekeeping/memory/housekeeping-$(date +%Y%m%d).md"
-  git add subsystem/housekeeping/memory/
 fi
-git commit -m "chore(housekeeping): revisión diaria $(date +%Y-%m-%d)"
-git push -u origin "$BRANCH"
-gh label create "hilo:housekeeping" --description "Mantenimiento diario del ecosistema" --color E6E6FA 2>/dev/null || true
-gh pr create --title "chore(housekeeping): revisión diaria $(date +%Y-%m-%d)" \
-  --label "hilo:housekeeping" --body-file "$SCRATCH/pr-housekeeping.md"
-cd "$REPO" && git worktree remove "$WT" --force
+# Cierre común: git add -A, commit, push, PR firmado con label, limpieza del worktree.
+CLOSE="$("$ROUTINE_PR" close --repo "$REPO" --wt "$WT" --branch "$BRANCH" \
+  --title "chore(housekeeping): revisión diaria $(date +%Y-%m-%d)" \
+  --body-file "$SCRATCH/pr-housekeeping.md" \
+  --routine housekeeping --label hilo:housekeeping)" \
+  || echo "routine-pr close salió con $? (3 = rama empujada, PR fallido: no revertir). Reporta el error."
+echo "$CLOSE"
 ```
 
 - **No** `--allow-empty`. Si no hay decisión y no hay diff → sin PR.
 - Si hay cambios en memorias dentro de secretary (consolidación), esos van en el commit del PR (o ambient si no hay nada que decidir).
 - El body del PR (y **cualquier comentario** que postee la rutina) lleva firma vía `sec-signature.sh housekeeping` (ver `_firma.md`).
-- Devolver la **URL del PR** al final (solo si abriste uno).
+- Devolver la **URL del PR** al final (solo si abriste uno) y la línea `RESULT=` de `routine-pr.sh close` (validación de las primeras corridas con el cierre común).
+- Si el PR falla (`RESULT=push-only`, exit 3), no revertir: la rama quedó empujada; reportar el error.
 - **Haptics** (ver `~/.secretary/rules/sec-haptics.md`): al entregar el PR, dejar
   señal `📬 _secretary entregó — housekeeping <fecha>, <n> ítems en "Atención primero"_`. Si la
   corrida detectó algo que reclama decisión (rama con WIP huérfano, PR auto acumulado, anomalía

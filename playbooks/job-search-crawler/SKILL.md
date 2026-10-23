@@ -38,28 +38,18 @@ No escribas en la copia de trabajo principal. Crea un worktree efímero, trabaja
 ```bash
 set -euo pipefail
 REPO=~/.secretary
-cd "$REPO"
-git worktree prune
-git fetch origin main
-TS=$(date +%Y%m%d-%H%M)
-SCOPE=job-search
-BRANCH="$SCOPE/auto-$TS"
-WT="$(mktemp -d)/secretary-$SCOPE"
-PREV=$(gh pr list --label hilo:job-search --state open --json number,headRefName,createdAt \
-    --jq 'map(select(.headRefName|test("^job-search/auto-")))
-          | sort_by(.createdAt) | last | ((.number|tostring)+" "+.headRefName)' 2>/dev/null || true)
-PREV_NUM="${PREV%% *}"; PREV_BRANCH="${PREV#* }"
-if [ -n "$PREV_NUM" ] && [ "$PREV_NUM" != "$PREV_BRANCH" ]; then
-  git fetch origin "$PREV_BRANCH"; BASE="origin/$PREV_BRANCH"
-  echo "Continuando sobre PR de job-search #$PREV_NUM ($PREV_BRANCH)"
-else
-  PREV_NUM=""; BASE="origin/main"; echo "Sin PR de job-search abierto → base = origin/main"
-fi
-git worktree add -b "$BRANCH" "$WT" "$BASE"
-echo "WT=$WT BRANCH=$BRANCH BASE=$BASE PREV_PR=${PREV_NUM:-ninguno}"
+ROUTINE_PR="${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/routine-pr.sh"
+# Preludio común: worktree prune + fetch + rama `job-search/auto-YYYYMMDD-HHMM` en /tmp.
+# Encadena: si hay un PR abierto con label hilo:job-search y rama ^job-search/auto-, parte de esa rama.
+OPEN="$("$ROUTINE_PR" open --repo "$REPO" --scope job-search \
+  --chain-label hilo:job-search --chain-pattern '^job-search/auto-')"
+eval "$OPEN"   # define WT, BRANCH, BASE, PREV_PR (vacío si no hay PR previo)
+if [ -n "$PREV_PR" ]; then echo "Continuando sobre PR de job-search #$PREV_PR ($BASE)"
+else echo "Sin PR de job-search abierto → base = origin/main"; fi
+echo "WT=$WT BRANCH=$BRANCH BASE=$BASE PREV_PR=${PREV_PR:-ninguno}"
 ```
 
-Desde aquí, TODAS las escrituras cuelgan de `$WT/loops/job-search/sources-web/` (nunca de `~/.secretary/`). Guarda `$PREV_NUM` para el cierre.
+Desde aquí, TODAS las escrituras cuelgan de `$WT/loops/job-search/sources-web/` (nunca de `~/.secretary/`). Guarda `$WT`, `$BRANCH` y `$PREV_PR` para el cierre (cada llamada a Bash abre un shell nuevo).
 
 IMPORTANTE — no toques `loops/job-search/inbox.md`: ese archivo lo escribe la rutina de correo. Tú trabajas SOLO en `loops/job-search/sources-web/`.
 
@@ -250,30 +240,25 @@ Si no hay ningún diff versionable: limpia worktree/rama y termina.
 
 ### 5b — Con reportables o swap de feed (PR como reporte)
 
-```bash
-git commit -m "chore(job-search): barrido de feeds $(date +%Y-%m-%d)"
-git push -u origin "$BRANCH"
-```
-Crea/actualiza el PR con `gh pr create`:
-- **Firma del body:** `_firma.md` → `sec-signature.sh job-search-crawler`.
-- Título: `chore(job-search): oportunidades web YYYY-MM-DD` (o `fix(job-search): sustituir feed …` si el diff es el swap).
-- Body: resumen — cuántas oportunidades nuevas por track, las 3-5 más interesantes con link, fuentes caídas si las hubo, `dry_streak` actual, y nota: "Wellfound y Contra siguen requiriendo navegador autenticado; cobertura parcial vía WWR." Si hubo swap, documenta old→new + HTTP evidence. Si continuó un PR previo, indicar "Continúa y reemplaza #$PREV_NUM".
-- Label: `hilo:job-search` (créala si no existe: `gh label create hilo:job-search --description "Rutina de búsqueda de oportunidades" --color 0e8a16`).
-- Base: `main`.
+Escribe el body con la herramienta Write en `/tmp/pr-job-search.md`:
+- **Firma:** la agrega `routine-pr.sh close` (`sec-signature.sh job-search-crawler`, ver `_firma.md`). No escribas marca ni footer en el body.
+- Título: `chore(job-search): oportunidades web YYYY-MM-DD` (o `fix(job-search): sustituir feed …` si el diff es el swap). `close` usa el título también como mensaje del commit.
+- Body: resumen — cuántas oportunidades nuevas por track, las 3-5 más interesantes con link, fuentes caídas si las hubo, `dry_streak` actual, y nota: "Wellfound y Contra siguen requiriendo navegador autenticado; cobertura parcial vía WWR." Si hubo swap, documenta old→new + HTTP evidence. Si continuó un PR previo, indicar "Continúa y reemplaza #$PREV_PR".
+- Label: `hilo:job-search` (`close` la crea si no existe). Base: `main`.
 
-Cierra el PR previo superado (chaining):
+Cierre común: commit, push, PR firmado con label, cierre del PR previo superado (chaining) y limpieza del worktree. Sin cambios versionables devuelve `RESULT=no-changes` y no abre PR.
 ```bash
-NEW_NUM=$(gh pr view "$BRANCH" --json number --jq .number)
-if [ -n "${PREV_NUM:-}" ]; then
-  gh pr close "$PREV_NUM" --delete-branch --comment "Superado por #$NEW_NUM (lo continúa e incluye todo su contenido + la corrida nueva)."
-fi
+REPO=~/.secretary
+ROUTINE_PR="${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/routine-pr.sh"
+TITLE="chore(job-search): oportunidades web $(date +%Y-%m-%d)"   # o fix(job-search): sustituir feed …
+CLOSE="$("$ROUTINE_PR" close --repo "$REPO" --wt "$WT" --branch "$BRANCH" \
+  --title "$TITLE" --body-file /tmp/pr-job-search.md \
+  --routine job-search-crawler --label hilo:job-search --supersede "$PREV_PR")" \
+  || echo "routine-pr close salió con $? (3 = rama empujada, PR fallido: no revertir). Reporta el error."
+echo "$CLOSE"
 ```
 
-Limpia el worktree:
-```bash
-cd ~/.secretary
-git worktree remove "$WT" --force 2>/dev/null || true
-```
+El PR superado se cierra con el comentario "Superado por #N (lo continúa e incluye su contenido)." El reporte final indica la línea `RESULT=` de `routine-pr.sh close` (validación de las primeras corridas con el cierre común).
 
 ## Reglas
 

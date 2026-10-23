@@ -91,21 +91,21 @@ flowchart LR
 | 2026-10-23 | n2 | sesion | iniciado: `git mv` de `.example` a `skills/` y `playbooks/`; `.gitignore` ajustado (se conserva ignorado `export_examples_secrets.yml`) |
 | 2026-10-23 | n6 | sesion | hallazgo: wiki-update, housekeeping y sales-crawler mergean con `--squash`; desactivar squash antes de actualizarlos rompe esas rutinas. Pendiente decisión de orden (D18) |
 | 2026-10-23 | n2 | sesion | hallazgo: skills instalados como copias en 4 destinos; Codex lee 2 y Cursor hasta 4. Pendiente decisión D17 |
-| 2026-10-23 | n1 | agente | PR alvaroemur/cowork-secretary#1517 abierto (no draft, mergeable). Pedido: sumar 3 contradicciones restantes (AGENTS.md de instancia, cierre-portable, decisión 2026-06-05). Abierto para owner: commit directo trivial del owner en Cowork gestión |
+| 2026-10-23 | n1 | agente | PR instancia#1517 abierto (no draft, mergeable). Pedido: sumar 3 contradicciones restantes (AGENTS.md de instancia, cierre-portable, decisión 2026-06-05). Abierto para owner: commit directo trivial del owner en Cowork gestión |
 | 2026-10-23 | n1 | agente | contradicciones restantes corregidas en el mismo PR (commit nuevo); validador OK |
-| 2026-10-23 | n5 | agente | PR alvaroemur/cowork-secretary#1518 abierto (no draft, mergeable). Esquema compatible con consumidores. Hallazgos fuera de alcance: `context.py` y el portal ignoran `enabled`; el instalador falla con rangos de día de semana (`1-5`) |
+| 2026-10-23 | n5 | agente | PR instancia#1518 abierto (no draft, mergeable). Esquema compatible con consumidores. Hallazgos fuera de alcance: `context.py` y el portal ignoran `enabled`; el instalador falla con rangos de día de semana (`1-5`) |
 | 2026-10-23 | n6 | sesion | configuración de merge aplicada y verificada en 41 repos; copias instaladas de wiki-update y sales-crawler pasadas a `--merge` antes del cambio |
 | 2026-10-23 | n1, n5 | sesion | #1517 y #1518 integrados con merge commit |
 | 2026-10-23 | D17 | sesion | copia única en `~/.agents/skills` + symlinks en `~/.claude/skills`; verificado que Claude Code no lee `~/.agents/skills` |
 | 2026-10-23 | n2 | sesion | PR alvaroemur/secretary-core#77 abierto, CI verde |
 | 2026-10-23 | n2i, n4 | agentes | lanzados |
-| 2026-10-23 | n2i, n4 | agentes | PRs alvaroemur/cowork-secretary#1521 y alvaroemur/Cowork-meta#4 abiertos |
+| 2026-10-23 | n2i, n4 | agentes | PRs instancia#1521 y workspaces#4 abiertos |
 | 2026-10-23 | n3 | sesion | wind-down (contrato 3) y desk-merge editados; PR apilado sobre `core/fuente-unica-skills` |
-| 2026-10-23 | n2, n3, n2i | owner | #77, #78 y alvaroemur/cowork-secretary#1521 integrados con merge commit; ramas remotas borradas por GitHub; ramas locales integradas (`is-ancestor`) y conservadas |
+| 2026-10-23 | n2, n3, n2i | owner | #77, #78 y instancia#1521 integrados con merge commit; ramas remotas borradas por GitHub; ramas locales integradas (`is-ancestor`) y conservadas |
 | 2026-10-23 | n7 (prep) | sesion | copias privadas de `skills/` y `playbooks/` del checkout principal movidas a `Dev/_archive/secretary-core-privado-2026-10-23/`; `main` local con fast-forward |
 | 2026-10-23 | n6 | sesion | `.wt/` en el gitignore global; instrucciones globales (Claude Code y Codex): sección de git reemplazada por referencia a `canon/rules/git/`, 4 rutas rotas corregidas, fuente de skills actualizada; checkout de la instancia con fast-forward |
-| 2026-10-23 | n4 | sesion | alvaroemur/Cowork-meta#4 sigue abierto (mergeable) |
-| 2026-10-23 | D15 | sesion aparte | auditoría en alvaroemur/cowork-secretary#1516; decisiones D15.1–D15.6 para el owner |
+| 2026-10-23 | n4 | sesion | workspaces#4 sigue abierto (mergeable) |
+| 2026-10-23 | D15 | sesion aparte | auditoría en instancia#1516; decisiones D15.1–D15.6 para el owner |
 | 2026-10-23 | n2 | sesion | hallazgo: los 3 pilotos instalados = `SKILL.md` corto + `procedure.md` más nuevo que el playbook de core |
 
 ## Árbol de decisiones

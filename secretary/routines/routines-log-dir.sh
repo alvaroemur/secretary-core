@@ -9,13 +9,17 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_layout.sh"
 INSTANCE="${SECRETARY_INSTANCE:-$HOME/.secretary}"
 CORE="${SECRETARY_CORE:-$HOME/Dev/secretary-core}"
 
+# Prints a path only when one resolves; an empty answer counts as a failure so
+# the caller falls back to $INSTANCE/subsystem/routines.
 _resolve_from_config() {
+  local out key
   if command -v secretary >/dev/null 2>&1; then
-    secretary config path subsystem.routines 2>/dev/null && return 0
-    secretary config path operations.routines 2>/dev/null && return 0
+    for key in subsystem.routines operations.routines; do
+      out="$(secretary config path "$key" 2>/dev/null)" && [[ -n "$out" ]] && { printf '%s\n' "$out"; return 0; }
+    done
   fi
   if [[ -f "$CORE/secretary/config.py" ]]; then
-    PYTHONPATH="$CORE" python3 -c "
+    out="$(PYTHONPATH="$CORE" python3 -c "
 from secretary.config import resolve_path_key
 for key in ('subsystem.routines', 'operations.routines'):
     try:
@@ -23,7 +27,7 @@ for key in ('subsystem.routines', 'operations.routines'):
         break
     except KeyError:
         pass
-" 2>/dev/null && return 0
+" 2>/dev/null)" && [[ -n "$out" ]] && { printf '%s\n' "$out"; return 0; }
   fi
   return 1
 }

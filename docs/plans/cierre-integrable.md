@@ -75,11 +75,11 @@ flowchart LR
 |----|------|--------|------|
 | n1 | autonomous | done | PR en la instancia `rules/politica-git`: `canon/rules/git/` y corrección de las instrucciones globales canónicas |
 | n2 | in_session | done | PR alvaroemur/secretary-core#77 (CI verde, mergeable) |
-| n2i | autonomous | running | PR en la instancia: claves de config, `canon/skills/`, retiro de `routines-piloto` |
+| n2i | autonomous | done | PR en la instancia: claves de config, `canon/skills/`, retiro de `routines-piloto` |
 | n3 | in_session | done | PR `skills/cierre-integrable`; incluye la contradicción de prefijos de rama en el CLAUDE.md del core |
 | n4 | autonomous | running | PR en el repo de mapa de workspaces |
 | n5 | autonomous | done | PR en la instancia `routines/manifiesto-real` |
-| n6 | in_session | running | Script de configuración de repos (OK explícito al ejecutar) y rutas de instrucciones globales no versionadas. Va antes de cualquier merge. |
+| n6 | in_session | done | Script de configuración de repos (OK explícito al ejecutar) y rutas de instrucciones globales no versionadas. Va antes de cualquier merge. |
 | n7 | in_session | pending | Reinstalación, hashes, pruebas y cierre de estos PRs con el wind-down nuevo |
 
 ### Log de ejecución
@@ -101,6 +101,10 @@ flowchart LR
 | 2026-10-23 | n2i, n4 | agentes | lanzados |
 | 2026-10-23 | n2i, n4 | agentes | PRs alvaroemur/cowork-secretary#1521 y alvaroemur/Cowork-meta#4 abiertos |
 | 2026-10-23 | n3 | sesion | wind-down (contrato 3) y desk-merge editados; PR apilado sobre `core/fuente-unica-skills` |
+| 2026-10-23 | n2, n3, n2i | owner | #77, #78 y alvaroemur/cowork-secretary#1521 integrados con merge commit; ramas remotas borradas por GitHub; ramas locales integradas (`is-ancestor`) y conservadas |
+| 2026-10-23 | n7 (prep) | sesion | copias privadas de `skills/` y `playbooks/` del checkout principal movidas a `Dev/_archive/secretary-core-privado-2026-10-23/`; `main` local con fast-forward |
+| 2026-10-23 | n6 | sesion | `.wt/` en el gitignore global; instrucciones globales (Claude Code y Codex): sección de git reemplazada por referencia a `canon/rules/git/`, 4 rutas rotas corregidas, fuente de skills actualizada; checkout de la instancia con fast-forward |
+| 2026-10-23 | n4 | sesion | alvaroemur/Cowork-meta#4 sigue abierto (mergeable) |
 | 2026-10-23 | D15 | sesion aparte | auditoría en alvaroemur/cowork-secretary#1516; decisiones D15.1–D15.6 para el owner |
 | 2026-10-23 | n2 | sesion | hallazgo: los 3 pilotos instalados = `SKILL.md` corto + `procedure.md` más nuevo que el playbook de core |
 

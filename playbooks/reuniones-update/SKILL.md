@@ -172,9 +172,54 @@ $WT/extractors/meetings/
 
 ### Phase 2 — Subagent dispatch
 
-For each group to process, launch **one subagent in parallel** via Agent tool
-(`subagent_type: general-purpose`). Invoke all subagents in one message with multiple simultaneous
-Agent calls.
+Phase 2 runs in two stages per group (pilot D15.8, see "Haiku delegation" below):
+
+- **2a — Literal extraction (Haiku).** One extraction subagent per group, all in one message.
+- **Validation** of each 2a result in the orchestrator.
+- **2b — Synthesis (default model).** For each group to process, launch **one subagent in
+  parallel** via Agent tool (`subagent_type: general-purpose`, no `model` override). Invoke all
+  subagents in one message with multiple simultaneous Agent calls. 2b receives the validated 2a
+  JSON as `extraccion_2a`. The anti-hallucination rules and the template below stay as they are.
+  If 2a failed for a group, that group's 2b gets `extraccion_2a: null` and reads the transcripts as
+  before.
+
+#### Haiku delegation (pilot D15.8) — 2a literal extraction
+
+- **Operation:** literal extraction from one meeting group. No synthesis, no classification of
+  actions, no wiki decisions.
+- **Minimal input:** before 2a, the orchestrator dumps each transcript to a local file without
+  loading it into context (`gog docs cat <drive_id> > "$TMPDIR/reuniones/<drive_id>.txt"`). The
+  prompt carries only: `group_key`, the list `{drive_id, path}`, and the open actions as
+  `{acc_id, titulo}` pairs. Never the playbook, the wiki indexes or the glosario.
+- **Agent call:** `subagent_type: general-purpose`, `model: "haiku"`. Instruction: read the given
+  files, copy quotes verbatim, return only the JSON below, invent nothing.
+- **Strict output (JSON only):**
+  ```json
+  {
+    "group_key": "...",
+    "docs_leidos": [{"drive_id": "...", "chars": 0, "primer_ts": "HH:MM", "ultimo_ts": "HH:MM"}],
+    "hablantes": ["<as written in the transcript>"],
+    "mencionados": ["<names as written>"],
+    "organizaciones": ["<as written>"],
+    "decisiones": [{"cita": "<verbatim>", "ts": "HH:MM", "hablante": "..."}],
+    "compromisos": [{"cita": "<verbatim>", "ts": "HH:MM", "hablante": "..."}],
+    "menciones_acciones": [{"acc_id": "acc-...", "cita": "<verbatim>", "ts": "HH:MM"}],
+    "tramos": [{"desde": "HH:MM", "hasta": "HH:MM", "etiqueta": "<3-6 words>"}]
+  }
+  ```
+- **Validation (orchestrator, before 2b):**
+  1. Parses as JSON with exactly these keys.
+  2. Set of `docs_leidos[].drive_id` = set of input drive_ids.
+  3. Every `ts` is between the first and last `**HH:MM` timestamp of its transcript file.
+  4. Every `menciones_acciones[].acc_id` is in the open-actions list given as input.
+  5. Pick 3 quotes at random (from `decisiones`, `compromisos`, `menciones_acciones`) and check
+     each with `grep -cF -- "<cita>" "$TMPDIR/reuniones/<drive_id>.txt"` (count ≥ 1). The
+     transcript never enters the orchestrator context.
+- **Fallback:** if any check fails, the orchestrator repeats 2a once for that group (same input,
+  no loop). If the retry also fails, 2b for that group runs with `extraccion_2a: null` and reads
+  the transcripts as before. Record the failure for the Phase 6 report.
+- **Boundaries:** 2a does not write files, does not touch Drive, wiki or memory, and its output
+  never goes into a summary without passing through 2b.
 
 #### Context the orchestrator prepares once before Phase 2
 
@@ -252,10 +297,16 @@ starting with a bare module prefix** — use only the absolute `resumen_path` pr
 ## Current open actions (check if any close/update in this meeting)
 {contenido_acciones_abiertas}
 
+## Validated literal extraction (stage 2a; may be null)
+{extraccion_2a}
+
 ## Your task
 
-1. Read each drive_id with MCP `read_file_content` (Drive). Tactiq format:
-   `**HH:MM Speaker:** text` per line.
+1. If `extraccion_2a` is not null, use it as the primary source for speakers, mentions,
+   organizations, decisions, commitments, action mentions and timeline blocks. Read a transcript
+   only to resolve a specific gap or doubt, not in full. If `extraccion_2a` is null, read each
+   drive_id with MCP `read_file_content` (Drive). Tactiq format: `**HH:MM Speaker:** text` per
+   line. In both cases the validation rules above apply unchanged.
 2. If multiple docs (same `group_key`), build unified transcript: order by `createdTime`, dedupe
    overlapping dialogue (same speaker + identical or ≥85% similar text within ±60s window).
 3. Identify principal doc (most complete/longest) and secondaries (continuations or duplicates).
@@ -448,6 +499,8 @@ The report (Markdown) is not printed standalone: write to a temp file and pass a
 - List of summaries generated (paths).
 - Drive move errors (if any).
 - Files in "awaiting stability" state (modified <10min ago) for next run to pick up.
+- **Haiku delegation (pilot D15.8):** per group, whether 2a passed validation, needed the retry,
+  or fell back to transcripts in 2b.
 
 ### Phase 7 — Close: Commit + Pull Request (this PR is the report)
 

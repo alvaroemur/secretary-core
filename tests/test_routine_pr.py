@@ -35,7 +35,7 @@ class RoutinePrTest(unittest.TestCase):
         subprocess.run(['git', 'init', '-q', '--bare', '-b', 'main', str(remote)], check=True)
         self.repo = root / 'repo'
         subprocess.run(['git', 'clone', '-q', str(remote), str(self.repo)], check=True, capture_output=True)
-        git(self.repo, 'config', 'user.email', 't@example.invalid')
+        git(self.repo, 'config', 'user.email', 't@localhost')
         git(self.repo, 'config', 'user.name', 't')
         (self.repo / 'a.md').write_text('a\n')
         git(self.repo, 'add', '-A'); git(self.repo, 'commit', '-q', '-m', 'init'); git(self.repo, 'push', '-q', 'origin', 'main')
@@ -46,8 +46,8 @@ class RoutinePrTest(unittest.TestCase):
         self.env = {**os.environ, 'PATH': f'{bin_dir}:{os.environ["PATH"]}', 'GH_LOG': str(self.gh_log),
                     'GH_PRS': str(self.gh_prs), 'SECRETARY_SIGNATURE': str(sig),
                     'SECRETARY_INSTANCE': str(self.repo), 'ROUTINE_WT_ROOT': str(root / 'wt'),
-                    'GIT_AUTHOR_NAME': 't', 'GIT_AUTHOR_EMAIL': 't@example.invalid',
-                    'GIT_COMMITTER_NAME': 't', 'GIT_COMMITTER_EMAIL': 't@example.invalid'}
+                    'GIT_AUTHOR_NAME': 't', 'GIT_AUTHOR_EMAIL': 't@localhost',
+                    'GIT_COMMITTER_NAME': 't', 'GIT_COMMITTER_EMAIL': 't@localhost'}
         (root / 'wt').mkdir()
         self.body = root / 'body.md'; self.body.write_text('Resumen de la corrida.\n')
 

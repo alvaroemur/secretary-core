@@ -22,13 +22,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-DEFAULT_REPOS = [
-    "alvaroemur/cowork-secretary",
-    "alvaroemur/cowork-ennui",
-    "alvaroemur/cowork-inspiro",
-    "alvaroemur/doc2struct",
-    "alvaroemur/secretary-core",
-]
+# Repos come from `.secretary.yml` (`dispatch.executor.repos`); no hardcoded fallback.
+DEFAULT_REPOS: list[str] = []
 
 ROUTINE_TO_MODULE = {
     "wiki-update": "modulos/wiki-update.md",

@@ -7,7 +7,7 @@ on:
 
 jobs:
   leak-guard:
-    name: Leak guard + example drift
+    name: Leak guard + skill distribution
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +25,7 @@ jobs:
       - name: Codex rules installer regression
         run: python -m unittest discover -s tests -p test_codex_rules.py -v
 
-      # Drift check: the private playbooks/ and skills/ sources are gitignored and
-      # not present in CI, so `export-examples --check` cannot run here. It is a
-      # local / pre-commit gate. See cli/README.md.
+      # skills/ and playbooks/ are the single versioned source (no private copies),
+      # so the distribution tests run against the real tree.
+      - name: Skill distribution regression
+        run: python -m unittest discover -s tests -p test_close_distribution.py -v

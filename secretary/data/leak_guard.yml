@@ -1,0 +1,45 @@
+# leak_guard.yml — PUBLIC config for the CI leak-guard (scripts/ci/check_no_leaks.py)
+#
+# Skills and playbooks have ONE versioned source with no personal data: instance
+# values (accounts, Drive ids, private repo slugs) are read at runtime with
+# `secretary config get <key>`. This file only guards that rule:
+#   - `detect:`   generic regexes for classes of PII (emails, Drive-style ids, phones)
+#                 that work on a fresh clone without any private value.
+#   - `preserve:` allowlist of public strings that must not be flagged.
+#
+# Exact private literals (optional, local only) live in the gitignored
+# `leak_guard_secrets.yml` (template: `leak_guard_secrets.example.yml`).
+#
+# NEVER add a real sensitive literal here.
+
+# detect: generic regexes for the leak-guard. Each should catch a CLASS of PII so
+# CI protects the repo even on a fresh clone without the private literals.
+detect:
+  - regex: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+    note: "Any email address. Public placeholder/example addresses are allowlisted below."
+  - regex: '\b(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*[0-9])[01][A-Za-z0-9_-]{25,}\b'
+    note: >-
+      Google Drive / Tactiq-style folder id: starts with 0 or 1, length >= 26,
+      mixed upper+lower+digit. Excludes hex hashes (no uppercase) and UUIDs
+      (no uppercase). Lock files are skipped by the guard to avoid base64 hits.
+  - regex: '\+\d{2,3}[\s.\-]?\d{3}[\s.\-]?\d{3}[\s.\-]?\d{3}'
+    note: "International phone numbers (e.g. +51 9-digit). Placeholder is allowlisted."
+
+
+# preserve: public strings + the placeholder values our redactions produce. The
+# guard treats these as an allowlist so `detect` never flags them.
+preserve:
+  # -- genuinely public, must survive verbatim in the examples --
+  - "alvaroemur/secretary-core"  # PUBLIC engine repo — everyone clones it. Keep.
+  - "Álvaro"                     # Owner's name. Public; shows real-world usage. Keep.
+  # -- placeholder / example values produced by redaction (non-sensitive) --
+  - "GoogleDrive-your.personal.email@gmail.com"  # Drive mount placeholder (greedy email match)
+  - "your.personal.email@gmail.com"
+  - "your.work.email@company.com"
+  - "dest@example.com"
+  - "cc@example.com"
+  - "sender@example.com"
+  - "git@github.com"             # appears in `git@github.com:...` remote URLs
+  - "YOUR_TACTIQ_FOLDER_ID"
+  - "YOUR_DRIVE_FOLDER_ID"
+  - "+00 000 000 000"

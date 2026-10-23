@@ -52,7 +52,9 @@ A partir de aquí, **todas las rutas de ESCRITURA cuelgan de `$WT/`** (`$WT/extr
 ### Variables de entorno — raíces del Drive
 
 ```bash
-GDRIVE="$HOME/Library/CloudStorage/GoogleDrive-your.personal.email@gmail.com"
+GDRIVE="$(secretary config get drive.mount)"   # raíz local del Drive montado
+PERSONAL="$(secretary config get accounts.personal)"
+WORK="$(secretary config get accounts.inspiro)"
 MY_DRIVE="$GDRIVE/My Drive"
 SHARED="$GDRIVE/Shared drives"
 INSPIRO="$SHARED/Inspiro Drive"
@@ -60,19 +62,19 @@ MISIONES="$SHARED/👩🏽‍🚀 MISIONES"
 COMERCIAL="$SHARED/💰 COMERCIAL"
 ```
 
-**Multi-cuenta.** El crawler cubre la cuenta personal (`your.personal.email@gmail.com`) siempre, y la
-corporativa (`your.work.email@company.com`) cuando esté registrada. Para las llamadas a la API de Drive
-de inspiro, añadir `--account=your.work.email@company.com`. Verificar disponibilidad igual que en `revision-correo`:
+**Multi-cuenta.** El crawler cubre la cuenta personal (`$PERSONAL`) siempre, y la
+corporativa (`$WORK`) cuando esté registrada. Para las llamadas a la API de Drive
+de inspiro, añadir `--account="$WORK"`. Verificar disponibilidad igual que en `revision-correo`:
 
 ```bash
 INSPIRO_ACTIVE=false
-if gog drive ls --account=your.work.email@company.com --max 1 --json --no-input 2>/dev/null | grep -q '"id"'; then
+if gog drive ls --account="$WORK" --max 1 --json --no-input 2>/dev/null | grep -q '"id"'; then
   INSPIRO_ACTIVE=true
 fi
 ```
 
 Si `INSPIRO_ACTIVE=false`: crawlear solo la cuenta personal y anotar en el reporte:
-"⚠️ `your.work.email@company.com` no registrada — inspiro.pe vía Drive local únicamente".
+"⚠️ `$WORK` no registrada — inspiro.pe vía Drive local únicamente".
 
 ### Mapa de zonas — política de crawling
 
@@ -154,7 +156,7 @@ El Drive tiene 4 raíces. Cada zona tiene una política: **delta** (crawleada en
 
 Google Drive está montado en streaming en:
 ```
-DRIVE="$HOME/Library/CloudStorage/GoogleDrive-your.personal.email@gmail.com/My Drive"
+DRIVE="$(secretary config get drive.mount)/My Drive"
 ```
 
 Puedes usar `ls`, `find`, `stat`, `cat`, `head` directamente sobre `$DRIVE`. Los archivos nativos de Google (Docs, Sheets, Slides) aparecen como stubs `.gdoc`, `.gsheet`, `.gslides` — estos NO son legibles via filesystem (son JSON con un link), pero sí puedes:
@@ -223,9 +225,9 @@ inicial) se hace el barrido inicial. Nunca asumir "primera corrida" por reflejo.
 
 Si es la primera corrida (estado.md sin ninguna corrida previa registrada), hacer un barrido inicial más amplio:
 - Arrancar por las carpetas de alto valor:
-  - `🚀 Vida profesional` (id: `YOUR_DRIVE_FOLDER_ID`) — proyectos, perfil, consultorías, contratos
-  - `🌱 Personal` (id: `YOUR_DRIVE_FOLDER_ID`) — finanzas, ensayos, documentos
-  - `📂 Registros` (id: `YOUR_DRIVE_FOLDER_ID`) — Obsidian, registros
+  - `🚀 Vida profesional` (id: `secretary config get drive.folders.vida_profesional`) — proyectos, perfil, consultorías, contratos
+  - `🌱 Personal` (id: `secretary config get drive.folders.personal`) — finanzas, ensayos, documentos
+  - `📂 Registros` (id: `secretary config get drive.folders.registros`) — Obsidian, registros
 - Luego archivos sueltos en root que sean docs/sheets/presentations
 - En la primera corrida, procesar por **lotes** para no explotar tokens: empezar por los más recientes (últimos 6 meses), luego ir hacia atrás en corridas sucesivas.
 
@@ -246,10 +248,10 @@ Si es la primera corrida (estado.md sin ninguna corrida previa registrada), hace
 - `application/vnd.google-apps.folder` — solo como estructura
 
 **SKIP completo** (ni metadata):
-- Carpeta `🛡️ Backups antiguos` (id: `YOUR_DRIVE_FOLDER_ID`)
-- Carpeta `Randomness` (id: `YOUR_DRIVE_FOLDER_ID`)
-- Carpeta `Tactiq Transcription` (id: `YOUR_TACTIQ_FOLDER_ID`) — ya cubierta por reuniones-update
-- Carpeta `Meet Recordings` (id: `YOUR_DRIVE_FOLDER_ID`) — videos, no legibles
+- Carpeta `🛡️ Backups antiguos` (id: `secretary config get drive.folders.backups_antiguos`)
+- Carpeta `Randomness` (id: `secretary config get drive.folders.randomness`)
+- Carpeta `Tactiq Transcription` (id: `secretary config get drive.folders.tactiq`) — ya cubierta por reuniones-update
+- Carpeta `Meet Recordings` (id: `secretary config get drive.folders.meet_recordings`) — videos, no legibles
 - Archivos con título "Untitled document" o "Untitled spreadsheet" — registrar pero no leer
 
 **SKIP de contenido — carpetas que son espejo de WIP local de Álvaro (feedback PR #59):**
@@ -446,7 +448,7 @@ Reescribir con:
 - Archivos con "password", "contraseña", "credential", "token", "key" en el título
 - Documentos financieros con montos específicos (registrar solo metadata)
 - Documentos legales personales (DNI, pasaporte, declaraciones) — solo metadata
-- El archivo "Passwords" (id: `YOUR_DRIVE_FOLDER_ID`) — **SKIP absoluto**
+- El archivo "Passwords" (id: `secretary config get drive.folders.passwords`) — **SKIP absoluto**
 - La carpeta `alvaro_keys/` en el root — **SKIP absoluto**
 
 Para estos, solo registrar: título, carpeta, tipo, fecha de modificación. Nada de contenido.

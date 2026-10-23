@@ -32,7 +32,7 @@ fi
 
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `TACTIQ_ROOT` | `YOUR_TACTIQ_FOLDER_ID` | Tactiq Drive folder (instance-specific — move to `.secretary.yml` phase 3) |
+| `TACTIQ_ROOT` | `$(secretary config get drive.folders.tactiq)` | Tactiq Drive folder id, from instance config |
 | `ACC` | `$PERSONAL_ACCOUNT` | Tactiq uses personal Drive |
 | `REPO` | `$SECRETARY_INSTANCE` | Local instance checkout |
 | `ROUTINE_REPO` | `$BRIEF_REPO` | GitHub repo for reuniones PRs |

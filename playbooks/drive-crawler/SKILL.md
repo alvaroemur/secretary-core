@@ -24,6 +24,7 @@ para la lista vacía), parte de su rama si existe y si no de `origin/main`. El w
 
 ```bash
 set -euo pipefail
+eval "$(secretary env)"
 eval "$("$SECRETARY_CORE/secretary/routines/ops/routine-pr.sh" open --scope drive \
   --chain-label hilo:drive --chain-pattern '^drive/(auto|consolidado)-')"
 echo "WT=$WT  BRANCH=$BRANCH  BASE=$BASE  PREV_PR=${PREV_PR:-ninguno}"
@@ -196,6 +197,7 @@ título: la sesión la aplica en el paso 2.
 (`find` + clasificación). Además, corre el script en `--dry-run` con el `state.md` del worktree:
 
 ```bash
+eval "$(secretary env)"
 "$SECRETARY_CORE/secretary/routines/ops/drive-scan.py" --dry-run \
   --state "$WT/extractors/drive/state.md" > /tmp/drive-scan-dryrun.json
 ```
@@ -562,6 +564,7 @@ Cierre común: commit, push, PR con label `hilo:drive` contra `main`, cierre del
 y solo limpia (`RESULT=no-changes`).
 
 ```bash
+eval "$(secretary env)"
 "$SECRETARY_CORE/secretary/routines/ops/routine-pr.sh" close --wt "$WT" --branch "$BRANCH" \
   --title "chore(drive): indexación diaria $(date +%Y-%m-%d)" --body-file /tmp/drive-pr-body.md \
   --routine drive-crawler --label hilo:drive --add extractors/drive/ --supersede "$PREV_PR"

@@ -21,6 +21,7 @@ on GitHub and merges.
 ## Instance setup
 
 ```bash
+eval "$(secretary env)"
 CFG=$(secretary config show)
 export SECRETARY_INSTANCE="${SECRETARY_INSTANCE:-$(echo "$CFG" | jq -r .instance)}"
 TIMEZONE=$(echo "$CFG" | jq -r '.timezone // "UTC"')
@@ -67,6 +68,7 @@ This run does **not** write to the main working copy. Work in an ephemeral workt
 
 ```bash
 set -euo pipefail
+eval "$(secretary env)"
 REPO="$SECRETARY_INSTANCE"
 ROUTINE_PR="${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/routine-pr.sh"
 # Common prelude: worktree prune + fetch + `reuniones/auto-YYYYMMDD-HHMM` from origin/main.
@@ -589,6 +591,7 @@ Esto consulta `distribution.yaml`, renderiza el HTML enriquecido desde `template
 `_firma.md`): first line mark, footer after `---`. Do **not** write the mark or footer into the body.
 
 ```bash
+eval "$(secretary env)"
 # Each Bash call starts a fresh shell: carry WT and BRANCH from the prelude output.
 REPO="$SECRETARY_INSTANCE"
 ROUTINE_PR="${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/routine-pr.sh"

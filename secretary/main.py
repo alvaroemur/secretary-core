@@ -21,6 +21,7 @@ from secretary.build_root import run_wiki_build, run_wiki_serve
 from secretary.config import (
     all_resolved_paths,
     config_show_dict,
+    core_root,
     get_value,
     instance_root,
     locate_host,
@@ -257,6 +258,7 @@ def dispatch_locate(
 def env_cmd() -> None:
     """Emit shell exports for instance bootstrap (eval "$(secretary env)")."""
     print(f'export SECRETARY_INSTANCE="{instance_root()}"')
+    print(f'export SECRETARY_CORE="{core_root()}"')
 
 
 @app.command("menu")

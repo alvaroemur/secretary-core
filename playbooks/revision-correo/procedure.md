@@ -14,6 +14,7 @@ Review mail from the last 24 hours and complete the tasks below. Run output is d
 ## Instance setup
 
 ```bash
+eval "$(secretary env)"
 CFG=$(secretary config show)
 export SECRETARY_INSTANCE="${SECRETARY_INSTANCE:-$(echo "$CFG" | jq -r .instance)}"
 TIMEZONE=$(echo "$CFG" | jq -r '.timezone // "UTC"')
@@ -38,8 +39,9 @@ Use the common prelude (`secretary/routines/README.md` § Preludio y cierre comu
 
 ```bash
 set -euo pipefail
+eval "$(secretary env)"
 REPO="$SECRETARY_INSTANCE"
-CORE="${SECRETARY_CORE:?SECRETARY_CORE not set}"
+CORE="$SECRETARY_CORE"
 eval "$("$CORE/secretary/routines/ops/routine-pr.sh" open --scope correo)"
 echo "WT=$WT  BRANCH=$BRANCH"
 ```
@@ -194,6 +196,8 @@ compact TSV: thread id, date, from, subject, labels, message count, owner partic
 Sections 1–4 with it, and do not skip the owner-conversation circuit (`scan`) because of it.
 
 ```bash
+eval "$(secretary env)"
+CORE="$SECRETARY_CORE"
 COLLECT="${ROUTINE_WT_ROOT:-/tmp}/mail-collect-$(date +%Y%m%d-%H%M).tsv"
 python3 "$CORE/secretary/routines/ops/mail-collect.py" --instance "$WT" --out "$COLLECT" \
   || echo "mail-collect failed (exit $?)"
@@ -431,6 +435,8 @@ When all work in `$WT/` is done, write the FINAL REPORT (Section 5, and Section 
 temporary file and open it as the PR body:
 
 ```bash
+eval "$(secretary env)"
+CORE="$SECRETARY_CORE"
 cd "$WT"
 if [ -n "$(git status --porcelain)" ]; then
   # scripts/ci/update_contract_freshness.py no existe (verificado 2026-08-29, sec-dream) — el

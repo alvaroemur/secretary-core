@@ -13,7 +13,7 @@ Este repo contiene el engine reutilizable. Los datos, políticas y configuració
 
 ## Trabajo y entrega
 
-- Trabaja en rama del hilo; nunca commitees código directamente a main. Respeta las instrucciones globales de commits y PRs.
+- Git se rige por la política de la instancia, `canon/rules/git/` (convenciones, worktrees en `.wt/<rama-slug>`, integración con merge commit). Nunca commitees código directamente a main.
 - Scopes existentes: `wiki`, `routines`, `whatsapp`, `mail`, `core`, `docs`, `skills`. Una rama por PR y un hilo por entrega.
 - Entrega por PR con problema, comportamiento resultante, verificaciones y bloqueos. No inventes resultados.
 - Ante una ambigüedad material, registra una pregunta concreta en un issue `needs-triage`, comprobando duplicados. No hagas suposiciones amplias.
@@ -22,6 +22,6 @@ Este repo contiene el engine reutilizable. Los datos, políticas y configuració
 
 - `AGENTS.md` guarda instrucciones estables; el estado transitorio vive en un brief de continuidad del repo.
 - Skills y playbooks tienen una sola fuente versionada en `skills/` y `playbooks/`, sin datos personales: los valores de instancia se leen con `secretary config get <clave>`. Lo propio de la instancia vive en su `canon/skills/` y `canon/playbooks/`.
-- `wind-down` recoge una vez el contexto y produce un brief único. No inicia otra sesión de reflexión ni inspecciona worktrees ajenos.
+- `wind-down` recoge una vez el contexto y produce un brief único. Deja cada tema listo para integrar en su worktree, propone el merge cuando el cambio es claro o comprobable y reporta, sin actuar, el trabajo abierto relacionado y los co-cambios. `desk-merge` ejecuta el merge (merge commit).
 - `secretary efficiency` ofrece snapshot y métricas opcionales dentro del CLI; ningún skill requiere un runtime adicional.
 - Instalación de skills: una copia en `~/.agents/skills`, symlinks en `~/.claude/skills`, sin copias del core en otros harnesses. El leak-guard de CI bloquea datos personales en archivos versionados (`cli/README.md`).

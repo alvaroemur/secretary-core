@@ -137,6 +137,14 @@ class CloseDistributionTests(unittest.TestCase):
         self.assertFalse((REPO/'skills.example').exists())
         self.assertFalse((REPO/'playbooks.example').exists())
 
+    def test_versioned_procedures_never_squash(self):
+        """Policy: merge commit only; squash hides integration from git."""
+        from secretary.skill_sources import close_contract
+        offenders = [str(p.relative_to(REPO)) for root in ('skills', 'playbooks')
+                     for p in (REPO/root).rglob('*.md') if '--squash' in p.read_text(encoding='utf-8')]
+        self.assertEqual(offenders, [])
+        self.assertGreaterEqual(close_contract(REPO/'skills/wind-down/SKILL.md'), 3)
+
 
 if __name__ == '__main__':
     unittest.main()

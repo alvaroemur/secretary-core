@@ -76,7 +76,7 @@ flowchart LR
 | n1 | autonomous | done | PR en la instancia `rules/politica-git`: `canon/rules/git/` y corrección de las instrucciones globales canónicas |
 | n2 | in_session | done | PR alvaroemur/secretary-core#77 (CI verde, mergeable) |
 | n2i | autonomous | running | PR en la instancia: claves de config, `canon/skills/`, retiro de `routines-piloto` |
-| n3 | in_session | pending | PR `skills/cierre-integrable`; incluye la contradicción de prefijos de rama en el CLAUDE.md del core |
+| n3 | in_session | done | PR `skills/cierre-integrable`; incluye la contradicción de prefijos de rama en el CLAUDE.md del core |
 | n4 | autonomous | running | PR en el repo de mapa de workspaces |
 | n5 | autonomous | done | PR en la instancia `routines/manifiesto-real` |
 | n6 | in_session | running | Script de configuración de repos (OK explícito al ejecutar) y rutas de instrucciones globales no versionadas. Va antes de cualquier merge. |
@@ -99,6 +99,8 @@ flowchart LR
 | 2026-10-23 | D17 | sesion | copia única en `~/.agents/skills` + symlinks en `~/.claude/skills`; verificado que Claude Code no lee `~/.agents/skills` |
 | 2026-10-23 | n2 | sesion | PR alvaroemur/secretary-core#77 abierto, CI verde |
 | 2026-10-23 | n2i, n4 | agentes | lanzados |
+| 2026-10-23 | n2i, n4 | agentes | PRs alvaroemur/cowork-secretary#1521 y alvaroemur/Cowork-meta#4 abiertos |
+| 2026-10-23 | n3 | sesion | wind-down (contrato 3) y desk-merge editados; PR apilado sobre `core/fuente-unica-skills` |
 | 2026-10-23 | D15 | sesion aparte | auditoría en alvaroemur/cowork-secretary#1516; decisiones D15.1–D15.6 para el owner |
 | 2026-10-23 | n2 | sesion | hallazgo: los 3 pilotos instalados = `SKILL.md` corto + `procedure.md` más nuevo que el playbook de core |
 

@@ -18,6 +18,24 @@ secretary/routines/
   backfill/                  # historical metrics / wallet helpers
 ```
 
+## Preludio y cierre comunes (`ops/routine-pr.sh`)
+
+Las rutinas que entregan un PR abren y cierran su corrida con un solo comando, sin repetir el bloque de worktree, commit, push y firma en cada playbook.
+
+```bash
+eval "$("$SECRETARY_CORE/secretary/routines/ops/routine-pr.sh" open --scope drive \
+  --chain-label hilo:drive --chain-pattern '^drive/(auto|consolidado)-')"
+# … la rutina escribe en "$WT" …
+"$SECRETARY_CORE/secretary/routines/ops/routine-pr.sh" close --wt "$WT" --branch "$BRANCH" \
+  --title "chore(drive): indexación diaria $(date +%F)" --body-file /tmp/pr-body.md \
+  --routine drive-crawler --label hilo:drive --supersede "$PREV_PR"
+```
+
+- `open` imprime `WT`, `BRANCH`, `BASE` y `PREV_PR` para `eval`. Sin `--chain-pattern`, la base es `origin/main`.
+- `close` firma el body con el helper de firma (`SECRETARY_SIGNATURE`), crea la label si falta y cierra el PR superado. Sin cambios, limpia y devuelve `RESULT=no-changes`. Si el push funcionó pero el PR falló, devuelve `RESULT=push-only` con código 3 y no revierte nada.
+- `--dry-run` muestra los comandos sin efectos: sirve para las 3 corridas de validación.
+- El worktree vive en `${ROUTINE_WT_ROOT:-/tmp}`, no en `$TMPDIR`.
+
 ## LaunchAgents
 
 `install-routine-schedule.sh` writes plists whose `ProgramArguments` invoke

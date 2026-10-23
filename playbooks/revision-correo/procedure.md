@@ -34,19 +34,17 @@ fi
 This run does **not** write to the main working copy. Create an ephemeral worktree from
 `origin/main`, work there, then open a PR at the end.
 
+Use the common prelude (`secretary/routines/README.md` § Preludio y cierre comunes):
+
 ```bash
 set -euo pipefail
 REPO="$SECRETARY_INSTANCE"
-cd "$REPO"
-git worktree prune
-git fetch origin main
-TS=$(date +%Y%m%d-%H%M)
-SCOPE=correo
-BRANCH="$SCOPE/auto-$TS"
-WT="$(mktemp -d)/secretary-$SCOPE"
-git worktree add -b "$BRANCH" "$WT" origin/main
+CORE="${SECRETARY_CORE:?SECRETARY_CORE not set}"
+eval "$("$CORE/secretary/routines/ops/routine-pr.sh" open --scope correo)"
 echo "WT=$WT  BRANCH=$BRANCH"
 ```
+
+The worktree lives under `${ROUTINE_WT_ROOT:-/tmp}`, cut from `origin/main`.
 
 From here on, **all WRITE paths hang off `$WT/`** (`$WT/extractors/mail/state.md`,
 `$WT/extractors/mail/memory/...`, `$WT/extractors/mail/policy.md`,
@@ -182,6 +180,32 @@ Read these files at the start of each run:
 
 5. **Routine memory**: the 2–3 most recent files in `$WT/extractors/mail/memory/`
    Daily memos from prior runs. Do not duplicate what is already in `state.md`.
+
+### Thread collector (validation mode, D15 N6)
+
+`secretary/routines/ops/mail-collect.py` reads, for every account in
+`account_usage.revision_correo`, the threads with activity since the last successful run
+(`freshness.last_success_at` in `extractors/mail/contract.yaml`, never less than 24 h) and writes one
+compact TSV: thread id, date, from, subject, labels, message count, owner participation
+(`last` / `replied` / `no`) and a short snippet of the last message. It only reads Gmail
+(`gog --readonly --gmail-no-send`): it never archives, labels or creates drafts.
+
+**Status: validation.** Run it **in addition to** the current path. Do not replace the searches of
+Sections 1–4 with it, and do not skip the owner-conversation circuit (`scan`) because of it.
+
+```bash
+COLLECT="${ROUTINE_WT_ROOT:-/tmp}/mail-collect-$(date +%Y%m%d-%H%M).tsv"
+python3 "$CORE/secretary/routines/ops/mail-collect.py" --instance "$WT" --out "$COLLECT" \
+  || echo "mail-collect failed (exit $?)"
+grep '^# account=' "$COLLECT"
+```
+
+Keep the list of thread ids you triage in Sections 1–3 (per account). Before W2, compare them with
+the ids in `$COLLECT` and add a section `### Validación del recolector` to the PR body with, per
+account: collector status and thread count, threads triaged, triaged threads **missing** from the
+collector (ids only), and collector threads you did not triage (count only). Write no senders,
+subjects or addresses in that section. Do not commit `$COLLECT`. The owner reviews three runs and
+decides activation (D15 node m8); keep running this comparison until the procedure changes.
 
 ## 1. Summary by category
 
@@ -408,10 +432,7 @@ temporary file and open it as the PR body:
 
 ```bash
 cd "$WT"
-if [ -z "$(git status --porcelain)" ]; then
-  echo "No versioned changes — no PR opened."
-  cd "$REPO" && git worktree remove "$WT" --force && git branch -D "$BRANCH" 2>/dev/null || true
-else
+if [ -n "$(git status --porcelain)" ]; then
   # scripts/ci/update_contract_freshness.py no existe (verificado 2026-08-29, sec-dream) — el
   # único script vivo es scripts/ci/contract_health.py y su --sync-contract no toca
   # freshness.last_success_at de extractors. Patch manual, mismo patrón que drive-crawler:
@@ -423,19 +444,19 @@ s = open(p).read()
 s = re.sub(r'last_success_at: ".*"', f'last_success_at: "{sys.argv[1]}"', s, count=1)
 open(p, "w").write(s)
 PYEOF
-  git add -A
-  git commit -m "chore(correo): corrida automática $(date +%Y-%m-%d)"
-  git push -u origin "$BRANCH"
-  gh label create "hilo:correo" --description "Hilo de trabajo: correo" --color BFD4F2 2>/dev/null || true
-  # Write report (Markdown) with the Write tool to a temp file, e.g. /tmp/pr-correo.md
-  gh pr create --title "chore(correo): corrida automática $(date +%Y-%m-%d)" \
-    --label "hilo:correo" --body-file /tmp/pr-correo.md
-  cd "$REPO" && git worktree remove "$WT" --force
 fi
+# Write report (Markdown) with the Write tool to a temp file first, e.g. /tmp/pr-correo.md
+"$CORE/secretary/routines/ops/routine-pr.sh" close --wt "$WT" --branch "$BRANCH" \
+  --title "chore(correo): corrida automática $(date +%Y-%m-%d)" --body-file /tmp/pr-correo.md \
+  --routine revision-correo --label hilo:correo
 ```
+
+`close` commits, pushes, signs the body, creates the label if missing and removes the worktree. With
+no versioned changes it only cleans up and prints `RESULT=no-changes`; otherwise it prints
+`RESULT=pr PR_NUMBER=… PR_URL=…`.
 
 Notes:
 - Create the report draft (`/tmp/pr-correo.md`) with the Write tool, not `echo`/heredoc.
-- If `gh pr create` fails (network/auth), do not revert: the branch is already pushed; report the
-  error and leave the worktree for manual inspection.
+- If the PR fails after the push, `close` prints `RESULT=push-only` and exits 3: do not revert; the
+  branch is already pushed. Report the error and leave the worktree for manual inspection.
 - Return the **PR URL** at the end.

@@ -17,35 +17,21 @@ drive abierto. Solo cuando NO hay PR de drive abierto se parte de `origin/main` 
 merge). Esto evita el bug histórico: antes cada corrida partía de `main` sin ver el trabajo previo y
 repetía el barrido inicial generando PRs casi-iguales.
 
+El preludio común `routine-pr.sh open` hace el chaining: busca el PR abierto con label `hilo:drive`
+y rama `drive/auto-*` o `drive/consolidado-*` más reciente (con el guard `select(. != null)` de jq
+para la lista vacía), parte de su rama si existe y si no de `origin/main`. El worktree vive en
+`${ROUTINE_WT_ROOT:-/tmp}`.
+
 ```bash
 set -euo pipefail
-REPO=~/.secretary
-cd "$REPO"
-git worktree prune
-git fetch origin main
-TS=$(date +%Y%m%d-%H%M)
-SCOPE=drive
-BRANCH="$SCOPE/auto-$TS"
-WT="$(mktemp -d)/secretary-$SCOPE"
-
-# ¿Hay un PR de drive abierto de una corrida previa? → continuar sobre él (chaining).
-PREV=$(gh pr list --label hilo:drive --state open --json number,headRefName,createdAt \
-    --jq 'map(select(.headRefName|test("^drive/(auto|consolidado)-")))
-          | sort_by(.createdAt) | last | select(. != null) | ((.number|tostring)+" "+.headRefName)' 2>/dev/null || true)
-PREV_NUM="${PREV%% *}"; PREV_BRANCH="${PREV#* }"
-if [ -n "$PREV" ] && [ -n "$PREV_NUM" ] && [ "$PREV_NUM" != "$PREV_BRANCH" ]; then
-  git fetch origin "$PREV_BRANCH"
-  BASE="origin/$PREV_BRANCH"
-  echo "Continuando sobre PR de drive #$PREV_NUM ($PREV_BRANCH)"
-else
-  PREV_NUM=""; BASE="origin/main"
-  echo "Sin PR de drive abierto → base = origin/main"
-fi
-git worktree add -b "$BRANCH" "$WT" "$BASE"
-echo "WT=$WT  BRANCH=$BRANCH  BASE=$BASE  PREV_PR=${PREV_NUM:-ninguno}"
+eval "$("$SECRETARY_CORE/secretary/routines/ops/routine-pr.sh" open --scope drive \
+  --chain-label hilo:drive --chain-pattern '^drive/(auto|consolidado)-')"
+echo "WT=$WT  BRANCH=$BRANCH  BASE=$BASE  PREV_PR=${PREV_PR:-ninguno}"
 ```
 
-A partir de aquí, **todas las rutas de ESCRITURA cuelgan de `$WT/`** (`$WT/extractors/drive/state.md`, `$WT/extractors/drive/memory/...`), nunca de `~/.secretary/`. Las lecturas de contexto (wiki, estado previo) también desde `$WT/`. Guardá `$PREV_NUM` — se usa en el cierre (W2) para cerrar el PR superado.
+Anota `WT`, `BRANCH` y `PREV_PR`: cada bloque posterior corre en un shell nuevo y debe redefinirlos.
+
+A partir de aquí, **todas las rutas de ESCRITURA cuelgan de `$WT/`** (`$WT/extractors/drive/state.md`, `$WT/extractors/drive/memory/...`), nunca de `~/.secretary/`. Las lecturas de contexto (wiki, estado previo) también desde `$WT/`. Guarda `$PREV_PR`: el cierre (W2) lo pasa a `--supersede` para cerrar el PR superado.
 
 ## 0. PREPARACIÓN
 
@@ -187,6 +173,39 @@ Herramientas MCP (prefijo `mcp__0152ec35-ec64-4894-9e7c-2260d61b50e2__`):
 
 ## 1. DETECCIÓN DE CAMBIOS (fase metadata — bajo costo de tokens)
 
+### Detección por script (`drive-scan.py`) — en validación
+
+`secretary/routines/ops/drive-scan.py` hace esta fase sin LLM: lee el mapa de zonas y las zonas
+sensibles de este playbook, las carpetas `SKIP completo` del filtro de tipos y la lista de espejos
+de la instancia (`extractors/drive/memory/espejos-wip.md`). Recorre las zonas `delta` por filesystem
+(vía A), poda las subzonas `sensible`, `skip`, `mapa` y `backfill`, y compara contra el corte de
+la corrida previa: fecha de "Última corrida" en `state.md` menos 15 minutos de solape; si no la
+encuentra, el marker; si tampoco, 24 h. Entrega un JSON con:
+
+- `archivos`: solo lo nuevo o cambiado, con `zona`, `politica` y `accion` (`contenido` |
+  `metadata` | `skip`) y su `motivo` (`tipo`, `espejo-wip`, `nombre-sensible`, `untitled`,
+  `tipo-desconocido`).
+- `root.archivos`: todos los archivos sueltos del root de My Drive, con `nuevo: true|false`, para el
+  paso 4.
+- `conteos` por zona y acción, `zonas_delta` con `montada`, `backfill` con `montada`, y el corte usado.
+
+El script no decide la regla de §6 sobre documentos financieros o legales sin palabra sensible en el
+título: la sesión la aplica en el paso 2.
+
+**Validación N6 (estado actual).** Durante 3 corridas, la detección sigue por el camino de abajo
+(`find` + clasificación). Además, corre el script en `--dry-run` con el `state.md` del worktree:
+
+```bash
+"$SECRETARY_CORE/secretary/routines/ops/drive-scan.py" --dry-run \
+  --state "$WT/extractors/drive/state.md" > /tmp/drive-scan-dryrun.json
+```
+
+Compara su lista `archivos` (y la acción de cada uno) con lo que detectó y clasificó el camino
+actual, y anota en el body del PR una línea `drive-scan dry-run: coincide | difiere (<qué>)`. Si
+difiere, describe la diferencia sin nombres de archivos privados (zona, acción, conteo). El
+propietario decide la activación (nodo m8 del plan D15 n5). Al activarse, el script reemplaza los
+`find` de esta sección y la delegación a Haiku de clasificación de paths.
+
 **Preferir filesystem para esta fase:**
 
 ```bash
@@ -274,6 +293,10 @@ Si lo hay → tratar como espejo (solo metadata) y añadir la carpeta a esta lis
 general: **si el contenido lo está produciendo Álvaro mismo, no es fuente — es WIP**.
 
 ### Delegación a Haiku (piloto D15.8) — clasificación de paths
+
+> **Se retira al activar `drive-scan.py` (decisión N5 del plan D15 n5).** Mientras el script esté en
+> validación, esta delegación sigue vigente. Al activarlo, borra esta subsección: el JSON del script
+> ya trae `zona`, `politica` y `accion`.
 
 - **Operación:** clasificar cada path detectado por los `find` de este paso contra el mapa de zonas
   y el filtro de tipos. No lee contenido ni decide qué indexar.
@@ -448,6 +471,7 @@ En `$WT/extractors/drive/organization.md`, añadir una sección por corrida:
 ### Ritmo de análisis
 
 - No analizar todo en una sola corrida. Procesar **~50 archivos sueltos del root por día** (vía filesystem: rápido y sin tokens). En ~7 corridas se cubre todo el root.
+- Con `drive-scan.py` activo, el lote sale de `root.archivos` del JSON (orden por fecha de modificación, `nuevo: true` primero en prioridad); la preclasificación con Haiku de abajo se queda.
 - En corridas posteriores, rotar hacia subcarpetas que parezcan desordenadas.
 - Las propuestas son SOLO propuestas — Álvaro las revisa en el PR y decide. La rutina **NUNCA mueve, renombra ni elimina archivos del Drive**.
 
@@ -520,45 +544,31 @@ s = open(p).read()
 s = re.sub(r'last_success_at: ".*"', f'last_success_at: "{sys.argv[1]}"', s, count=1)
 open(p, "w").write(s)
 PYEOF
-git add extractors/drive/
-git status
 ```
 
-Si hay cambios:
+Escribe el body del PR en `/tmp/drive-pr-body.md` (sin firma: el cierre la agrega con
+`sec-signature.sh drive-crawler`), con estas secciones:
+
+- **Archivos indexados**: cuántos, cuáles los más relevantes
+- **Hallazgos para la wiki**: personas, orgs, proyectos descubiertos
+- **Propuestas de organización**: resumen de lo propuesto (mover N archivos, M duplicados, etc.)
+- **Pendientes**: qué queda para la próxima corrida
+- **Delegación y validación**: una línea por operación delegada a Haiku y la línea
+  `drive-scan dry-run: …` del paso 1.
+- Si esta corrida **continuó** un PR previo (`$PREV_PR`), indicarlo: "Continúa y reemplaza #$PREV_PR".
+
+Cierre común: commit, push, PR con label `hilo:drive` contra `main`, cierre del PR superado
+(chaining: el nuevo contiene todo lo del anterior) y limpieza del worktree. Sin cambios, no abre PR
+y solo limpia (`RESULT=no-changes`).
 
 ```bash
-git commit -m "chore(drive): indexación diaria $(date +%Y-%m-%d)"
-git push -u origin "$BRANCH"
+"$SECRETARY_CORE/secretary/routines/ops/routine-pr.sh" close --wt "$WT" --branch "$BRANCH" \
+  --title "chore(drive): indexación diaria $(date +%Y-%m-%d)" --body-file /tmp/drive-pr-body.md \
+  --routine drive-crawler --label hilo:drive --add extractors/drive/ --supersede "$PREV_PR"
 ```
 
-Abrir PR con `gh pr create`:
-- **Firma del body:** `_firma.md` → `sec-signature.sh drive-crawler`.
-- Título: `chore(drive): indexación diaria YYYY-MM-DD`
-- Body: resumen de la corrida con secciones:
-  - **Archivos indexados**: cuántos, cuáles los más relevantes
-  - **Hallazgos para la wiki**: personas, orgs, proyectos descubiertos
-  - **Propuestas de organización**: resumen de lo propuesto (mover N archivos, M duplicados, etc.)
-  - **Pendientes**: qué queda para la próxima corrida
-  - Si esta corrida **continuó** un PR previo (`$PREV_NUM`), indicarlo: "Continúa y reemplaza #$PREV_NUM".
-- Label: `hilo:drive` (crear si no existe)
-- Base: `main`
-
-**Cerrar el PR previo superado (chaining).** Como este PR contiene todo lo del anterior + lo nuevo,
-cerrar el viejo para que quede UN solo PR de drive abierto:
-
-```bash
-NEW_NUM=$(gh pr view "$BRANCH" --json number --jq .number)
-if [ -n "${PREV_NUM:-}" ]; then
-  gh pr close "$PREV_NUM" --delete-branch \
-    --comment "Superado por #$NEW_NUM (lo continúa e incluye todo su contenido + la corrida nueva)."
-fi
-```
-
-Limpiar worktree:
-```bash
-cd ~/.secretary
-git worktree remove "$WT" --force 2>/dev/null || true
-```
+`RESULT=push-only` (código 3): la rama quedó empujada pero el PR falló. Anótalo en el reporte; no
+reviertas nada.
 
 > **Ciclo de vida de los PRs de drive.** Por el chaining, normalmente hay **un único** PR de drive
 > abierto que se va engordando corrida a corrida y reemplazando al anterior. Desde 2026-06, drive **sí**
@@ -568,7 +578,7 @@ git worktree remove "$WT" --force 2>/dev/null || true
 > entidades y proyectos descubiertos por este crawler. El merge no ejecuta nada sobre Drive: las
 > propuestas de mover/borrar siguen siendo eso, propuestas que Álvaro decide aplicar.
 
-Si NO hay cambios (nada nuevo en Drive y nada que proponer), no crear PR. Solo limpiar el worktree.
+Si NO hay cambios (nada nuevo en Drive y nada que proponer), `routine-pr.sh close` no crea PR y solo limpia el worktree.
 
 ## NOTAS DE AUSTERIDAD
 

@@ -2,7 +2,7 @@
 
 # Cierre integrable y fuente única de skills
 
-**Estado:** alcance confirmado por el owner el 2026-10-23. La ejecución requiere elegir el grafo de trabajo; nada se ha implementado.
+**Estado:** completado el 2026-10-23. Todos los nodos integrados y desplegados.
 
 **Objetivo:** que el cierre de trabajo en git deje cada tema listo para integrar, avise de trabajo relacionado y de lo que el cambio arrastra; y que skills y playbooks tengan una sola fuente sin datos personales, con la configuración de la instancia en `.secretary`.
 
@@ -77,10 +77,10 @@ flowchart LR
 | n2 | in_session | done | PR alvaroemur/secretary-core#77 (CI verde, mergeable) |
 | n2i | autonomous | done | PR en la instancia: claves de config, `canon/skills/`, retiro de `routines-piloto` |
 | n3 | in_session | done | PR `skills/cierre-integrable`; incluye la contradicción de prefijos de rama en el CLAUDE.md del core |
-| n4 | autonomous | running | PR en el repo de mapa de workspaces |
+| n4 | autonomous | done | PR en el repo de mapa de workspaces |
 | n5 | autonomous | done | PR en la instancia `routines/manifiesto-real` |
 | n6 | in_session | done | Script de configuración de repos (OK explícito al ejecutar) y rutas de instrucciones globales no versionadas. Va antes de cualquier merge. |
-| n7 | in_session | pending | Reinstalación, hashes, pruebas y cierre de estos PRs con el wind-down nuevo |
+| n7 | in_session | done | Reinstalación, hashes, pruebas y cierre de estos PRs con el wind-down nuevo |
 
 ### Log de ejecución
 
@@ -107,6 +107,9 @@ flowchart LR
 | 2026-10-23 | n4 | sesion | workspaces#4 sigue abierto (mergeable) |
 | 2026-10-23 | n7 (prep) | sesion | conciliación de playbooks instalados con core: #82 (core) e instancia#1522 (repos de housekeeping, espejos WIP) integrados |
 | 2026-10-23 | D15 | sesion aparte | #81 (Haiku) integrado tras probar el merge sobre #82 sin conflictos |
+| 2026-10-23 | — | sesion | #80, #79 y workspaces#4 integrados con merge commit; `main` local de core e instancia con fast-forward |
+| 2026-10-23 | n7 | sesion | reinstalación: 65 skills del core en `~/.agents/skills` iguales a la fuente (desk-overview lleva el overlay de conversaciones), 65 symlinks en `~/.claude/skills`, 0 copias del core en Codex y Cursor, 17 rutinas; sales-crawler y wiki-update conservan `--merge` |
+| 2026-10-23 | n7 | sesion | cierre: 9 worktrees del plan con carpeta = rama, integrados (`is-ancestor`) y limpios; se conservan hasta la limpieza aparte (D4, D7) |
 | 2026-10-23 | D15 | sesion aparte | auditoría en instancia#1516; decisiones D15.1–D15.6 para el owner |
 | 2026-10-23 | n2 | sesion | hallazgo: los 3 pilotos instalados = `SKILL.md` corto + `procedure.md` más nuevo que el playbook de core |
 

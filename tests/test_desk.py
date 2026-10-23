@@ -66,7 +66,7 @@ class DeskTests(unittest.TestCase):
             for name in ['desk.py', 'brief_html.py', 'signatures.py']:
                 (source/'secretary'/name).write_text('# runtime fixture\n')
             current = '---\nname: wind-down\nmetadata:\n  close-contract: "2"\n---\ncurrent close'
-            for folder, text in [('skills.example', current), ('portable/skills', 'obsolete close')]:
+            for folder, text in [('skills', current), ('portable/skills', 'obsolete close')]:
                 skill = source/folder/'wind-down/SKILL.md'
                 skill.parent.mkdir(parents=True); skill.write_text(text)
             deployment(source, [target], root/'runtime', True)

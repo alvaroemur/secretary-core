@@ -21,7 +21,7 @@ Este repo contiene el engine reutilizable. Los datos, políticas y configuració
 ## Contexto portable
 
 - `AGENTS.md` guarda instrucciones estables; el estado transitorio vive en un brief de continuidad del repo.
-- Los skills se editan en `skills/` (fuente privada); `skills.example/` contiene sus exports sanitizados. No mantengas una segunda fuente de cierre.
+- Skills y playbooks tienen una sola fuente versionada en `skills/` y `playbooks/`, sin datos personales: los valores de instancia se leen con `secretary config get <clave>`. Lo propio de la instancia vive en su `canon/skills/` y `canon/playbooks/`.
 - `wind-down` recoge una vez el contexto y produce un brief único. No inicia otra sesión de reflexión ni inspecciona worktrees ajenos.
 - `secretary efficiency` ofrece snapshot y métricas opcionales dentro del CLI; ningún skill requiere un runtime adicional.
-- `skills.example/` y `playbooks.example/` son exports sanitizados; conserva la separación público/privado documentada en `cli/README.md`.
+- Instalación de skills: una copia en `~/.agents/skills`, symlinks en `~/.claude/skills`, sin copias del core en otros harnesses. El leak-guard de CI bloquea datos personales en archivos versionados (`cli/README.md`).

@@ -4,16 +4,17 @@
 Detection is designed to work on a FRESH CLONE (CI), with no access to the private
 secrets file:
 
-- GENERIC `detect` regexes from the committed public map
-  (``secretary/data/export_examples_map.yml``): any email, Google-Drive-style folder
+- GENERIC `detect` regexes from the committed public config
+  (``secretary/data/leak_guard.yml``): any email, Google-Drive-style folder
   id, and phone number. These catch accidental PII without needing the real values.
 - The `preserve` allowlist from the same map: public strings and the placeholder
   values redaction produces (e.g. `alvaroemur/secretary-core`, `Álvaro`,
   `your.personal.email@gmail.com`). A `detect` hit that sits inside a preserved
   string is ignored.
 
-When the PRIVATE secrets file (``export_examples_secrets.yml``, gitignored) IS
-present locally, the guard ALSO scans for those exact literals for precision.
+When the PRIVATE literals file (``leak_guard_secrets.yml``, gitignored; legacy
+name ``export_examples_secrets.yml``) IS present locally, the guard ALSO scans for
+those exact literals for precision.
 
 Skipped: the public map, the committed template, this script, dependency lock files
 (machine-generated hashes, not PII), and binary/unreadable files.
@@ -32,14 +33,15 @@ from typing import Any
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MAP_REL = "secretary/data/export_examples_map.yml"
-TEMPLATE_REL = "export_examples_secrets.example.yml"
-SECRETS_REL = "export_examples_secrets.yml"
+MAP_REL = "secretary/data/leak_guard.yml"
+TEMPLATE_REL = "leak_guard_secrets.example.yml"
+SECRETS_REL = "leak_guard_secrets.yml"
+LEGACY_SECRETS_REL = "export_examples_secrets.yml"
 SELF_REL = "scripts/ci/check_no_leaks.py"
 
 # Files exempt from scanning: they legitimately hold literals/patterns, or are
 # machine-generated dependency manifests full of hash-like tokens.
-EXEMPT_FILES = {MAP_REL, TEMPLATE_REL, SECRETS_REL, SELF_REL}
+EXEMPT_FILES = {MAP_REL, TEMPLATE_REL, SECRETS_REL, LEGACY_SECRETS_REL, SELF_REL}
 LOCKFILE_NAMES = {
     "uv.lock",
     "package-lock.json",
@@ -57,12 +59,18 @@ def _load_map() -> dict[str, Any]:
 
 
 def _load_secret_literals() -> list[str]:
-    """Exact `pattern` literals from the private secrets file (empty if absent)."""
-    path = REPO_ROOT / SECRETS_REL
-    if not path.is_file():
-        return []
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return [r["pattern"] for r in (data.get("redact") or []) if r.get("pattern")]
+    """Exact literals from the private file (empty if absent).
+
+    Accepts `literals: [..]` and the legacy `redact: [{pattern: ..}]` schema.
+    """
+    for rel in (SECRETS_REL, LEGACY_SECRETS_REL):
+        path = REPO_ROOT / rel
+        if path.is_file():
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            literals = [str(x) for x in (data.get("literals") or [])]
+            literals += [r["pattern"] for r in (data.get("redact") or []) if r.get("pattern")]
+            return literals
+    return []
 
 
 def _tracked_files() -> list[str]:
@@ -137,8 +145,8 @@ def main() -> int:
         for leak in leaks:
             print(f"  {leak}")
         print(
-            f"\n{len(leaks)} hallazgo(s). Redactá vía el mapa/secrets de "
-            "export-examples, o agregá a `preserve` si es público."
+            f"\n{len(leaks)} hallazgo(s). Lee el valor en ejecución con "
+            "`secretary config get <clave>`, o agrega a `preserve` si es público."
         )
         return 1
 

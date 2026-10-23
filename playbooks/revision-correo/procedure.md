@@ -1,11 +1,9 @@
 ---
 name: revision-correo
 description: >-
-  Daily mail summary, reply drafts, inbox cleanup, and Inbox Zero goal.
-  Delivers run output as a Pull Request report.
 ---
 
-Read instance `CLAUDE.md` at `SECRETARY_INSTANCE` before starting. Instance appendix:
+Read instance `AGENTS.md` at `SECRETARY_INSTANCE` before starting. Instance appendix:
 `operational/briefing.md` (Google accounts, calendar). Doctrine: `rules/skills-contract.md`.
 
 # revision-correo — evening mail batch
@@ -24,6 +22,7 @@ BRIEF_REPO=$(echo "$CFG" | jq -r '.brief.repo // empty')
 BRIEF_LABEL=$(echo "$CFG" | jq -r '.brief.label // "tipo:informe-diario"')
 PERSONAL_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.personal // empty')
 WORK_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.inspiro // .accounts.work // empty')
+ENNUI_ACCOUNT=$(echo "$CFG" | jq -r '.accounts.ennui // empty')
 
 if [ -z "$BRIEF_REPO" ]; then
   BRIEF_REPO=$(gh -R "$SECRETARY_INSTANCE" repo view --json nameWithOwner -q .nameWithOwner)
@@ -86,11 +85,17 @@ For senders that exist in `$WT/knowledge/wiki/articulos/personas/`, before draft
    Delegate the draft to `sec-compose` (channel: email) anchored on recent conversation.
 3. Active collaborators (ongoing project, recent meeting) → always route through `sec-compose`
    instead of cold drafting.
+4. Project with structured state available — before defaulting to a cold draft, check whether the
+   sender/thread maps to a `proyecto` (same normalization `reuniones-update` uses on `contexto`)
+   that has either: (a) an active entry in `$WT/subsystem/wip/<repo>.md`, or (b) frontmatter on
+   `~/Cowork/<workspace>/proyectos/<slug>/README.md`. If either exists → route through `sec-compose`
+   too, even if it doesn't meet triggers 2/3 above. No match → no change, fall through to normal
+   cold-draft or trigger 3.
 
 ### 0.3 — Persist draft copy (Gmail thread replies only)
 
 **Inbox thread replies only** — not project deliverables. Proposals/decks/commercial docs belong
-in the target org's Cowork project folder per instance `CLAUDE.md` § domain dispatch and
+in the target org's Cowork project folder per instance `AGENTS.md` § domain dispatch and
 `operational/sistemas-ordenamiento.md` §6.1 (`<cowork>/<org>/proyectos/<slug>/borradores/`).
 
 Besides the Gmail draft, save text to `$WT/extractors/mail/drafts/YYYY-MM-DD-<slug>.md` **only for
@@ -108,9 +113,9 @@ Use `gog` (Google Workspace CLI) for Gmail read/write.
 `GOG_KEYRING_BACKEND`, `GOG_KEYRING_PASSWORD`, and `GOG_ACCOUNT` are already in harness
 `settings.json` under `env`.
 
-**Multi-account.** This routine covers two accounts when configured: `PERSONAL_ACCOUNT` (always
-active) and `WORK_ACCOUNT` (corporate, when registered in gog). Check whether the work account is
-registered before using it:
+**Multi-account.** This routine covers up to three accounts: `PERSONAL_ACCOUNT` (always active),
+`WORK_ACCOUNT` (Inspiro, corporate), and `ENNUI_ACCOUNT` (ennui.solutions, hub de desarrollo).
+Check each additional account before using it:
 
 ```bash
 WORK_ACTIVE=false
@@ -118,12 +123,21 @@ if [ -n "$WORK_ACCOUNT" ] && \
    gog gmail search 'newer_than:1d' --account="$WORK_ACCOUNT" --max 1 --plain --no-input 2>/dev/null; then
   WORK_ACTIVE=true
 fi
+
+ENNUI_ACTIVE=false
+if [ -n "$ENNUI_ACCOUNT" ] && \
+   gog gmail search 'newer_than:1d' --account="$ENNUI_ACCOUNT" --max 1 --plain --no-input 2>/dev/null; then
+  ENNUI_ACTIVE=true
+fi
 ```
 
-If `WORK_ACTIVE=true`: run the mail sweep for both accounts (add `--account="$WORK_ACCOUNT"` on
-work-account calls) and consolidate into one PR with separate sections per account. If
-`WORK_ACTIVE=false`: operate on the personal account only and add one line to the report:
-`⚠️ $WORK_ACCOUNT not registered in gog — see instance CLAUDE.md § Google accounts`.
+For each active account: run the full mail sweep (search, triage, archive, drafts, follow-up) adding
+`--account="$ACCOUNT"` on every `gog` call. Consolidate all accounts into one PR with **separate
+sections per account** in the report. For inactive accounts, add one line:
+`⚠️ $ACCOUNT not registered in gog — see instance AGENTS.md § Google accounts`.
+
+The `policy.md` inbox/archive/delete rules apply to **all accounts** unless a rule explicitly names
+one. Account-specific rules (e.g. a capture-only account) are noted in `policy.md`.
 
 **Compact output — use `--plain`, not `--json`, for reading.** `gog ... --json` returns huge payloads
 (a `thread get --json` ~49 KB) that the harness truncates into `tool-results/<id>`, which you then
@@ -184,6 +198,12 @@ restrict to `in:inbox`). Important items may have been auto-archived by a rule; 
 - **Job alerts**: one grouped line with the most relevant roles.
 - **Promotions / spam**: mention briefly if any, no detail.
 
+**Ticket candidate (issue cowork-secretary#512):** if an "action required" mail is a client
+requesting new work (not a routine follow-up), flag it in the report as a ticket candidate — e.g.
+"📎 posible ticket: <client> pide <thing> — ver `subsystem/contratos/tickets.md`". Never write the
+ticket file yourself; the owner decides what counts as billable/trackable work and registers it
+manually.
+
 ## 2. Reply drafts
 
 For "important" and "action required" mail, create drafts with a professional but warm tone
@@ -217,6 +237,37 @@ follow-up is warranted.
 5. **Never send** — leave drafts for owner review. List each suggested follow-up in the report
    (recipient, subject, why) and each evaluated-and-skipped thread in one line.
 
+## 2.6 Drafts acumulados en un mismo hilo (consolidación)
+
+Gmail permite múltiples drafts por hilo vía API, pero su UI solo muestra el último — un draft
+sustancial puede quedar invisible mientras se crea uno nuevo más corto sobre el mismo hilo,
+perdiendo contenido. Caso real que motivó esto: hilo con Juliana Villalba (ERP CLab) con un draft
+del 3-jul (sílabo completo de 10h) y otro del 8-jul mucho más corto que no lo reaprovechaba —
+ambos seguían sin resolver un mes después.
+
+1. Listar drafts de la cuenta: `gog gmail drafts list --account="$ACC" --json`.
+2. Agrupar por `threadId`. Grupos con **2 o más drafts** son candidatos.
+3. Filtrar por umbral de días desde el draft **más antiguo** del grupo:
+   `mail.settings.consolidacion_drafts_umbral_dias` (default 6 si `settings.md` no define el campo).
+4. Antes de sintetizar, chequear si hubo respuesta real del destinatario en el hilo desde el draft
+   más viejo: `gog gmail thread get <threadId> --plain --no-input --account="$ACC"`. Si respondió
+   después de esa fecha → **no consolidar**, el contexto cambió más que solo el tiempo transcurrido;
+   marcar el hilo para revisión manual en el reporte y seguir con el siguiente candidato.
+5. Sin respuesta intermedia → traer el detalle de cada draft del grupo:
+   `gog gmail drafts get <draftId> --json` (headers, body, `internalDate`).
+6. Sintetizar un draft consolidado: preservar la sustancia del draft **más completo** (no
+   necesariamente el más reciente), con el tono/urgencia ajustado a que pasó tiempo, sin sonar como
+   excusa ("retomo esto que quedó pendiente..." en vez de ignorar o negar la demora). Tono de
+   `settings.md` (Abrazo, tuteo, conciso). Si hay más de 3 grupos candidatos en la corrida, delegar
+   la síntesis de cada uno a un subagente aislado — no bloquear el resto de la corrida.
+7. Actualizar el draft en Gmail vía `sec-mail` con `intent=update-draft`: `draft_id` = el que se
+   mantiene vivo, `body` = el consolidado, `superseded_draft_ids` = el resto del grupo.
+8. **Nunca borrar los drafts superseded automáticamente** — `gog gmail drafts delete` es
+   irreversible y no pasa por Trash. Listarlos en el reporte para confirmación explícita del owner.
+9. Reportar cada grupo procesado: hilo/destinatario, cuántos drafts tenía, fecha del más viejo,
+   acción tomada (consolidado / revisión manual por respuesta intermedia / bajo el umbral, sin
+   acción).
+
 ## 3. Inbox cleanup
 
 Apply `policy.md` rules with `gog gmail labels modify`. When in doubt, **prefer leaving in inbox**.
@@ -247,6 +298,11 @@ This report is **not printed standalone**: write it to a temporary Markdown file
 ### Sent follow-up (Section 2.5)
 - Follow-up drafts created (recipient, subject, reason)
 - Sent threads evaluated and skipped (one line each)
+
+### Drafts consolidados (Section 2.6)
+- Hilos consolidados (destinatario, cuántos drafts tenía, draft vivo actualizado)
+- Superseded pendientes de confirmación para borrar (draft-id uno por uno)
+- Hilos marcados para revisión manual (respuesta intermedia detectada)
 
 ### Inbox cleanup
 - How many labeled Queue/Delete (with examples)
@@ -356,6 +412,17 @@ if [ -z "$(git status --porcelain)" ]; then
   echo "No versioned changes — no PR opened."
   cd "$REPO" && git worktree remove "$WT" --force && git branch -D "$BRANCH" 2>/dev/null || true
 else
+  # scripts/ci/update_contract_freshness.py no existe (verificado 2026-08-29, sec-dream) — el
+  # único script vivo es scripts/ci/contract_health.py y su --sync-contract no toca
+  # freshness.last_success_at de extractors. Patch manual, mismo patrón que drive-crawler:
+  NOW=$(TZ=America/Lima date +"%Y-%m-%dT%H:%M:%S-05:00")
+  python3 - "$NOW" <<'PYEOF'
+import sys, re
+p = "extractors/mail/contract.yaml"
+s = open(p).read()
+s = re.sub(r'last_success_at: ".*"', f'last_success_at: "{sys.argv[1]}"', s, count=1)
+open(p, "w").write(s)
+PYEOF
   git add -A
   git commit -m "chore(correo): corrida automática $(date +%Y-%m-%d)"
   git push -u origin "$BRANCH"

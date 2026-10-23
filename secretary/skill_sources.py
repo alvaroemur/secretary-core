@@ -27,13 +27,8 @@ def close_contract(path: Path) -> int:
 
 
 def skill_source(source: Path, name: str) -> Path:
-    public = source/'skills.example'/name
-    private = source/'skills'/name
-    origin = private if private.is_dir() else public
-    if name in CLOSE_SKILLS and private.is_dir():
-        if close_contract(private/'SKILL.md') < close_contract(public/'SKILL.md'):
-            raise ValueError(f'Fuente privada de {name} obsoleta; reconcilia skills/ con '
-                             'skills.example/ revisado antes de desplegar')
+    """Single versioned source: `skills/<name>` in core, with a minimum close contract."""
+    origin = source/'skills'/name
     if name in CLOSE_SKILLS and origin.is_dir():
         if close_contract(origin/'SKILL.md') < MIN_CLOSE_CONTRACT:
             raise ValueError(f'Contrato de cierre obsoleto en {origin}; requiere versión '
@@ -41,19 +36,25 @@ def skill_source(source: Path, name: str) -> Path:
     return origin
 
 
+def skill_origins(source: Path, instance_skills: Path | None = None) -> dict[str, Path]:
+    """Every skill to install: core `skills/` plus the instance's own skills.
+
+    A name present in both is an error, not an override: an override would bring
+    back two diverging copies of the same skill.
+    """
+    def scan(root: Path | None) -> dict[str, Path]:
+        if root is None or not root.is_dir():
+            return {}
+        return {p.name: p for p in sorted(root.iterdir()) if (p/'SKILL.md').is_file()}
+    core = {name: skill_source(source, name) for name in scan(source/'skills')}
+    instance = scan(instance_skills)
+    clash = sorted(set(core) & set(instance))
+    if clash:
+        raise ValueError(f'Skill duplicado entre core e instancia: {", ".join(clash)}')
+    return {**core, **instance}
+
+
 def check_close_destination(src: Path, dst: Path) -> None:
     if src.name == 'SKILL.md' and src.parent.name in CLOSE_SKILLS:
         if close_contract(src) < close_contract(dst):
             raise ValueError(f'No se permite degradar el contrato de cierre: {dst}')
-
-
-def check_export_sources(private: Path, public: Path) -> None:
-    """Refuse an export that would erase or lower a reviewed close contract."""
-    for name in sorted(CLOSE_SKILLS):
-        source = private/name/'SKILL.md'
-        if not source.is_file():
-            continue
-        required = max(MIN_CLOSE_CONTRACT, close_contract(public/name/'SKILL.md'))
-        if close_contract(source) < required:
-            raise ValueError(f'Fuente privada de {name} obsoleta; el export perdería el '
-                             f'contrato de cierre {required}')

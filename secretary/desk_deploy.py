@@ -8,21 +8,26 @@ import sys
 import subprocess
 from pathlib import Path
 
-from secretary.skill_sources import CLOSE_SKILLS, check_close_destination, close_contract, skill_source
+from secretary.skill_sources import CLOSE_SKILLS, check_close_destination, close_contract, skill_origins
 
 
 def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = False,
-               scheduled: Path | None = None, bin_dir: Path | None = None) -> list[dict]:
-    names = json.loads((source/'secretary/data/desk_names.json').read_text())
+               scheduled: Path | None = None, bin_dir: Path | None = None,
+               instance_skills: Path | None = None, links: list[Path] = (),
+               prunes: list[Path] = ()) -> list[dict]:
+    """Install one physical copy per skill in `targets`.
+
+    `links` are harness skill dirs that cannot read `targets` (they get one symlink
+    per skill into the first target). `prunes` are harness dirs that already read
+    `targets`; their copies of these skills are removed so each skill appears once.
+    """
     playbooks = source/'playbooks'
-    if not playbooks.is_dir():playbooks = source/'playbooks.example'
+    origins = skill_origins(source, instance_skills)
     copies = []
     overrides = {}
     for target in targets:
-        for name in set(names['skills']) | set(names['skills'].values()) | {'wind-down', 'handover', 'jump'}:
-            origin = skill_source(source, name)
-            if origin.is_dir():
-                copies.extend((p, target/name/p.relative_to(origin)) for p in origin.rglob('*') if p.is_file())
+        for name, origin in origins.items():
+            copies.extend((p, target/name/p.relative_to(origin)) for p in origin.rglob('*') if p.is_file())
     copies.append((source/'secretary/desk.py', runtime/'desk.py'))
     copies.append((source/'secretary/brief_html.py', runtime/'brief_html.py'))
     copies.append((source/'secretary/signatures.py', runtime/'signatures.py'))
@@ -70,6 +75,15 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
     # sources and newer installations. A failed preflight leaves every target intact.
     for src, dst in copies:
         check_close_destination(src, dst)
+    primary = targets[0] if targets else None
+    layout = []  # (kind, path): 'link' → symlink into primary, 'prune' → remove copy
+    for kind, dirs in (('link', links), ('prune', prunes)):
+        for folder in dirs:
+            for name, origin in origins.items():
+                dst = folder/name
+                if not dst.is_symlink():
+                    check_close_destination(origin/'SKILL.md', dst/'SKILL.md')
+                layout.append((kind, dst))
     revision = subprocess.run(['git', '-C', str(source), 'rev-parse', 'HEAD'],
                               capture_output=True, text=True)
     source_commit = revision.stdout.strip() if revision.returncode == 0 else None
@@ -86,6 +100,22 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
                 backup = runtime/'backups'/hashlib.sha256(str(dst).encode()).hexdigest()/hashlib.sha256(dst.read_bytes()).hexdigest()
                 backup.parent.mkdir(parents=True, exist_ok=True);shutil.copy2(dst, backup)
             tmp = dst.with_name(dst.name+'.desk-tmp');tmp.write_bytes(data);tmp.replace(dst)
+    for kind, dst in layout:
+        want = primary/dst.name if kind == 'link' else None
+        if kind == 'link':
+            changed = not (dst.is_symlink() and dst.resolve() == want.resolve())
+        else:
+            changed = dst.exists() or dst.is_symlink()
+        plan.append({kind: str(dst), 'changed': changed, **({'target': str(want)} if want else {})})
+        if apply and changed:
+            if dst.is_symlink():
+                dst.unlink()
+            elif dst.exists():
+                backup = runtime/'backups'/hashlib.sha256(str(dst).encode()).hexdigest()/'tree'
+                shutil.rmtree(backup, ignore_errors=True);shutil.copytree(dst, backup, symlinks=True)
+                shutil.rmtree(dst)
+            if want is not None:
+                dst.parent.mkdir(parents=True, exist_ok=True);dst.symlink_to(want, target_is_directory=True)
     if apply:
         runtime.mkdir(parents=True, exist_ok=True)
         (runtime/'deployment.json').write_text(json.dumps(plan, indent=2)+'\n')
@@ -98,8 +128,11 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
 def main() -> None:
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--source',type=Path,required=True)
     p.add_argument('--target',type=Path,action='append',required=True);p.add_argument('--runtime',type=Path,required=True)
+    p.add_argument('--link',type=Path,action='append',default=[]);p.add_argument('--prune',type=Path,action='append',default=[])
+    p.add_argument('--instance-skills',type=Path)
     p.add_argument('--scheduled',type=Path);p.add_argument('--bin-dir',type=Path);p.add_argument('--apply',action='store_true')
-    a=p.parse_args();print(json.dumps(deployment(a.source,a.target,a.runtime,a.apply,a.scheduled,a.bin_dir),indent=2))
+    a=p.parse_args();print(json.dumps(deployment(a.source,a.target,a.runtime,a.apply,a.scheduled,a.bin_dir,
+                                                 a.instance_skills,a.link,a.prune),indent=2))
 
 
 if __name__=='__main__':main()

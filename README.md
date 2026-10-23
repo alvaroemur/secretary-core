@@ -16,7 +16,7 @@ the architecture, the core/instance split, and how routines work.
 Then walk me through:
 1. Creating my instance repo (private, holds my data)
 2. Picking which channels to activate (email, WhatsApp, meetings, Drive)
-3. Adapting the routine templates in playbooks.example/ for my setup
+3. Filling my instance `.secretary.yml` with the values the playbooks read (`secretary config get`)
 4. Setting up the wiki and running the first build using the secretary CLI
 5. Scheduling the routines to run daily using LaunchAgents or your scheduler
 
@@ -64,9 +64,8 @@ secretary-core/            ← this repo (engine, public)
 ├── plugins/
 │   └── gwork/             # Google Workspace sync and style tool (git submodule)
 ├── secd/                  # Local daemon server (bridge to Axon browser extension)
-├── skills/                # Agent Skills (sec-*, jump, topology) — discovered via plugin.json
-├── playbooks.example/     # Anonymized templates for scheduled routine prompts
-└── skills.example/        # Anonymized templates for agentic assistant skills
+├── skills/                # Agent Skills — single source, no personal data (values via `secretary config get`)
+└── playbooks/             # Scheduled routine procedures — same rule
 ```
 
 Open `architecture/index.html` via a local server to browse the system diagrams interactively.
@@ -125,7 +124,7 @@ The engine provides a python-based CLI tool and a local daemon:
 
 ## Routines
 
-Each folder in `playbooks.example/` contains structured prompts/instructions for scheduled tasks. They are designed for [Claude Code scheduled tasks](https://docs.anthropic.com/en/docs/claude-code) or cron schedules:
+Each folder in `playbooks/` contains structured prompts/instructions for scheduled tasks. They are designed for [Claude Code scheduled tasks](https://docs.anthropic.com/en/docs/claude-code) or cron schedules:
 
 | Routine | Schedule | What it does |
 |---------|----------|-------------|
@@ -173,7 +172,7 @@ If you prefer to set things up yourself instead of using the AI prompt above:
    - `mail/policy.example.md` → `your-instance/mail/policy.md`
    - `mail/settings.example.md` → `your-instance/mail/settings.md`
    - `whatsapp/policy.example.md` → `your-instance/whatsapp/policy.md`
-4. **Copy routine templates** from `playbooks.example/` into your local `playbooks/` folder and adapt them (replace placeholders with your paths, tools, and preferences).
+4. **Fill your instance values** in `.secretary.yml` (accounts, `drive.*`, `wiki.deploy_repo`); playbooks read them at runtime with `secretary config get <key>`. Instance-only playbooks go in your instance's `canon/playbooks/`.
 5. **Create your first wiki article** about yourself in `wiki/articulos/your-name.md`.
 6. **Run the wiki build** via the CLI: `SECRETARY_INSTANCE="$INSTANCE" secretary wiki build`
 7. **Schedule the routines** using the setup wizard: `secretary routines setup`

@@ -60,7 +60,7 @@ secretary fresh drive --format json
 Read unmerged proposals (if `auto_pr` non-empty):
 
 ```bash
-gh pr list --repo yourusername/cowork-secretary --state open --json number,headRefName,title \
+gh pr list --repo "$(secretary config get brief.repo)" --state open --json number,headRefName,title \
   | jq '[.[] | select(.headRefName | startswith("drive/auto-"))]'
 git -C "$SECRETARY_INSTANCE" show origin/<branch>:extractors/drive/organization.md | tail -80
 ```

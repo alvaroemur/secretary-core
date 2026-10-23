@@ -46,14 +46,64 @@ gh api "repos/$OWNER/$NAME/issues/$N/comments" --jq '.[] | {author: .user.login,
 ```
 
 Clasifica el PR:
-- **Sin comentarios sin resolver** (no hay `reviewThreads` con `isResolved:false`, ni comentarios del hilo general que pidan un cambio aún no aplicado) → **mergear con SQUASH**: `gh pr merge "$N" --squash --delete-branch`. **El repo NO permite merge commits** (`--merge` falla con "Merge commits are not allowed on this repository" — aprendizaje 2026-06-12); usar siempre `--squash`. Suma a `$MERGED`.
+- **Sin comentarios sin resolver** (no hay `reviewThreads` con `isResolved:false`, ni comentarios del hilo general que pidan un cambio aún no aplicado) → **mergear con merge commit**: `gh pr merge "$N" --merge --delete-branch`. **El repo solo permite merge commit** (squash y rebase desactivados desde 2026-10-23, política `canon/rules/git/`); usar siempre `--merge`. Suma a `$MERGED`.
 - **Con comentarios sin resolver** → NO mergear todavía. Para cada comentario:
   - Si el pedido es **claro y acotado** (renombrar, corregir un dato, ajustar un campo): hacer checkout de la rama del PR en un worktree temporal, **aplicar el cambio**, commit (`fix(<scope>): atiende comentario PR #$N — <qué>`) y push. Cuando TODOS los comentarios del PR queden atendidos: resolver el/los review thread(s) (GraphQL `resolveReviewThread`) o responder al comentario indicando qué se hizo, y entonces mergear. Suma a `$MERGED` con nota "(comentarios aplicados)".
   - Si el pedido es **ambiguo, amplio, requiere criterio o toca muchos archivos**: NO adivinar, NO mergear. Dejar el PR abierto y sumarlo a `$NEEDS_REVIEW` con una línea de qué pide el comentario.
-- **Conflicto/checks rojos al intentar mergear** → en general queda abierto, suma a `$NO_MERGE` (no es fatal). **PERO** los PRs de `reuniones/auto-*` y `drive/auto-*` chocan de forma rutinaria contra el PR de wiki anterior (#wiki que flipeó `pendiente_wiki: true→false` mientras el extractor apiló items nuevos en el mismo `*/memory/*.md`). Ese conflicto es **trivial de resolver y vale la pena** porque la evidencia de reuniones alimenta la wiki esta misma corrida: checkout de la rama en worktree temporal, `git merge origin/main`, y en cada bloque conflictivo **conservar el flip-to-false de `origin/main`** (el item ya integrado) **+ todos los items nuevos del lado HEAD** (los enriquecimientos/acciones del extractor). Commit, push, `gh pr merge --squash`. Aprendizaje 2026-06-12: así se rescataron #243 (reuniones) y #244 (drive) que habrían quedado sin integrar.
+- **Conflicto/checks rojos al intentar mergear** → en general queda abierto, suma a `$NO_MERGE` (no es fatal). **PERO** los PRs de `reuniones/auto-*` y `drive/auto-*` chocan de forma rutinaria contra el PR de wiki anterior (#wiki que flipeó `pendiente_wiki: true→false` mientras el extractor apiló items nuevos en el mismo `*/memory/*.md`). Ese conflicto es **trivial de resolver y vale la pena** porque la evidencia de reuniones alimenta la wiki esta misma corrida: checkout de la rama en worktree temporal, `git merge origin/main`, y en cada bloque conflictivo **conservar el flip-to-false de `origin/main`** (el item ya integrado) **+ todos los items nuevos del lado HEAD** (los enriquecimientos/acciones del extractor). Commit, push, `gh pr merge --merge`. Aprendizaje 2026-06-12: así se rescataron #243 (reuniones) y #244 (drive) que habrean quedado sin integrar.
 
-**Aprendizaje 2026-07-15 — overlapping `reuniones/auto-*`:** si mergeás varios PRs de reuniones el mismo día, el árbol conflictivo puede **truncar bloques `acc-*` a mitad de línea** y empalmar campos Alma↔ERP (p.ej. `acc-20260715-001` con título Alma pero `contexto:` de erp-clab). Tras resolver markers, **re-validá** los `## acc-YYYYMMDD-*` nuevos contra el **primer commit del PR** (`gh pr view N --json commits` → `git show <oid>:extractors/meetings/memory/acciones.md`) y reemplazá bloques corruptos antes de integrar a la wiki. No confíes sólo en el resultado del merge-file heurístico.
+**Aprendizaje 2026-07-15 — overlapping `reuniones/auto-*`:** si mergeas varios PRs de reuniones el mismo día, el árbol conflictivo puede **truncar bloques `acc-*` a mitad de línea** y empalmar campos Alma↔ERP (p.ej. `acc-20260715-001` con título Alma pero `contexto:` de erp-clab). Tras resolver markers, **re-validá** los `## acc-YYYYMMDD-*` nuevos contra el **primer commit del PR** (`gh pr view N --json commits` → `git show <oid>:extractors/meetings/memory/acciones.md`) y reemplazá bloques corruptos antes de integrar a la wiki. No confíes sólo en el resultado del merge-file heurístico.
 
+**Aprendizaje 2026-07-19 — CI rojo por billing ≠ contenido:** cuando `Validar` falla en ~2–4s con annotation _"The job was not started because recent account payments have failed…"_ y el PR está `mergeable=MERGEABLE` / `mergeStateStatus=UNSTABLE`, **sí mergear** (el gate de checks es cosmético; validá local con `scripts/ci/validate_*.py` si hay duda). No sumar a `$NO_MERGE` sólo por ese rojo.
+
+**Aprendizaje 2026-07-19 — fallback API si `gh pr merge` choca con worktree:** si tras resolver conflictos y pushear, `gh pr merge --merge` falla con `fatal: 'main' is already used by worktree at ~/.secretary` (o mergeability queda `UNKNOWN`), mergea vía API: `gh api -X PUT repos/$OWNER/$NAME/pulls/$N/merge -f merge_method=merge -f commit_title='… (#N)'`. Luego `git fetch` + `pull --ff-only` en el checkout principal.
+
+**Aprendizaje 2026-09-13 — `gh pr merge` con `non-200 OK status code: 499` (sin relación con worktree):** las 4 mergeadas de esta corrida fallaron con `499` (client-closed/timeout del CLI, no un error de contenido — `gh pr view` confirmaba el PR seguía `OPEN`). Mismo fallback que el aprendizaje anterior sirve aunque la causa sea otra: `gh api -X PUT repos/$OWNER/$NAME/pulls/$N/merge -f merge_method=merge -f commit_title='…'` funcionó a la primera en los 4 casos. Ante cualquier `gh pr merge` que devuelva un código no-200 sin mensaje de contenido claro, saltar directo a la API en vez de reintentar el CLI — más confiable y sin costo extra.
+
+**Aprendizaje 2026-09-18 — conflictos reuniones/auto-* en ledgers + lag de mergeabilidad:** tras mergear otros candidatos, el PR de reuniones chocó en `acciones.md`/`entidades.md`/`reuniones.md` con un solo bloque conflictivo por archivo. Receta que funcionó: worktree temporal desde la rama del PR, `git merge origin/main`, y por bloque tomar el lado HEAD (items nuevos) reemplazando **solo su primera línea** (el `- pendiente_wiki:` del item previo) por la del lado `origin/main` (el flip con comentario `# integrado`); commit, push. Tras el push, GitHub tarda unos segundos en recalcular: el merge por API devuelve 405 "merge conflicts" si se intenta de inmediato; `sleep 8` y reintentar (`mergeable=MERGEABLE`, aunque el estado sea UNSTABLE por el CI de billing). En zsh, `echo "=== x"` dentro de comandos del Bash tool falla (`= not found`); usa `---`.
+
+**Aprendizaje 2026-07-23 — flip `pendiente_wiki` sin comer newlines:** al reemplazar `pendiente_wiki: true` con regex, **no** uses `true(\s*(#.*)?)?` si el `\s*` puede tragar el `\n\n` antes del siguiente `##` — al reescribir la línea se pegan bloques (`…(wiki-update)## Siguiente`). Flip línea a línea (solo la línea que contiene `pendiente_wiki:`) o usa un replace que preserve los newlines posteriores. Si ya se pegaron, restaurá el ledger desde `origin/main` y re-flipá; un `re.sub(r'([^\n])(## )', …)` sobre ledgers históricos puede **inventar** headers al partir texto que ya tenía `##` mid-line.
+
+**Aprendizaje 2026-08-10 — `pendiente_wiki: false` sin artículo:** una sesión interactiva (`/sec-refresh`) puede dejar items nuevos en `*/memory/` ya en `false` (o sin comentario `# integrado`) **sin** haber creado el artículo wiki. El mapa `$PROV` de PRs auto de W0 no los ve. Tras listar pendientes `true`, barre también items recientes (`detectado:` = hoy/ayer) en `false` cuyo slug/título **no** aparece en `knowledge/wiki/articulos/` ni en líneas `acc-*` de artículos — intégralos como backfill (procedencia: pre-existente en main) y anota el ledger. Caso: Foro Bioeconomía 10-ago (Ruth, Red, tema Foro, acc-001…004).
+
+**Aprendizaje 2026-07-19 — provenance en zsh:** el loop `for N in $MERGED` **no parte palabras** en zsh (sin `SH_WORD_SPLIT`). Usá lista literal (`for N in 655 657 …`), array, o `for N in ${=MERGED}`. Si el conteo de `$PROV` da 0 con PRs de reuniones/correo que sí aportaron `##` en memory, sospechá este bug antes que ausencia de datos.
+
+**Aprendizaje 2026-08-13 — colisión recurrente de `acc-YYYYMMDD-NNN`:** el 12-ago y otra vez el 13-ago, `reuniones-update` reutilizó el mismo prefijo diario para reuniones distintas (Foro Acción vs Soltrak → dos `acc-20260813-001`). Tras mergear overlapping `reuniones/auto-*`, **antes de integrar**: detectá headers `## acc-…` duplicados en `acciones.md`; renumerá el segundo hilo al siguiente libre del día (p.ej. Soltrak SAP → `acc-20260813-005`) y actualiza evidencias/updates que citen el ID viejo. Dejá duda en `dudas-pendientes.md` apuntando al bug de origen (contador no único por corrida multi-meeting).
+
+**Aprendizaje 2026-08-13 — dos `wiki/auto-*` el mismo día:** si W0 ve más de un PR `wiki/auto-YYYYMMDD-HHMM` abierto, mergea **sólo el más reciente** (mayor timestamp) tras resolver conflictos, y **cierra** los más viejos con comentario `> 🤖 **wiki-update**` ("superado por #N"). Caso: #916 cerrado, #917 mergeado.
+
+**Aprendizaje 2026-08-16 — `pendiente_wiki: false # enriquecer` del crawler de drive:** el drive-crawler a veces marca un item `false` con comentario `# enriquecer <artículo>` (no `# integrado … (wiki-update)`). Eso **no** significa «ya integrado»: significa «no crear artículo nuevo, enriquecer el existente». Si el item viene en `$PROV` de esta corrida y el artículo aún no refleja el dato, **enriquecé igual** y deja el `false` (no lo vuelvas a `true`). Distinguí del flip de wiki-update por el texto del comentario. Caso: Soltrak relevamiento/cronograma en #956/#962.
+
+**Aprendizaje 2026-08-16 — conflictos de `correo/auto-*`:** mismo patrón que reuniones/drive — conservar `pendiente_wiki: false` de `origin/main` + items nuevos del HEAD. Caso: #961 (`personas.md`, Luis flip + Jean Franco/Jhasminy).
+
+**Aprendizaje 2026-09-08 — `reuniones-update` emite acciones nuevas ya en `pendiente_wiki: false` sin integrar:** 7 acciones nuevas de un solo PR (`acc-20260908-001..007`, Soltrak) llegaron con `pendiente_wiki: false` **sin comentario** desde su creación — no `true` como especifica el contrato (§1.2), y sin el comentario `# integrado … (wiki-update)` que normalmente prueba que ya pasaron por esta rutina. Verificalo así: si un acc-* de un PR recién mergeado no aparece citado en ningún artículo de la wiki (`grep -rn "acc-XXXXXXXX-NNN" knowledge/wiki/articulos/`), está sin integrar aunque diga `false` — mismo criterio que el backfill de items `false` sin artículo del aprendizaje 2026-08-10. Integralo igual y déjale el comentario de integración; no asumas que `false` sin comentario siempre significa "ya procesado". El bug de origen está en `reuniones-update`, no se corrige aquí.
+
+**Aprendizaje 2026-08-16 — varios `correo/auto-*` el mismo día (solo memo/state):** si tras mergear el más completo (p.ej. memo ~18:15) otro PR del mismo día solo trae memo/`state.md` más viejo o solapado, **cerralo** con `> 🤖 **wiki-update**` ("superado por #N") en vez de forzar un merge vacío. Caso: #976 cerrado, #975 mergeado.
+
+**Aprendizaje 2026-08-17 — `correo/auto-*` complemento el mismo día:** si el PR más reciente se titula complemento (o su body dice que complementa al ~18:00) y trae `state.md`/memo **más nuevo** (p.ej. hilos que Álvaro re-enganchó), **no lo cierres** como "solo memo viejo". Mergea primero el más completo y después el complemento; si chocan `state.md`+memo, conserva el timestamp más nuevo y suma los hechos únicos del 18:00 (borradores urgentes, RSVP). Caso: #993 mergeado tras resolver contra #992. Reaplicado 2026-08-18: #1003 (18:00, drafts+inbox) + #1004 (18:10, Doris FU #3 + reply Arturo).
+
+**Aprendizaje 2026-08-18 — `reuniones/auto-*` más viejo con resúmenes que el posterior no trajo:** un `reuniones/auto-*` posterior (#1005 «sin reuniones nuevas», #1006 Foro 18-ago) puede mergearse a `main` **antes** de W0 y dejar abierto uno más temprano del mismo día (#1002 08:11) con reuniones del 17-ago que **no** están en main. No lo cierres como superado: mergealo resolviendo conflictos (conservar acc- del HEAD **y** del later run). Caso: summaries `2026-08-17-soltrak-revision-procesos` / `jeanfranco-alvaro` / `greg-alvaro` faltaban en main hasta #1002.
+
+**Aprendizaje 2026-08-19 — `correo/auto-*` degradada con consolidados:** un PR ~18:09 titulado «solo lectura» / token `invalid_grant` **puede** traer `personas.md` (y memo 18:10) más completo que el 18:00 (solo memo+state). No lo cierres como vacío: mergea el que tiene consolidados y cierra el memo-only anterior («superado por #N»). Caso: #1020 mergeado, #1019 cerrado.
+
+**Aprendizaje 2026-08-18 — wikilink `project_*` en heartbeat:** `subsystem/heartbeat/*.md` puede emitir `[[project_whatsapp_baileys_jubilado]]` (≥2 refs → FAIL). Mismo patrón que los slugs de nota del crawler: registrar `pendiente_wiki: true` en `extractors/drive/memory/entidades.md` (el validator solo lee `*/memory/entidades.md`). No flipear. El arreglo de origen es que heartbeat no emita wikilinks de notas.
+
+**Aprendizaje 2026-08-14 — corrida concurrente tras W0 vacío:** si otra sesión de `wiki-update` (p.ej. Claude Code) arranca **después** de que esta corrida ya mergeó los auto-PRs, su W0 verá "candidatos: ninguno" e integrará el mismo lote de `*/memory/`. Puede abrir un `wiki/auto-*` **antes** de que esta corrida termine. No abandones por timestamp: **compara cobertura** (artículos nuevos, `_index`, cierres de `acc-*`, módulos). Si la tuya es más completa, abre/mantené tu PR y **cierra** la concurrente con `> 🤖 **wiki-update**` ("superado por #N — añade …"). Caso: #950 cerrado, #951 retenido (creó `wri-brasil` / `cinthia-varela` / `gonzalo-indacochea`).
+
+**Aprendizaje 2026-08-21 — deuda de tidy/módulos de la corrida anterior:** si el `indice.md` / body del `wiki/auto-*` previo dice que omitió Paso 3.5 / 3.7 / 4 por presupuesto, **esta** corrida prioriza completarlos aunque el lote de `pendiente_wiki: true` sea chico (flips + índices + panel `modulos/*`). Caso: #1028 omitió tidy/módulos; #1033 los cerró.
+
+**Aprendizaje 2026-08-21 — W0 con merges concurrentes:** mientras resuelves conflictos de un candidato (p.ej. drive), otra sesión puede mergear correo/reuniones/housekeeping. Antes del worktree, **vuelve a listar** auto abiertos: no asumas que `$CANDIDATES` inicial sigue vigente. Caso: #1030/#1031/#1029/#1032 cerraron en paralelo a la resolución de #1026.
+
+
+**Aprendizaje 2026-09-20 — no saltar Paso W.5 ni fiarse de `update_agent_stats.py` sin revisar:** (a) `sec:pending` puede haber sido anotado el mismo día en main; antes del build ejecuta `grep -rl 'sec:pending' articulos` y, si hay bloques, integralos (quitá el comentario y añade la prosa antes de `· fuente:`). (b) `update_agent_stats.py` puede fallar en su `gh pr list` del repo de la instancia (transitorio) y dejar `temas/secretary.md` sin los PRs del repo; mira su salida por «Advertencia» y reejecutalo. (c) `gh pr merge --merge` funcionó a la primera esta corrida; el conflicto del wiki anterior (#1286) era solo flips de ledger: receta del 2026-09-18 aplicada con un script Python (HEAD primera línea + resto del lado main; índice mensual: ambos lados).
+
+**Aprendizaje 2026-09-24 — `[update]` del fold interactivo sin `pendiente_wiki`:** `secretary acc fold` (sesión interactiva, PR `reuniones/reconciliacion-acc-*`) emite bloques `## acc-… [update]` con `origen: interactive:secretary-acc-fold` y **sin** línea `pendiente_wiki`. El barrido por `pendiente_wiki: true` no los ve: 24 cierres del 21-sep quedaron abiertos en la wiki hasta el 24-sep. Cada corrida debe buscar además bloques `[update]` sin el campo (`'interactive:secretary-acc-fold' in b and 'pendiente_wiki' not in b`), aplicar el cierre (mover a *Acciones cerradas* si la sección existe, si no tachar en su lugar) y añadir `- pendiente_wiki: false  # integrado …`.
+
+**Aprendizaje 2026-09-24 — `reuniones/auto-*` nocturno re-emite items del PR del mediodía aún abierto:** si el PR de 12:41 (#1311) no se mergeó antes de la corrida nocturna (#1325), el extractor vuelve a apilar en `reuniones.md` las mismas reuniones (bloques idénticos) y el merge queda con duplicados sin conflicto visible. Tras mergear ambos, deduplicá bloques `## ` idénticos con `detectado:` de hoy (split por `^## `, conservar el primero) antes de integrar; verificá con `grep -c '^## <fecha>'`. En el conflicto de #1325, un bloque HEAD que repite verbatim un bloque ya presente arriba se resuelve tomando el lado `origin/main` (vacío).
+
+**Aprendizaje 2026-09-25 — no borres ramas a mano tras el merge:** el repo borra la rama head al mergear por API (el `DELETE git/refs` posterior devuelve 404/422). Un loop que borraba refs de **todos** los candidatos, incluso de uno cuyo merge falló por conflicto (#1329), eliminó su rama y GitHub **cerró** el PR. Recuperación: push de la rama resuelta + `gh pr reopen N` + merge. Regla: no ejecutes `DELETE git/refs` en W0; si hace falta, solo tras confirmar `merged: true` de ese PR.
+
+**Aprendizaje 2026-09-25 — `sec:pending` en commit local sin pushear:** si el checkout principal está *ahead* de `origin/main` con un commit `sec-sys-annotate` (`docs(wiki): anotar … pendiente de integrar`), el worktree (desde `origin/main`) no ve la anotación. Revisa `git log origin/main..main` en `$REPO` e integra ese contenido como prosa en el worktree; repórtalo para que el commit local se descarte al sincronizar. Caso: `ff67f6c8` (kuehne-nagel).
 
 **Regla de oro:** ante la mínima duda sobre qué pide un comentario, **no mergear** — dejarlo en `$NEEDS_REVIEW` para Álvaro. Es preferible que un PR espere a que se aplique mal un cambio.
 
@@ -106,20 +156,23 @@ Para cada `$N` en `$RECENT_CLOSED`:
 
 **Por qué.** En el Paso 1 integras el **estado consolidado** de `*/memory/` (todo item presente = pendiente de integrar), no sólo lo que aportaron los PRs auto de esta corrida. Eso es deseado: si Álvaro dejó trabajo real en `main` por fuera del pipeline (un commit/wave manual, un backfill, una consolidación a mano), igual debe integrarse. **Pero el reporte no debe atribuir ese trabajo a los PRs auto de la corrida.** Hay que distinguir "item nuevo de un extractor de hoy" de "item que ya estaba en `main` por otra vía". (Caso real: las 10 acciones de Nativas `acc-20260520-*` venían del commit manual `697071f` "wave may-2026"; el PR de reuniones de esa corrida integró **0 acciones** y aun así el reporte las reclamó como propias.)
 
-Tras el merge (Paso 2), construí el mapa. `gh pr diff` funciona aunque el PR ya esté mergeado y la rama borrada:
+Tras el merge (Paso 2), construye el mapa. `gh pr diff` funciona aunque el PR ya esté mergeado y la rama borrada:
 
 ```bash
 PROV=/tmp/wiki-provenance.tsv
 : > "$PROV"
 for N in $MERGED; do
-  gh pr diff "$N" 2>/dev/null | awk -v n="$N" '
+  gh pr diff "$N" 2>/dev/null > /tmp/d-$N.diff   # volcá el diff a archivo primero (ver aprendizaje 2026-07-17)
+  awk -v n="$N" '
     /^\+\+\+ b\// { f=$2; sub("^b/","",f) }
-    /^\+## / && f ~ /memory\// { h=$0; sub(/^\+/,"",h); print f "\t" h "\tPR#" n }' >> "$PROV"
+    /^\+## / && f ~ /memory\// { h=$0; sub(/^\+/,"",h); print f "\t" h "\tPR#" n }' /tmp/d-$N.diff >> "$PROV"
 done
 echo "Procedencia capturada: $(wc -l < "$PROV") items aportados por PRs auto."
 ```
 
-Cada línea es `ruta-memory <TAB> "## header" <TAB> PR#N`. Regla para el Paso 1: cualquier item de memory que integres y **no** aparezca en `$PROV` es **pre-existente en `main`** (no vino de un PR auto de hoy). Para esos, sacá el commit de origen al reportarlos:
+> **Aprendizaje 2026-07-17 — no encadenes `gh pr diff | awk` dentro del `for`.** El pipe directo `gh pr diff "$N" | awk ... >> "$PROV"` en el loop produjo **0 items** de forma silenciosa (el diff de `gh` interactúa mal con el pipe+redirect en el for de zsh). Volcar cada diff a un archivo (`> /tmp/d-$N.diff`) y correr `awk` sobre el archivo captura los headers correctamente. Verificá siempre el conteo final: si da 0 y sabés que hubo PRs de reuniones/correo con items, es este bug, no ausencia de datos.
+
+Cada línea es `ruta-memory <TAB> "## header" <TAB> PR#N`. Regla para el Paso 1: cualquier item de memory que integres y **no** aparezca en `$PROV` es **pre-existente en `main`** (no vino de un PR auto de hoy). Para esos, extrae el commit de origen al reportarlos:
 
 ```bash
 # F = ruta del archivo de memory; H = header exacto ("## acc-…" o "## Nombre")
@@ -252,7 +305,7 @@ Estructura esperada (a medida que la app evolucione, los archivos pueden ampliar
 #### Acciones — manejo especial
 
 Cada item con encabezado `## acc-YYYYMMDD-NNN` (sin sufijo) es una acción nueva. Integrarla a la wiki así:
-- Si `responsable` matchea con [[alvaro-mur]] (Álvaro Mur o variantes) → añadirla a la sección *Acciones abiertas* en `articulos/alvaro-mur.md`.
+- Si `responsable` matchea con `alvaro-mur` (Álvaro Mur o variantes) → añadirla a la sección *Acciones abiertas* en `articulos/alvaro-mur.md`.
 - Si responsable es otra persona con artículo en wiki → añadirla a sección *Acciones pendientes* en su artículo de `articulos/personas/`.
 - Cualquiera que sea el responsable, también añadir un cross-link desde el artículo del tema/proyecto referenciado en `contexto`. Sección *Acciones abiertas* del tema.
 - Formato sugerido para una acción en wiki: `- **acc-YYYYMMDD-NNN** — <accion> · responsable: [[wikilink]] · deadline: YYYY-MM-DD · origen: [resumen](path)`
@@ -286,10 +339,17 @@ Si la memoria cita un meeting-id concreto, usar `ref: reuniones:<meeting-id>`.
 Usar los MCP tools `list_calendars` y `list_events` disponibles. Obtener eventos de los últimos 14 días y próximos 30.
 
 > ⚠️ **Barre TODOS los calendarios, no solo el primary.** `list_events` sin `calendarId` se salta los
-> compartidos — incluido el de **Inspiro** (`your.work.email@company.com`, donde viven las reuniones de Norte
+> compartidos — incluido el de **Inspiro** (`secretary config get accounts.inspiro`, donde viven las reuniones de Norte
 > Compartido / Inspiro 3.0). Tras `list_calendars`, itera `list_events` por cada calendario relevante
-> (mínimo `your.personal.email@gmail.com` y `your.work.email@company.com`). El MCP de la cuenta personal ya alcanza el
+> (mínimo `secretary config get accounts.personal` y `secretary config get accounts.inspiro`). El MCP de la cuenta personal ya alcanza el
 > de Inspiro como owner — no hace falta cambiar de cuenta.
+
+> **Aprendizaje 2026-07-20 — runtime cursor-cron sin MCP de calendario.** En corridas headless
+> `cursor` / `cursor-cron` el catálogo MCP puede no exponer `list_calendars` / `list_events`. Si
+> `GetMcpTools` (o equivalente) no encuentra el server, **omití la fuente sin fallar**, anota
+> "Calendario MCP no disponible esta corrida" en el reporte/Paso 7 y en `modulos/calendario.md`
+> Última sincronización. No inventés eventos. La cobertura de agenda del día suele llegar igual
+> vía `reuniones-update` + brief.
 
 - Participantes recurrentes → artículos en `personas/`.
 - Títulos recurrentes → temas o proyectos en `temas/` / `organizaciones/`.
@@ -459,7 +519,7 @@ Para cada target `T` en `FAIL` (todos) y los top 3 de `GRANDFATHERED` por nº de
 2. **¿Es una entidad real pero todavía no hay material suficiente para un artículo?**  
    → registrarla como `pendiente_wiki: true` en el `*/memory/entidades.md` del módulo que más la cita (reuniones / whatsapp / correo). El validator la deja de marcar al detectar el forward-ref. Si estaba en `known_broken`, remover la línea.
 
-3. **¿Es un slug mal formado, typo compartido entre dos resúmenes, o un wikilink que el transcriptor inventó (p.ej. `[[acc-20260511 detracciones]]` con espacio, `[[alvaro-mur\]]` con bracket escapado)?**  
+3. **¿Es un slug mal formado, typo compartido entre dos resúmenes, o un wikilink que el transcriptor inventó (p.ej. `acc-20260511 detracciones` con espacio, `[[alvaro-mur\]]` con bracket escapado)?**  
    → corregir el slug en los resúmenes que lo emiten (el validator imprime la ruta:línea de cada ref). Si era una sola ref es WARN, pero si son varias suele ser el extractor emitiendo mal — corregir y, si hace falta, dejar nota en el módulo origen (whatsapp/reuniones-update) para que ajuste su plantilla.
 
 4. **¿Es una referencia a una acción (`[[acc-…]]`) o a un resumen (`[[extractors/meetings/summaries/…]]`)?**  
@@ -516,12 +576,14 @@ Antes de leer métricas o ramas necesitas saber, por cada artículo de `modulos/
 | `reuniones` | `reuniones-update` (contract.yaml); también `reuniones-scheduler` (poller mecánico, sin PR propio) | `reuniones/auto-` | instancia (`$OWNER/$NAME`) |
 | `drive` | `drive-crawler` (contract.yaml) | `drive/auto-` | instancia (`$OWNER/$NAME`) |
 | `whatsapp` | `whatsapp-monitor` (contract.yaml) — **pausado**, ver nota abajo | `whatsapp/auto-` | instancia (`$OWNER/$NAME`) |
-| `job-search` | `job-search-crawler` (contract.yaml) | `loops/job-search/auto-` | instancia (`$OWNER/$NAME`) |
+| `job-search` | `job-search-crawler` (contract.yaml) | `job-search/auto-` | instancia (`$OWNER/$NAME`) |
 | `calendario` | — (sin rutina propia, corre inline en wiki-update vía MCP) | N/A | N/A |
 | `wiki-update` | `wiki-update` | `wiki/auto-` | instancia (`$OWNER/$NAME`) |
 | `sec-heartbeat` | `sec-heartbeat` | N/A (main-only, nunca abre PR — ver su propio artículo) | — |
 | `housekeeping` | `housekeeping` (contract.yaml si existe) + `tidy-up` (poller mecánico) | `housekeeping/auto-` | instancia (`$OWNER/$NAME`) |
 | `dispatch` | `dispatch-executor` | sin prefijo fijo — cada PR vive en el repo destino del issue `dispatch:execute`, rama la que ese repo use | allowlist de `dispatch.executor.repos` en `$REPO/.secretary.yml` (lista `{repo, path}`) |
+
+**job-search — nota (aprendizaje 2026-07-26):** el prefijo real de rama es `job-search/auto-`, no `loops/job-search/auto-` (verificado contra `gh pr list`: PRs #549…#748 usan `job-search/auto-YYYYMMDD-HHMM`, aunque el módulo vive en disco bajo `loops/job-search/`). El prefijo equivocado hacía que Paso 4.3 no encontrara PRs y `modulos/job-search.md` quedara con el último mergeado desactualizado.
 
 **whatsapp — nota:** el `contract.yaml` documenta la rutina retirada (`whatsapp-monitor`, Baileys, sin `auth/` desde ~2026-05-20); la captura actual es event-driven vía Axon→`secd` y no genera `latest-whatsapp-monitor.meta.json` nuevo. Si no hay meta reciente (`mtime` > 30 días o inexistente), la sección 4.2 debe decir explícitamente "sin corridas programadas — captura event-driven vía Axon" en vez de reportar datos viejos como si fueran actuales.
 
@@ -530,6 +592,8 @@ Si `contract.yaml` no existe para un módulo lector y la tabla tampoco lo cubre,
 ### Paso 4.2 — Historial de ejecución y métricas (última corrida + acumulado mensual)
 
 **Importante:** `subsystem/routines/latest/` y `subsystem/routines/metrics/metrics.jsonl` están en `.gitignore` (bookkeeping local, no versionado) — no existen en `$WT` (que parte de `origin/main`). Léelos siempre de `$REPO` (la instancia principal, `~/.secretary`), nunca del worktree.
+
+**Aprendizaje 2026-07-25 — `latest-*.meta.json` puede estar stale sin que sea un bug de esta corrida.** El 2026-07-25 todos los `latest-*.meta.json` en `$REPO/subsystem/routines/latest/` mostraban `status: error` con fechas de ~2026-07-09, mientras `indice.md` documentaba corridas exitosas de correo/reuniones/drive hasta el 23/24-jul. Esto es un bug de bookkeeping local preexistente (algo dejó de refrescar esos archivos), no algo que esta corrida deba "arreglar" inventando datos. **No escribas la cifra stale como si fuera la "última corrida" real** — sería peor que dejar la sección sin refrescar. Si detectás esta discrepancia (fecha del meta muy anterior al último `indice.md` con corridas exitosas de ese módulo), sáltate el refresco de Paso 4.2 para ese módulo, deja la sección de métricas como estaba, y repórtalo en el Paso 7 como hallazgo para investigar por separado (no es responsabilidad de wiki-update arreglar el bookkeeping de otras rutinas).
 
 **Última corrida** — por cada `routine_id` de la tabla 4.1:
 
@@ -612,6 +676,19 @@ YYYY-MM-DD — PR #N (wiki) mergeado/abierto esta corrida. <resumen 1 línea: it
 
 Antepón la línea nueva a las anteriores (no las borres — es el mismo historial append-only que ya llevaban `correo.md`/`reuniones.md`); si el archivo crece demasiado, es aceptable truncar entradas de más de ~6 meses a un resumen de una línea por mes, nunca borrar sin dejar rastro.
 
+### Paso 4.5 — Ejecución automatizada de métricas de agentes y PRs de desarrollo
+
+Para garantizar que todos los módulos reciban sus métricas y que los artículos de temas y el perfil de Álvaro reflejen los PRs de desarrollo de los repos de trabajo, ejecuta el script de actualización:
+
+```bash
+python3 ~/Dev/secretary-core/wiki/update_agent_stats.py "$WT"
+```
+
+El script se encarga de:
+1. Inyectar `<!-- auto:execution-metrics -->` en los artículos de módulos con el historial de la última corrida y el acumulado mensual de `metrics.jsonl`.
+2. Inyectar `<!-- auto:desarrollo-git -->` en los temas asociados a cada repositorio de trabajo (`doc2struct.md`, `erp-clab.md`, `plan-v.md`, `inspiro-agents.md`, `secretary.md`, `comuna-nacion.md`, `ennui-dev.md`) a partir de los PRs de desarrollo reales (excluyendo auto-PRs de extractores).
+3. Inyectar `<!-- auto:actividad-desarrollo-git -->` en `personas/alvaro-mur.md` con la línea de tiempo unificada de desarrollo Git.
+
 ## Paso 5 — Registrar cambios
 
 Añadir una línea al final de `secretary/knowledge/wiki/memory/indices/$(date +%Y-%m).md` por cada artículo creado o modificado:
@@ -645,7 +722,7 @@ Si el build fue exitoso, publicar el output (refleja el contenido de este worktr
 ~/Dev/secretary-core/wiki/deploy-output.sh "sync-wiki $(date +%Y-%m-%d)"
 ```
 
-El script entra a `wiki/output`, hace `git add -A` + commit + push, e inicializa el remote (`git@github.com:yourusername/wiki.git`) la primera vez. Si no hay cambios en el HTML (todo idéntico), no crea commit y sale 0. Si el push falla (red, auth), reportar el error pero no revertir la corrida — los artículos Markdown ya están correctos en el worktree y entrarán al PR. Mantener el deploy en este único script (no reintroducir el push inline).
+El script entra a `wiki/output`, hace `git add -A` + commit + push, e inicializa el remote (`git@github.com:$(secretary config get wiki.deploy_repo).git`) la primera vez. Si no hay cambios en el HTML (todo idéntico), no crea commit y sale 0. Si el push falla (red, auth), reportar el error pero no revertir la corrida — los artículos Markdown ya están correctos en el worktree y entrarán al PR. Mantener el deploy en este único script (no reintroducir el push inline).
 
 ## Paso 7 — Reporte final (cuerpo del PR)
 
@@ -655,7 +732,7 @@ Este reporte (resumen + "Dudas para Álvaro") se escribe a un archivo temporal e
 - **Items integrados, separados por procedencia** (acciones, personas, orgs, temas), usando los contadores del Paso 1:
   - **De extractores de esta corrida**: cuántos por fuente, citando el `PR#N` que los aportó.
   - **Pre-existentes en `main`** (NO de un PR de esta corrida): cuántos, citando el commit de origen y su mensaje (p.ej. `697071f "wave may-2026"`). Para acciones, lista los IDs `acc-*` de este grupo.
-  - **Nunca** presentes como "integrado de esta corrida" algo que ya estaba en `main` por fuera del pipeline; si no podés determinar la procedencia de un item, repórtalo como "procedencia indeterminada", no como propio.
+  - **Nunca** presentes como "integrado de esta corrida" algo que ya estaba en `main` por fuera del pipeline; si no puedes determinar la procedencia de un item, repórtalo como "procedencia indeterminada", no como propio.
 - Fuentes consultadas y cuáles estaban vacías/no disponibles.
 - Cualquier dato dudoso que quedó como `[por rellenar]` y por qué.
 - Confirmación del deploy (Paso 6.5): si se publicó HTML nuevo o quedó idéntico.
@@ -757,6 +834,6 @@ Si durante una corrida descubres una carpeta o sistema que **parece una fuente n
 - No tocar archivos fuera de `secretary/knowledge/wiki/` excepto para **leer** de las rutas de fuentes listadas arriba.
 - No ejecutar el build si hubo errores al escribir artículos — arregla primero.
 - **Forward-refs de wikilinks van SOLO en `*/memory/entidades.md`** (heading = slug, o campo `slug_existente: categoria/slug`), nunca en `personas.md`/`organizaciones.md`. El validator (`load_pending`) sólo lee `entidades.md`; marcar `pendiente_wiki: true` en un item de `personas.md` **no exime** el wikilink y CI falla igual. Aprendizaje 2026-06-12: `[[personas/jose-zuniga]]` referenciado en ≥2 artículos seguía rojo hasta registrarlo como bloque con `slug_existente: personas/jose-zuniga` en `extractors/meetings/memory/entidades.md`.
-- **Nunca escribas `[[algo]]` literal dentro de comentarios o notas en archivos de `*/memory/`** (ni en notas inline de `pendiente_wiki: false  # …`). El validator parsea CUALQUIER `[[…]]` del repo como wikilink y lo cuenta como roto. Aprendizaje 2026-06-12: una nota que decía "el crawler no debería emitir `[[project_*]]/[[wiki_*]]`" creó 3 wikilinks rotos y volvió roja la CI. Describe los slugs con prefijos en texto plano (`project-…`, `wiki-…`), sin dobles corchetes.
-- **No flipees a `false` un item de `extractors/drive/memory/entidades.md` cuyo slug el crawler emite como wikilink en sus memos** (`project_*`, `wiki_*`): esos `[[…]]` viven en `extractors/drive/memory/*.md` y el `pendiente_wiki: true` es lo único que los exime. Flipearlos rompe CI. Déjalos `true` y reporta que el arreglo va en el crawler. Aprendizaje 2026-06-12.
+- **Nunca escribas `[[algo]]` literal dentro de comentarios o notas en archivos de `*/memory/`** (ni en notas inline de `pendiente_wiki: false  # …`). El validator parsea CUALQUIER `dobles corchetes de un wikilink` del repo como wikilink y lo cuenta como roto. Aprendizaje 2026-06-12: una nota que decía "el crawler no debería emitir `[[project_*]]/[[wiki_*]]`" creó 3 wikilinks rotos y volvió roja la CI. Describe los slugs con prefijos en texto plano (`project-…`, `wiki-…`), sin dobles corchetes.
+- **No flipees a `false` un item de `extractors/drive/memory/entidades.md` cuyo slug el crawler emite como wikilink en sus memos** (`project_*`, `wiki_*`): esos `dobles corchetes de un wikilink` viven en `extractors/drive/memory/*.md` y el `pendiente_wiki: true` es lo único que los exime. Flipearlos rompe CI. Déjalos `true` y reporta que el arreglo va en el crawler. Aprendizaje 2026-06-12.
 - **Si delegas la integración a sub-agentes (útil cuando hay muchos items): nunca dejes el path del worktree sin sustituir en el prompt.** Pasa el `$WT` absoluto ya expandido (no un placeholder tipo `WTPATH_PLACEHOLDER`), y dile a cada sub-agente explícitamente "todos tus paths empiezan con `<$WT absoluto>`; NO escribas en `~/.secretary` ni en ningún path que no empiece con esa raíz". Aprendizaje 2026-06-11: con el placeholder sin sustituir, un sub-agente resolvió la raíz como el repo principal y escribió 5 archivos en `~/.secretary` en vez del worktree; hubo que recuperarlos al worktree y revertir el working tree principal. Partición de archivos sin solape entre agentes (cada artículo lo posee 1 solo agente; `_index.md`, `alvaro-mur.md` y los `*/memory/` los maneja el orquestador) sigue siendo la regla para evitar conflictos de escritura.

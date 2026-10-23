@@ -7,9 +7,9 @@ Los skills dependientes de Secretary usan `desk-*`. `delegate` captura y deriva 
 
 ## Instalación
 
-`python -m secretary.desk_deploy --source <core> --target <skills> --runtime <runtime> --scheduled <playbooks-instalados> --bin-dir <bin>` muestra el plan. Repite `--target` para cada harness. `--apply` instala con backups por hash y crea `secretary-desk`. El setup ejecuta este overlay después de sincronizar las fuentes existentes.
+`python -m secretary.desk_deploy --source <core> --target ~/.agents/skills --link ~/.claude/skills --prune ~/.codex/skills --prune ~/.cursor/skills --instance-skills <instancia>/canon/skills --runtime <runtime> --scheduled <playbooks-instalados> --bin-dir <bin>` muestra el plan. `--target` recibe la única copia física; `--link` crea un symlink por skill para el harness que no lee `~/.agents/skills` (Claude Code); `--prune` quita las copias del core en harnesses que ya leen `~/.agents/skills`. `--apply` instala con backups por hash y crea `secretary-desk`.
 
-Fuentes privadas en `skills/` y `playbooks/`, exports públicos sanitizados en `.example/`. Los skills de cierre usan ese mismo flujo, sin una fuente portable adicional. Los playbooks privados de ventas reciben solo `routine-overlays/`: no se exportan ni se reemplazan sus procedimientos de negocio o scripts.
+Una sola fuente versionada en `skills/` y `playbooks/`, sin datos personales; los valores de instancia se leen con `secretary config get <clave>`. Los skills y playbooks propios de la instancia viven en su `canon/skills/` y `canon/playbooks/`; un nombre repetido con core es error. Los playbooks privados de ventas reciben solo `routine-overlays/`: no se reemplazan sus procedimientos de negocio o scripts.
 
 ## Interfaces
 
@@ -38,7 +38,7 @@ La regla permite preparar código, pruebas, análisis y documentos reversibles e
 
 ## Comprobaciones
 
-`python -m unittest discover -s tests -p test_desk.py -v` verifica alcance, consentimiento, cambios del body, preparación segura, destinatario único, idempotencia, fallos inciertos y despliegue reproducible. Valida también frontmatter de skills y redacción de exports antes de publicar.
+`python -m unittest discover -s tests -p test_desk.py -v` verifica alcance, consentimiento, cambios del body, preparación segura, destinatario único, idempotencia, fallos inciertos y despliegue reproducible. Valida también frontmatter de skills y ausencia de datos personales (leak-guard) antes de publicar.
 
 ---
 🤖 _Claude Code · sesion → skills/desk-reorganizacion · 2026-10-16_
@@ -52,12 +52,8 @@ Ejemplo: `secretary status "✅" "proyecto" "informe subido para revisión" --st
 ## Distribución del cierre
 
 Los cuatro procedimientos de cierre declaran `metadata.close-contract`. El distribuidor
-compara la fuente privada con el export revisado. Una fuente privada con un contrato
-anterior bloquea toda la operación antes de escribir; no se sustituye silenciosamente
-por el export. Reconcilia primero el procedimiento privado y regenera su export con
-el mecanismo de redacción del repo. No copies datos privados al repositorio público.
-`core export-examples` aplica la misma comprobación antes de borrar `skills.example/`:
-un export no puede perder ni bajar el contrato revisado.
+exige el contrato mínimo en la fuente versionada antes de escribir. No hay fuente
+privada ni export: lo que se instala es lo que está en git.
 
 Una instalación con un contrato superior también bloquea el lote completo. El plan
 incluye fuente efectiva, commit de origen (o `null` fuera de Git), hash y contrato.

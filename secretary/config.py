@@ -65,6 +65,22 @@ def resolve_path_key(key: str, config: dict[str, Any] | None = None) -> Path:
     return (instance_root() / flat[key]).resolve()
 
 
+def get_value(key: str, config: dict[str, Any] | None = None) -> Any:
+    """Return the instance value at a dotted key (e.g. `drive.mount`).
+
+    Skills and playbooks read instance-specific values (accounts, Drive ids,
+    repo slugs) at runtime through this lookup, so their source stays free of
+    personal data and the installed copy equals the versioned one.
+    """
+    cfg = config if config is not None else load_config()
+    node: Any = cfg
+    for part in key.split("."):
+        if not isinstance(node, dict) or part not in node:
+            raise KeyError(f"Clave desconocida en `.secretary.yml`: {key!r}")
+        node = node[part]
+    return node
+
+
 def all_resolved_paths(config: dict[str, Any] | None = None) -> dict[str, Path]:
     cfg = config if config is not None else load_config()
     paths = cfg.get("paths", {})

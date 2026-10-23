@@ -4,7 +4,8 @@ description: >-
   Overnight / on-demand completion loop — one substantial dream job per run: cross-signal synthesis
   from meetings, mail, and repo WIP into a staged deliverable (PR and/or Gmail draft). Consolidates
   memory as input, reports in subsystem/dream/. Triggers: "/desk-dream", "/desk-dream soul",
-  "/desk-dream --job lane", scheduled headless 05:00 America/Lima (budget 120 min).
+  "/desk-dream --job lane", scheduled headless 05:00 (large job, budget 120 min), 13:00 and 21:00
+  (medium job) in the instance timezone.
 ---
 
 # desk-dream — overnight completion
@@ -86,7 +87,7 @@ Collect debug (gitignored): `subsystem/dream/collect/collect-*.json`
 
 | Mode | Invocation |
 |------|------------|
-| Scheduled | 05:00 instance timezone — finishes before portal aggregate (07:00), pre-brief heartbeat (07:10), and briefing |
+| Scheduled | 05:00 instance timezone (large job) — finishes before portal aggregate (07:00), pre-brief heartbeat (07:10), and briefing. 13:00 and 21:00 (medium job), paused by the rate-limit brake in the routine playbook |
 | On-demand | `/desk-dream` |
 | Soul review | `/desk-dream soul` |
 | Force lane | `/desk-dream --job <lane>` |
@@ -162,6 +163,11 @@ lane's job (issue cowork-secretary#509). Notably: cite evidence literally in the
 
 **Discover (LLM + rules) — orden fijo antes de skip (spec 024):**
 
+When run as the scheduled routine, the routine playbook (`sec-dream`) defines the source order
+(`dispatch:execute` work orders first, then this queue, brief decisions, issues with a deadline
+and unreviewed PRs) and the work-order execution contract absorbed from work-runner. The steps
+below apply inside that order.
+
 0. **Owner queue first.** Read `$SECRETARY_INSTANCE/subsystem/dream/queue.md` § Pendientes
    before touching `job_candidates`. This is work Álvaro explicitly approved during a `desk-overview`
    on-ramp (skill § 6.5) — it outranks scoring entirely, no ≥2-source requirement applies. If
@@ -202,7 +208,7 @@ gh issue list --repo "$BRIEF_REPO" --state open --limit 50 \
 
 Reglas:
 
-1. **Clasifica y registra.** Lee `../desk-context/references/control.md`. Puede preparar un PR aislado bajo la regla vigente `prepare-pr-v1`, o registrar una propuesta con ese metadato para work-runner. Verifica límites y efectos; la etiqueta no autoriza. Si necesita cambio de estrategia, fuentes fuera de una regla vigente, permisos o ampliación de alcance, crea/actualiza la decisión canónica `desk:decision` con evidencia, consecuencia y recomendación. No se autoriza a sí mismo ni ejecuta un merge.
+1. **Clasifica y registra.** Lee `../desk-context/references/control.md`. Puede preparar un PR aislado bajo la regla vigente `prepare-pr-v1`, o registrar una propuesta con ese metadato y `dispatch:execute` para una corrida posterior. Verifica límites y efectos; la etiqueta no autoriza. Si necesita cambio de estrategia, fuentes fuera de una regla vigente, permisos o ampliación de alcance, crea/actualiza la decisión canónica `desk:decision` con evidencia, consecuencia y recomendación. No se autoriza a sí mismo ni ejecuta un merge.
 
 2. **Autoridad de cierre** sobre duplicados y obsoletos encontrados en este minado — cerrar con
    comentario que cite el issue canónico o la razón de obsolescencia. Fingerprint ad-hoc = el
@@ -392,4 +398,4 @@ If fallback only: lead with `skipped_no_owner_job` or soul proposal — do not f
 Antes de elegir trabajo, recoge decisiones de utilidad de rutinas ya reportadas y aún abiertas. No repitas decisiones resueltas ni cierres una decisión estratégica como obsoleta sin evidencia. Publica en su reporte la autoridad utilizada, PR preparado y decisiones pendientes.
 
 
-Para derivar una preparación elegible a work-runner, registra el metadato de prepare-pr-v1 en el body y añade `dispatch:execute` como enrutamiento. El runner verificará la regla y efectos de nuevo. Si la preparación requiere una elección del propietario, usa desk:decision sin habilitar ejecución.
+work-runner se fusionó en esta rutina. Para dejar una preparación elegible para una corrida posterior, registra el metadato de prepare-pr-v1 en el body y añade `dispatch:execute` como enrutamiento; la corrida que la tome verificará la regla y los efectos de nuevo con el contrato de ejecución del playbook. Si la preparación requiere una elección del propietario, usa desk:decision sin habilitar ejecución.

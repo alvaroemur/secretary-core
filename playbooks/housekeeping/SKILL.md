@@ -84,17 +84,6 @@ Verificar si existe `CLAUDE.md` en la raíz del repo. Si no existe y el repo tie
 
 Verificar si existe `.gitignore` en la raíz. Detectar si hay directorios típicos de build artifacts sin ignorar (`build/`, `dist/`, `output/`, `node_modules/`, `__pycache__/`, `*.pyc`, binarios Go).
 
-### Delegación a Haiku (piloto D15.8) — inventario de la Fase 1
-
-- **Operación:** correr 1.1–1.4 en cada repo de `$REPOS` y devolver los datos crudos. No clasifica urgencia ni toca nada.
-- **Entrada mínima:** la lista `$REPOS` y los comandos de 1.1–1.4 tal cual.
-- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
-- **Salida estricta (JSON):** `[{"repo": "<ruta>", "rama": "…", "ahead": "n|?", "behind": "n|?", "dirty": n, "stashes": n, "prs_abiertos": [<salida de gh pr list>], "claude_md": true|false, "gitignore": true|false, "artifacts_sin_ignorar": ["…"]}]`.
-- **Validación (sesión principal):**
-  1. Filas = repos de `$REPOS`, uno por fila.
-  2. Elige 2 repos al azar y reejecuta 1.1 y 1.2: rama, ahead/behind, dirty y número de PRs deben coincidir.
-- **Fallback:** si falla, la sesión principal hace la Fase 1 ella misma una vez y lo registra.
-- **Límites:** la clasificación de PRs (auto/manual/stale) y todo lo que sigue queda en la sesión principal.
 
 ## Fase 2 — Procesar CLAUDE.md reviews
 
@@ -270,15 +259,6 @@ Reportar **conteos por clase y por repo** + solo las `wip`; listar las subsumida
 
 No borrar automáticamente en ningún caso — solo clasificar y proponer (las ramas con WIP pueden tener trabajo no pusheado).
 
-#### Delegación a Haiku (piloto D15.8) — clasificar ramas `[gone]`
-
-- **Operación:** correr el bloque `git cherry` + `git diff --quiet` de arriba sobre cada rama `[gone]` y clasificarla.
-- **Entrada mínima:** pares `{repo, rama}` y el bloque de comandos de arriba.
-- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
-- **Salida estricta (JSON):** `[{"repo": "…", "rama": "…", "clase": "subsumida|wip", "archivos_wip": ["…"]}]`.
-- **Validación (sesión principal):** filas = pares de entrada; **toda** rama `subsumida` se reverifica con `git diff --quiet origin/main <rama> -- <archivo>` sobre los archivos de sus commits `+`. Si alguna difiere, pasa a `wip`.
-- **Fallback:** si falla, la sesión principal clasifica todas las ramas ella misma una vez y lo registra.
-- **Límites:** el subagente no borra ramas ni crea ramas de rescate. El comando `git branch -D` solo aparece en el reporte, como propuesta.
 
 ### 4.3 PRs auto acumulados
 
@@ -308,18 +288,6 @@ jq -c --arg c "$(date -v-60d +%Y-%m-%d)" 'select(.fecha_visto>=$c)' "$LEDGER" > 
 
 Reportar los nuevos en la sección correspondiente de Fase 5. Si encuentras feedback claramente sobre una rutina, indicarlo (`→ feedback para rutina X`).
 
-#### Delegación a Haiku (piloto D15.8) — filtrar comentarios nuevos
-
-- **Operación:** correr los comandos de arriba y aplicar las reglas de filtrado 1 y 3 (excluir agente, excluir ledger). La regla 2 (qué es accionable) la decide la sesión principal.
-- **Entrada mínima:** la lista de repos GitHub, los comandos de arriba, los marcadores a excluir y la ruta del ledger `comentarios-vistos.jsonl` (solo lectura).
-- **Llamada:** `subagent_type: general-purpose`, `model: "haiku"`.
-- **Salida estricta (JSON):** `[{"repo": "…", "pr": n, "id": <comment_id>, "autor": "…", "url": "…", "body": "<literal>"}]`.
-- **Validación (sesión principal):**
-  1. Cada `id` existe: aparece en la salida de `gh pr view`/`gh api` de su PR (spot-check de todos si son ≤5; si no, 5 al azar).
-  2. Ningún `body` contiene `agent-generated`, `claude-generated`, `🤖 _Generado por` ni `🤖 _Secretary —`.
-  3. Ningún `id` está en el ledger (`grep -F '"id":<id>,'`).
-- **Fallback:** si falla, la sesión principal filtra ella misma una vez y lo registra.
-- **Límites:** el subagente no escribe el ledger ni comenta en PRs. Agregar IDs al ledger es de la sesión principal.
 
 ## Fase 5 — Reporte como PR
 
@@ -443,7 +411,6 @@ Candidatos detectados en Fase 3.6 — spec cambió después del último update d
 - X repos revisados · X PRs pendientes (Y 🔴 urgentes)
 - X cambios de CLAUDE.md aplicados, Z pendientes de decisión
 - X memorias consolidadas
-- Delegación a Haiku (piloto D15.8): inventario Fase 1 · ramas `[gone]` · comentarios → ✅ validado / ⚠️ fallback (motivo)
 - Próxima corrida: mañana 06:00
 
 ---

@@ -2,8 +2,9 @@
 name: desk-merge
 description: >-
   Persistent secretary mode that keeps session work "current" (merged to main). When a session PR
-  becomes mergeable, raises a 🚧 gate and, on confirmation, merges+prunes — tier-gated: data/prose
-  merges on "yes", executable code shows diff first. Secretary's merge-on-confirm layer above
+  becomes mergeable, raises a 🚧 gate and, on confirmation, merges with a merge commit and
+  fast-forwards the local main — tier-gated: data/prose merges on "yes", executable code shows
+  diff first. The only merge executor; wind-down proposes, desk-merge merges. Secretary's merge-on-confirm layer above
   babysit. Triggers: "/desk-merge", "keep this current", "merge-on-confirm on/off", or at session
   start when owner wants OKs to close PRs.
 ---
@@ -13,7 +14,7 @@ description: >-
 **What this does:** close the gap between "reviewed in chat" and "merged to `main`". Owner review in live
 sessions becomes what merges, instead of leaving PRs hanging until `wiki-update` W0 or manual GitHub.
 
-Doctrine: `rules/skills-contract.md`
+Doctrine: `rules/skills-contract.md` · instance git policy `canon/rules/git/integracion.md`
 
 ## Instance setup
 
@@ -26,7 +27,9 @@ Haptics: `secretary` CLI or instance harness scripts for compuerta/delivery sign
 
 ## What this is NOT
 
-- **Not babysit.** Babysit brings PR to merge-ready and stops. desk-merge merges+prunes on confirm.
+- **Not babysit.** Babysit brings PR to merge-ready and stops. desk-merge merges on confirm.
+- **Not cleanup.** It never deletes worktree folders or local branches. Cleanup is a separate
+  step, proven with `git merge-base --is-ancestor <branch> origin/main`.
 - **Not for autonomous routines.** Without a human present, mode is inert; `auto-*` merges stay with
   `wiki-update` W0.
 - **Not third-party sends.** Mail/WhatsApp gates are separate.
@@ -48,7 +51,7 @@ Classify by **files touched** — `gh pr diff <N> --name-only` — not by repo n
 
 | Tier | PR touches… | On confirm |
 |---|---|---|
-| **low** | data/prose only: `*.md`, `*/memory/`, `wiki/`, summaries, `*state*.md`, notes | 🚧 → merge+prune without diff |
+| **low** | data/prose only: `*.md`, `*/memory/`, `wiki/`, summaries, `*state*.md`, notes | 🚧 → merge without diff |
 | **high** | executable: code, workflows, `package.json`, `Makefile`, `.secretary.yml`, build scripts | show diff/summary → merge only after diff confirm |
 | **mixed** | any executable line | **high wins** |
 | **unclear** | — | default **high** |
@@ -116,9 +119,15 @@ wait for remote CI or explicit owner override.
    - low, local-gate: `🚧 _secretary: CI bloqueado (cuota Actions) — validación local OK — ¿merge?_`
    - high, local-gate: diff first, then `🚧 _secretary: <PR title> ready (local gate) — make official?_`
    - high, remote-green: diff first, then same gate as low remote-green.
-5. **On confirm:** `gh pr merge <N> --squash --delete-branch` (instance repo: squash only; respect
-   other repos' policies).
-6. **Signal delivery:** `📬 _secretary delivered — #N merged, branch pruned_`.
+5. **On confirm:** `gh pr merge <N> --merge`. Merge commit only: squash and rebase are disabled
+   by policy. Do not pass `--delete-branch` — GitHub deletes the remote branch on merge, and the
+   flag would also delete the local branch. If the repo still rejects merge commits
+   (`gh api repos/<owner/repo> -q .allow_merge_commit` is false), stop and report; never fall
+   back to squash.
+5b. **Update the local main:** in the repo's main checkout, only if it is on `main` and clean:
+   `git -C <main-checkout> fetch origin && git -C <main-checkout> merge --ff-only origin/main`.
+   Otherwise report why it was skipped. Do not touch the topic worktree.
+6. **Signal delivery:** `📬 _secretary delivered — #N merged (merge commit), main updated_`.
 7. **Fold linked actions:** if PR or heartbeat cites `acc-id` with open state in meetings memory:
 
 ```bash
@@ -149,8 +158,10 @@ override — do not log noise.
 - Wiki changes always via PR (CI / `validate_wikilinks.py`).
 - High tier always requires diff before merge.
 - Gate OK must be explicit for *that* PR.
-- Default off for `~/Dev` sessions unless activated there.
+- Default off for `~/Dev` sessions unless activated there, or invoked by wind-down after the
+  owner confirms that PR's merge.
 - Post-merge heartbeat push is mandatory.
+- Never squash, never `--delete-branch`, never remove the worktree folder.
 
 ## Output
 

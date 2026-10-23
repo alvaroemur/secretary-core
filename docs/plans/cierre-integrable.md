@@ -74,12 +74,12 @@ flowchart LR
 | id | mode | status | note |
 |----|------|--------|------|
 | n1 | autonomous | done | PR en la instancia `rules/politica-git`: `canon/rules/git/` y corrección de las instrucciones globales canónicas |
-| n2 | in_session | running | PR `core/fuente-unica-skills` |
-| n2i | autonomous | pending | PR en la instancia: claves de config, `canon/skills/`, retiro de `routines-piloto` |
+| n2 | in_session | done | PR alvaroemur/secretary-core#77 (CI verde, mergeable) |
+| n2i | autonomous | running | PR en la instancia: claves de config, `canon/skills/`, retiro de `routines-piloto` |
 | n3 | in_session | pending | PR `skills/cierre-integrable`; incluye la contradicción de prefijos de rama en el CLAUDE.md del core |
-| n4 | autonomous | pending | PR en el repo de mapa de workspaces |
+| n4 | autonomous | running | PR en el repo de mapa de workspaces |
 | n5 | autonomous | done | PR en la instancia `routines/manifiesto-real` |
-| n6 | in_session | pending | Script de configuración de repos (OK explícito al ejecutar) y rutas de instrucciones globales no versionadas. Va antes de cualquier merge. |
+| n6 | in_session | running | Script de configuración de repos (OK explícito al ejecutar) y rutas de instrucciones globales no versionadas. Va antes de cualquier merge. |
 | n7 | in_session | pending | Reinstalación, hashes, pruebas y cierre de estos PRs con el wind-down nuevo |
 
 ### Log de ejecución
@@ -94,6 +94,11 @@ flowchart LR
 | 2026-10-23 | n1 | agente | PR alvaroemur/cowork-secretary#1517 abierto (no draft, mergeable). Pedido: sumar 3 contradicciones restantes (AGENTS.md de instancia, cierre-portable, decisión 2026-06-05). Abierto para owner: commit directo trivial del owner en Cowork gestión |
 | 2026-10-23 | n1 | agente | contradicciones restantes corregidas en el mismo PR (commit nuevo); validador OK |
 | 2026-10-23 | n5 | agente | PR alvaroemur/cowork-secretary#1518 abierto (no draft, mergeable). Esquema compatible con consumidores. Hallazgos fuera de alcance: `context.py` y el portal ignoran `enabled`; el instalador falla con rangos de día de semana (`1-5`) |
+| 2026-10-23 | n6 | sesion | configuración de merge aplicada y verificada en 41 repos; copias instaladas de wiki-update y sales-crawler pasadas a `--merge` antes del cambio |
+| 2026-10-23 | n1, n5 | sesion | #1517 y #1518 integrados con merge commit |
+| 2026-10-23 | D17 | sesion | copia única en `~/.agents/skills` + symlinks en `~/.claude/skills`; verificado que Claude Code no lee `~/.agents/skills` |
+| 2026-10-23 | n2 | sesion | PR alvaroemur/secretary-core#77 abierto, CI verde |
+| 2026-10-23 | n2i, n4 | agentes | lanzados |
 | 2026-10-23 | D15 | sesion aparte | auditoría en alvaroemur/cowork-secretary#1516; decisiones D15.1–D15.6 para el owner |
 | 2026-10-23 | n2 | sesion | hallazgo: los 3 pilotos instalados = `SKILL.md` corto + `procedure.md` más nuevo que el playbook de core |
 

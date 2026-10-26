@@ -3,8 +3,8 @@
 // (Baileys, retired) used to write, so `wiki-update` integrates it with no
 // code changes on its side.
 //
-// v1 scope: writes a raw transcript (not an LLM-synthesized memo — Axon's
-// capture path is synchronous JS with no subagent). `wiki-update` (run by an
+// Called by whatsapp-cases.mjs once a case bundle finishes processing. Writes
+// the case transcript (not an LLM-synthesized memo); `wiki-update` (run by an
 // LLM) does the synthesis into wiki prose when it integrates, same as it
 // already does for other extractors' raw consolidated facts.
 
@@ -29,7 +29,7 @@ function ensureContractDirs(instance) {
 }
 
 /** Instance owner's display name, read at runtime from `identity.name` in `.secretary.yml`. */
-function ownerName(instance) {
+export function ownerName(instance) {
   return configScalar(instance, 'identity.name', 'yo');
 }
 
@@ -60,22 +60,8 @@ function slugify(s) {
     .slice(0, 60) || 'chat';
 }
 
-/** Period "YYYY-MM-DD a YYYY-MM-DD" from message timestamps; falls back to today. */
-function periodFromMessages(messages) {
-  const stamps = messages
-    .map((m) => (typeof m.timestamp === 'number' ? new Date(m.timestamp) : null))
-    .filter(Boolean);
-  if (stamps.length === 0) {
-    const t = todayStamp();
-    return `${t} a ${t}`;
-  }
-  const min = new Date(Math.min(...stamps.map((d) => d.getTime())));
-  const max = new Date(Math.max(...stamps.map((d) => d.getTime())));
-  return `${todayStamp(min)} a ${todayStamp(max)}`;
-}
-
-/** Render the raw transcript body (frontmatter + message list) written to summaries/. */
-function renderTranscript({ owner, chatId, alias, jid, isGroup, categoria, messages }) {
+/** Frontmatter for a summary file; the body is the case transcript from whatsapp-cases.mjs. */
+function renderSummary({ chatId, alias, jid, isGroup, categoria, periodo, caso, transcript }) {
   const fm = [
     '---',
     'fuente: axon',
@@ -85,27 +71,24 @@ function renderTranscript({ owner, chatId, alias, jid, isGroup, categoria, messa
     `fecha: ${todayStamp()}`,
     'tipo: captura-axon (transcripción cruda, sin sintetizar)',
     `categoria: ${categoria}`,
-    `periodo: "${periodFromMessages(messages)}"`,
+    `periodo: "${periodo}"`,
+    `caso: "${caso || '—'}"`,
     '---',
     '',
   ].join('\n');
-
-  const lines = messages.map((m) => {
-    const who = m.type === 'message-out' ? owner : (m.senderName || alias || 'contacto');
-    const ts = m.backupTimestamp || (typeof m.timestamp === 'number' ? new Date(m.timestamp).toISOString() : '—');
-    let content = m.content;
-    if (content == null) content = `[${m.format || 'contenido'}]`;
-    else if (typeof content !== 'string') content = `[${m.format || 'adjunto'}]`;
-    return `- **${who}** (${ts}, ${m.format || 'chat'}): ${content}`;
-  });
-
-  return fm + '## Transcripción\n\n' + lines.join('\n') + '\n';
+  return fm + transcript;
 }
 
-/** Append one section to chats.md and write its summary file. Returns the written paths, or null if there were no new messages to record. */
-export function appendChatCapture(instance, { chatId, alias, jid, isGroup, messages }) {
+/**
+ * Write a case summary to summaries/ and index it in chats.md. `transcript` is
+ * the rendered case transcript (whatsapp-cases.mjs owns the rendering). With
+ * `summaryFile` from an earlier pass (a retried case), the summary is rewritten
+ * in place and chats.md is left alone, so a retry never duplicates the entry.
+ * Returns the written paths, or null when no message was selected.
+ */
+export function appendChatCapture(instance, { chatId, alias, jid, isGroup, periodo, mensajes, caso, transcript, summaryFile: previous }) {
   if (!chatId) throw new Error('chatId required');
-  if (!Array.isArray(messages) || messages.length === 0) return null;
+  if (!mensajes) return null;
 
   const resolution = resolveEntity(instance, { name: alias, chatId });
   const matched = resolution.status === 'matched';
@@ -118,6 +101,11 @@ export function appendChatCapture(instance, { chatId, alias, jid, isGroup, messa
 
   ensureContractDirs(instance);
   const dir = summariesDir(instance);
+  const body = renderSummary({ chatId, alias, jid, isGroup, categoria, periodo, caso, transcript });
+  if (previous) {
+    writeFileSync(join(instance, previous), body);
+    return { chatsFile: 'extractors/whatsapp/memory/chats.md', summaryFile: previous, entity: matched ? resolution.entity : null };
+  }
   const stamp = todayStamp();
   const slug = slugify(alias || chatId);
   let summaryFile = `${stamp}-${timeStamp()}-${slug}.md`;
@@ -129,7 +117,7 @@ export function appendChatCapture(instance, { chatId, alias, jid, isGroup, messa
     summaryPath = join(dir, summaryFile);
     n += 1;
   }
-  writeFileSync(summaryPath, renderTranscript({ owner: ownerName(instance), chatId, alias, jid, isGroup, categoria, messages }));
+  writeFileSync(summaryPath, body);
 
   // temas: only emit a wikilink when it resolves to an *existing* wiki
   // article (the resolver's index is built from real articles, so this is
@@ -143,8 +131,8 @@ export function appendChatCapture(instance, { chatId, alias, jid, isGroup, messa
     `## ${stamp} — ${alias || chatId}`,
     `- categoria: ${categoria}`,
     `- jid: ${jid || (isGroup ? '—' : chatId)}`,
-    `- periodo: "${periodFromMessages(messages)}"`,
-    `- mensajes_procesados: ${messages.length}`,
+    `- periodo: "${periodo}"`,
+    `- mensajes_procesados: ${mensajes}`,
     `- temas: ${temas}`,
     `- resumen_path: extractors/whatsapp/summaries/${summaryFile}`,
     `- detectado: ${stamp}`,

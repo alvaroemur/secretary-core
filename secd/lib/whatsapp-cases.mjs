@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { appendAccion, appendChatCapture, ownerName } from './capture.mjs';
 import { loadLlmConfig } from './llm.mjs';
 
 export const CASE_SCHEMA_VERSION = '1.1';
@@ -193,6 +194,26 @@ function normalizeMedia(media, messageId) {
   };
 }
 
+function optionalText(value, field, max = 2000) {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string' || value.length > max) throw new Error(`${field} is invalid`);
+  return value.replace(/\s+/g, ' ').trim() || null;
+}
+
+/** Optional commitment detected by the caller; it lands in acciones.md once the case is processed. */
+function normalizeAccion(input) {
+  if (input == null) return null;
+  if (typeof input !== 'object' || Array.isArray(input)) throw new Error('accion is invalid');
+  const accion = optionalText(input.accion, 'accion.accion');
+  if (!accion) throw new Error('accion.accion is required');
+  return {
+    accion,
+    responsable: optionalText(input.responsable, 'accion.responsable', 240),
+    deadline: optionalText(input.deadline, 'accion.deadline', 64),
+    contexto: optionalText(input.contexto, 'accion.contexto'),
+  };
+}
+
 export function validateCasePayload(payload, instance = null) {
   if (!payload || typeof payload !== 'object') throw new Error('JSON object required');
   const accountId = safeId(payload.account_profile_id, 'account_profile_id');
@@ -249,6 +270,9 @@ export function validateCasePayload(payload, instance = null) {
     };
   });
   if (totalBytes > MAX_CASE_BYTES) throw new Error('case media exceeds 1 GiB');
+  if (payload.is_group != null && typeof payload.is_group !== 'boolean') {
+    throw new Error('is_group is invalid');
+  }
   messages.sort((a, b) =>
     a.timestamp_epoch - b.timestamp_epoch ||
     a.source_order - b.source_order ||
@@ -259,6 +283,8 @@ export function validateCasePayload(payload, instance = null) {
     chat_id: chatId,
     chat_name: String(payload.chat_name || 'chat').slice(0, 240),
     title: payload.title == null ? null : String(payload.title).slice(0, 240),
+    is_group: payload.is_group ?? chatId.endsWith('@g.us'),
+    accion: normalizeAccion(payload.accion),
     timezone,
     messages,
     total_bytes: totalBytes,
@@ -339,10 +365,12 @@ function publicMessage(message, mediaRecord) {
   };
 }
 
-function renderTranscript(manifest, messages) {
+/** Case transcript, shared by transcript.md and the extractor summary. `owner` names outgoing messages. */
+function renderTranscript(manifest, messages, owner) {
   const lines = [`# ${manifest.title || `${manifest.date} — ${manifest.chat_name}`}`, ''];
   for (const message of messages.filter((m) => m.selected)) {
-    lines.push(`## ${message.sender_name} — ${message.timestamp_local}`, '');
+    const sender = message.direction === 'out' ? owner : message.sender_name;
+    lines.push(`## ${sender} — ${message.timestamp_local}`, '');
     if (message.text) lines.push(message.text, '');
     if (message.caption && message.caption !== message.text) lines.push(`Caption: ${message.caption}`, '');
     if (message.media?.selected) {
@@ -437,6 +465,37 @@ async function describeImage(instance, path, mime, caption, fetchImpl) {
   };
 }
 
+/**
+ * Feed a processed case into the WhatsApp extractor memory that wiki-update
+ * reads: summary + chats.md entry, plus acciones.md when the case carries one.
+ * manifest.memory records what was written, so a retry rewrites the summary
+ * in place and never appends a second entry or action.
+ */
+function writeCaseMemory(instance, manifest, messages, owner) {
+  const selected = messages.filter((m) => m.selected);
+  const dates = selected.map((m) => m.timestamp_local.slice(0, 10)).sort();
+  const written = manifest.memory || {};
+  const chat = appendChatCapture(instance, {
+    chatId: manifest.chat_id,
+    alias: manifest.chat_name,
+    jid: manifest.chat_id,
+    isGroup: manifest.is_group,
+    periodo: dates.length ? `${dates[0]} a ${dates.at(-1)}` : '—',
+    mensajes: selected.length,
+    caso: relative(resolve(instance), manifest.bundle_path),
+    transcript: renderTranscript(manifest, messages, owner),
+    summaryFile: written.summary_file,
+  });
+  if (chat) written.summary_file = chat.summaryFile;
+  manifest.memory = written;
+  if (manifest.accion && !written.accion_id) {
+    written.accion_id = appendAccion(instance, {
+      ...manifest.accion,
+      origen: written.summary_file || 'axon',
+    }).id;
+  }
+}
+
 // One in-flight pass per bundle: concurrent callers share it instead of
 // starting a second round of model calls and racing writes on the same files.
 const inFlight = new Map();
@@ -499,10 +558,20 @@ async function runBundle(instance, bundlePath, fetchImpl = globalThis.fetch) {
   const consistent =
     counts.messages === manifest.selected_counts.messages &&
     counts.media === manifest.selected_counts.media;
+  const owner = ownerName(instance);
+  writeFileSync(join(bundlePath, 'messages.jsonl'), `${messages.map(JSON.stringify).join('\n')}\n`);
+  writeFileSync(join(bundlePath, 'transcript.md'), renderTranscript(manifest, messages, owner));
+  try {
+    writeCaseMemory(instance, manifest, messages, owner);
+  } catch (error) {
+    manifest.failures.push({
+      code: 'memory_write_failed',
+      message: String(error.message || error),
+      retryable: true,
+    });
+  }
   manifest.status = consistent && manifest.failures.length === 0 ? 'ready' : 'partial';
   manifest.updated_at = new Date().toISOString();
-  writeFileSync(join(bundlePath, 'messages.jsonl'), `${messages.map(JSON.stringify).join('\n')}\n`);
-  writeFileSync(join(bundlePath, 'transcript.md'), renderTranscript(manifest, messages));
   writeJsonAtomic(manifestPath, manifest);
   return manifest;
 }
@@ -555,6 +624,8 @@ export async function createCase(instance, payload, options = {}) {
     chat_id: normalized.chat_id,
     chat_name: normalized.chat_name,
     title: normalized.title,
+    is_group: normalized.is_group,
+    accion: normalized.accion,
     timezone: normalized.timezone,
     date,
     source_counts: sourceCounts,
@@ -568,7 +639,7 @@ export async function createCase(instance, payload, options = {}) {
     retention: 'manual',
   };
   writeFileSync(join(bundlePath, 'messages.jsonl'), `${records.map(JSON.stringify).join('\n')}\n`);
-  writeFileSync(join(bundlePath, 'transcript.md'), renderTranscript(manifest, records));
+  writeFileSync(join(bundlePath, 'transcript.md'), renderTranscript(manifest, records, ownerName(instance)));
   writeJsonAtomic(manifestPath, manifest);
   if (options.defer) {
     setImmediate(() => {

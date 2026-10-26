@@ -90,6 +90,29 @@ Optional estimates read rates from `<instance>/.secd/capture.json`:
 
 Missing rates produce an unavailable estimate, never a fabricated cost.
 
+### Extractor memory
+
+When a case finishes processing (`ready` or `partial`), secd also writes it into
+the WhatsApp extractor memory that `wiki-update` reads, all with
+`pendiente_wiki: true`:
+
+- `extractors/whatsapp/summaries/<date>-<time>-<chat>.md`: frontmatter plus the
+  same transcript as the bundle's `transcript.md`.
+- `extractors/whatsapp/memory/chats.md`: one entry per case, pointing to the summary.
+- `extractors/whatsapp/memory/acciones.md`: only when the payload carries an
+  `accion` object (`accion` required; `responsable`, `deadline`, `contexto`
+  optional). `responsable` defaults to the owner.
+
+Outgoing messages and the default `responsable` use `identity.name` from
+`.secretary.yml` (fallback `yo`). The optional boolean `is_group` sets
+`categoria: proyecto`; without it, a `chat_id` ending in `@g.us` counts as a group.
+
+`manifest.memory` records the summary path and action id. A retry rewrites the
+summary in place and does not append a second `chats.md` entry or action. If
+`wiki-update` already integrated the entry, it does not see the rewrite. A failed
+memory write marks the case `partial` with `memory_write_failed`; retry it like
+any other failure.
+
 ### Start automatically on macOS
 
 ```bash

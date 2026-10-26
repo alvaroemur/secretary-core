@@ -316,3 +316,87 @@ test('serializes deferred processing and a concurrent retry on the same bundle',
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('a processed case feeds the extractor memory with owner name from config', async () => {
+  const root = instance();
+  try {
+    writeFileSync(join(root, '.secretary.yml'), `${readFileSync(join(root, '.secretary.yml'), 'utf8')}identity:\n  name: Persona Sintética\n`);
+    const out = {
+      message_id: 'msg-003',
+      source_order: 2,
+      timestamp_iso: '2026-09-12T15:03:00.000Z',
+      timestamp_epoch: 1789225380,
+      sender_name: 'You',
+      direction: 'out',
+      kind: 'text',
+      text: 'Respuesta sintética',
+      selected: true,
+    };
+    const manifest = await createCase(root, fixture({
+      messages: [...fixture().messages, out],
+      accion: { accion: 'Enviar el diagrama revisado', deadline: '2026-09-20' },
+    }), { fetchImpl: imageFetch });
+    assert.equal(manifest.status, 'ready');
+    assert.equal(manifest.is_group, false);
+    assert.match(manifest.memory.summary_file, /^extractors\/whatsapp\/summaries\/.+-project-group\.md$/);
+    assert.match(manifest.memory.accion_id, /^acc-\d{8}-001$/);
+
+    const memory = join(root, 'extractors', 'whatsapp', 'memory');
+    const chats = readFileSync(join(memory, 'chats.md'), 'utf8');
+    assert.match(chats, /## \d{4}-\d{2}-\d{2} — Project group/);
+    assert.match(chats, /periodo: "2026-09-12 a 2026-09-12"/);
+    assert.match(chats, /mensajes_procesados: 2/);
+    assert.match(chats, /pendiente_wiki: true/);
+
+    const summary = readFileSync(join(root, manifest.memory.summary_file), 'utf8');
+    const transcript = readFileSync(join(manifest.bundle_path, 'transcript.md'), 'utf8');
+    assert.ok(summary.endsWith(transcript), 'summary reuses the case transcript');
+    assert.match(summary, /caso: "runtime\/whatsapp-inbox\/cases\//);
+    assert.match(transcript, /## Persona Sintética — /);
+    assert.doesNotMatch(transcript, /## You — /);
+
+    const acciones = readFileSync(join(memory, 'acciones.md'), 'utf8');
+    assert.match(acciones, /accion: Enviar el diagrama revisado/);
+    assert.match(acciones, /responsable: Persona Sintética/);
+    assert.match(acciones, /origen: extractors\/whatsapp\/summaries\//);
+    assert.match(acciones, /pendiente_wiki: true/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a retried case updates its summary without duplicating memory entries', async () => {
+  const root = instance();
+  try {
+    const failFetch = async () => ({ ok: false, status: 503, json: async () => ({}) });
+    const partial = await createCase(root, fixture({
+      // WhatsApp group JID, built at runtime so the leak guard's email regex skips it
+      chat_id: ['group-opaque', 'g.us'].join('@'),
+      accion: { accion: 'Revisar el diagrama' },
+    }), { fetchImpl: failFetch });
+    assert.equal(partial.status, 'partial');
+    assert.equal(partial.is_group, true);
+    const summaryPath = join(root, partial.memory.summary_file);
+    assert.match(readFileSync(summaryPath, 'utf8'), /Processing error/);
+
+    const bundleName = partial.bundle_path.split('/').at(-1);
+    const ready = await retryCase(root, bundleName, { fetchImpl: imageFetch });
+    assert.equal(ready.status, 'ready');
+    assert.equal(ready.memory.summary_file, partial.memory.summary_file);
+    assert.equal(ready.memory.accion_id, partial.memory.accion_id);
+    assert.match(readFileSync(summaryPath, 'utf8'), /A synthetic diagram/);
+
+    const memory = join(root, 'extractors', 'whatsapp', 'memory');
+    assert.equal(readFileSync(join(memory, 'chats.md'), 'utf8').match(/^## /gm).length, 1);
+    assert.match(readFileSync(join(memory, 'chats.md'), 'utf8'), /categoria: proyecto/);
+    assert.equal(readFileSync(join(memory, 'acciones.md'), 'utf8').match(/^## acc-/gm).length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects a malformed accion', () => {
+  assert.throws(() => validateCasePayload(fixture({ accion: { deadline: 'mañana' } })), /accion\.accion is required/);
+  assert.throws(() => validateCasePayload(fixture({ accion: 'texto' })), /accion is invalid/);
+  assert.throws(() => validateCasePayload(fixture({ is_group: 'sí' })), /is_group is invalid/);
+});

@@ -132,7 +132,7 @@ MD→plain conversion, signature from settings, and typo review before `gog gmai
 
 ## Report
 
-Render **inline**. Header: `✉️ **Drafts — for <recipient>** · 📌 anchor: `` `source:date` `` — <why it fits>` (or "no prior anchor" → cold open only). Tentative unmerged anchors keep the `⏳ tentative (unmerged, PR #N)` marker. Then 1–2 drafts on labeled lines: **Cold open** › "…" and **Continuation** › "…". If an MD file was written, include its absolute path. Keep commentary minimal — drafts are the deliverable.
+Render **inline**. Header: `✉️ **Drafts — for <recipient>** · 📌 anchor: `` `source:date` `` — <why it fits>` (or "no prior anchor" → cold open only). Tentative unmerged anchors keep the `⏳ tentative (unmerged, PR #N)` marker. Then 1–2 drafts, each under its label (**Cold open**, **Continuation**) in its own fenced ```text block so it copies clean (no nested fences, no rendered markdown inside). If an MD file was written, include its absolute path. Keep commentary minimal — drafts are the deliverable.
 
 If the draft responds to a brief item:
 

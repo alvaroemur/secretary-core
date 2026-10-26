@@ -83,7 +83,7 @@ git -C "$SECRETARY_INSTANCE" show origin/<branch>:extractors/whatsapp/memory/<sl
 
 - **Stream health first.** Don't answer a WhatsApp question as if data is current without checking `state.md`/`fresh whatsapp` — the known failure mode here isn't "PR unmerged," it's "nothing captured in weeks."
 - Non-whitelisted chats: report their existence from `inbox/chats/` if asked, but don't fabricate a processed memo that doesn't exist.
-- Drafts are copy-ready text for the owner to paste/send manually or via WhatsApp Web — this skill has no send capability by design.
+- Drafts are copy-ready text for the owner to paste/send manually or via WhatsApp Web — this skill has no send capability by design. Paste-ready text follows `canon/rules/skills/skills-contract.md` § Output templates: one fenced ```text block per piece, no nested fences.
 
 ## Integration
 

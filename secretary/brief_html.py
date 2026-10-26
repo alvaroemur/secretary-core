@@ -4,7 +4,7 @@ import html
 import re
 
 INK, MUTED, LINE = '#0f172a', '#64748b', '#e2e8f0'
-ACCENT = {'✅': '#059669', '🧵': '#6366f1', '🤖': '#6366f1', '📅': '#6366f1', '🩺': '#0e7490'}
+ACCENT = {'✅': '#059669', '🧵': '#6366f1', '🤖': '#6366f1', '📅': '#6366f1', '🩺': '#0e7490', '🗂️': '#b45309'}
 
 
 _REPO = ''
@@ -38,6 +38,12 @@ def block(lines):
         l = lines[i].rstrip()
         if not l.strip():
             i += 1; continue
+        if l.lstrip().startswith('```'):
+            j = i + 1
+            while j < len(lines) and not lines[j].lstrip().startswith('```'): j += 1
+            code = html.escape('\n'.join(lines[i + 1:j]), quote=False)
+            out.append(f'<pre style="background:#f8fafc;border:1px solid {LINE};border-radius:8px;padding:10px 12px;font-size:12px;white-space:pre-wrap;margin:0 0 10px 0;">{code}</pre>')
+            i = j + 1; continue
         if l.startswith('|'):
             j = i
             while j < len(lines) and lines[j].startswith('|'): j += 1

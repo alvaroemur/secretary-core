@@ -25,12 +25,14 @@ Incluye decisiones que una rutina necesita para seguir siendo útil: fuentes ago
 
 Busca el issue de hoy por etiqueta y fecha en timezone configurada: si existe, actualízalo conservando comentarios; si no, créalo. Lee pendientes del anterior y enlaza el nuevo antes de cerrar el anterior. BRIEF_REFRESH_ISSUE apunta al issue existente; valida etiqueta. Firma con el helper de la instancia.
 
-Secciones, en este orden:
-1. Requiere tu decisión: hasta tres principales, rutina/proyecto, evidencia/antigüedad, consecuencia de esperar, recomendación y enlace; contador/enlaces de las restantes. Urgencias concretas primero; pospuestas no vencidas aparte.
+Secciones, en este orden. Se mantiene la estructura; los emojis marcan sección y estado. Doctrina de plantillas: `canon/rules/skills/skills-contract.md` § Output templates.
+1. Requiere tu decisión: hasta tres principales, numeradas (`1.`, `2.`, `3.`), con rutina/proyecto, evidencia/antigüedad, consecuencia de esperar, recomendación y enlace; contador/enlaces de las restantes. Urgencias concretas primero; pospuestas no vencidas aparte. Cierra la sección con un bloque cercado ```text, prellenado con la recomendación de cada número, listo para copiar y editar como comentario del issue (`1: sí`, `2: posponer 7 días`). Un solo bloque, sin fences anidados.
 2. Trabajo en marcha: sesiones conocidas, repo/rama, PR, cambios pendientes, bloqueos; cobertura/frescura.
 3. Avances y entregas: PR preparado/en revisión/fusionado distinguidos, acciones de negocio con evidencia. No afirma terminado por dispatch:done.
-4. Agenda y asuntos: correo, reuniones, Drive, pendientes relevantes de fuentes existentes.
-5. Salud y utilidad de rutinas: última evidencia, problemas abiertos, acción o decisión requerida. No confundir invocación, consumo y éxito.
+4. 🤖 Dream entregó: PR abiertos o fusionados en la ventana cuya rama empieza con `dream/` (en `repo_prs` del JSON), sin contar los reportes `chore(dream)`. Una línea por PR: enlace · compromiso que avanza · por qué sirve · cómo verificarlo en menos de 2 minutos. Toma el compromiso y la verificación del body del PR (`gh pr view`); si faltan, dilo en la línea. Sin entregas, omite la sección.
+5. Agenda y asuntos: correo, reuniones, Drive, pendientes relevantes de fuentes existentes.
+6. 🗂️ Compromisos caducados esta semana (solo los lunes, en la timezone configurada): en `$(secretary config path meetings.memory)/acciones.md`, entradas que pasaron a `caducada` o `cancelada` en los últimos 7 días, agrupadas por proyecto con su ID `acc-…` y motivo. Aparte, las propuestas de caducar que esperan decisión (proyectos con reunión reciente): esas van como decisión en la sección 1. En lo que lee el propietario, el sistema se llama "compromisos".
+7. Salud y utilidad de rutinas: última evidencia, problemas abiertos, acción o decisión requerida. No confundir invocación, consumo y éxito.
 
 No crea encargos ejecutables ni modifica su autorización. Notificar no equivale a autorizar.
 

@@ -180,10 +180,12 @@ def push_ranges(stdin: str, remote: str) -> list[list[str]]:
         _local_ref, local_sha, _remote_ref, remote_sha = parts
         if local_sha == ZERO_SHA:
             continue  # branch deletion: nothing is published
-        if remote_sha == ZERO_SHA:
-            ranges.append([local_sha, "--not", f"--remotes={remote}"])
-        else:
-            ranges.append([f"{remote_sha}..{local_sha}"])
+        # Only commits no remote ref has yet: a merge of origin/main brings in
+        # commits that are already public and must not be flagged again.
+        args = [local_sha, "--not", f"--remotes={remote}"]
+        if remote_sha != ZERO_SHA:
+            args.append(remote_sha)
+        ranges.append(args)
     return ranges
 
 

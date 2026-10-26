@@ -32,7 +32,7 @@ daily brief at best state — **without duplicating** the daily issue.
 | Progress snapshot (no mutate) | `desk-overview` | **After** phase 5 — validate refresh |
 | WIP board only | `desk-state` | Phase 4 — read; if empty/stale, suggest `desk-write` |
 | Session close | `wind-down` | **Do not** invoke — opposite intent |
-| Operational beat | `desk-heartbeat` | Phase 3 — writes `subsystem/heartbeat/` |
+| Operational beat | routine `sec-heartbeat` | Phase 3 — writes `subsystem/heartbeat/` |
 | Merge-ready PRs | `babysit` | Phase 4 — CI/conflicts; **no merge** |
 | Merge with human OK | `desk-merge` | Only if owner requests merge same session |
 | Morning catch-up | `pre-brief-pipeline.sh` | Phase 3 — after downtime |
@@ -192,7 +192,7 @@ PRE_BRIEF_FORCE=1 "$SECRETARY_INSTANCE/scripts/routines/pre-brief-pipeline.sh"
 
 Runs (per stale/force): `drive-crawler`, `housekeeping`, `job-search-crawler`, `revision-correo`
 (if `state.md` stale), `reuniones-update`, optional `wiki-update` if `PRE_BRIEF_RUN_WIKI=1`, closes
-with `desk-heartbeat` pre-brief slot.
+with the `sec-heartbeat` pre-brief slot.
 
 **Gated 🚧:**
 
@@ -210,7 +210,7 @@ Verify beat:
 head -40 "$(secretary config path operations.heartbeat)/latest.md"
 ```
 
-If missing or >3h stale on workday → invoke `desk-heartbeat` in session.
+If missing or >3h stale on workday → run the routine: `HEARTBEAT_SLOT=session bash "$SECRETARY_CORE/secretary/routines/run-routine.sh" sec-heartbeat`.
 
 #### Phase 3 report
 
@@ -220,7 +220,7 @@ If missing or >3h stale on workday → invoke `desk-heartbeat` in session.
 | Extractor / routine | Action | Result |
 |---|---|---|
 | drive-crawler | run / skip | PR / fresh |
-| desk-heartbeat | run | latest.md timestamp |
+| sec-heartbeat | run | latest.md timestamp |
 ```
 
 ### Phase 4 — Ordered WIP
@@ -304,7 +304,7 @@ Optional: invoke `desk-overview` to validate brief vs evidence.
 | `git fetch` / `git pull` on main | ✅ | |
 | `secretary validate` | ✅ | |
 | `pre-brief-pipeline` (force) | ✅ | |
-| `desk-heartbeat` commit+push main | ✅ | |
+| `sec-heartbeat` commit+push main | ✅ | |
 | `babysit` | ✅ | |
 | Create/edit brief issue | ✅ | |
 | Send mail/WhatsApp | | 🚧 |

@@ -5,7 +5,7 @@ description: Consolidación programada de corto plazo. Escribe latest.md para br
 
 # sec-heartbeat (scheduled task)
 
-Lee contexto en `~/.secretary/CLAUDE.md`, la spec `~/.secretary/_diseño/specs/008-sec-heartbeat/spec.md` y el skill operativo `~/.claude/skills/sec-heartbeat/SKILL.md`.
+Lee contexto en `~/.secretary/CLAUDE.md`, la spec `~/.secretary/_diseño/specs/008-sec-heartbeat/spec.md` y `procedure.md` junto a este archivo (formato de `latest.md`, fuentes y reglas). Ya no existe el skill `desk-heartbeat`: este playbook y su procedimiento son la única fuente.
 
 ## Cadencia oficial (Lima)
 
@@ -137,11 +137,6 @@ git push origin main
 - No cerrar acciones automáticamente.
 - No escribir wiki.
 - No enviar mensajes a terceros.
-
-
-## Visibilidad de decisiones pendientes · Desk
-
-Lee `desk-context/references/control.md` instalado. Antes de terminar, distingue una corrida vacía de una rutina que ya no puede aportar valor. Si faltan fuentes/accesos, se agota la cola o se necesita cambiar estrategia fuera de una regla ya aprobada: busca issues `desk:decision`/`para-alvaro` del mismo problema y actualiza el canónico o crea uno firmado. Incluye rutina/proyecto, fingerprint estable, evidencia fechada, consecuencia de esperar, opciones, recomendación y decisión requerida. No lo dejes solo en state, log o PR ni crees un duplicado diario. Revisa decisiones anteriores antes de volver a pedirlas. Si puedes resolverlo bajo una regla vigente, resuélvelo y reporta el resultado, sin inventar otra compuerta. No amplía tus permisos de envío, fuentes o negocio. Brief y overview consumirán esta misma decisión.
 
 
 ## Visibilidad de decisiones pendientes · Desk

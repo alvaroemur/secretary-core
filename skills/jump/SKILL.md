@@ -1,33 +1,33 @@
 ---
 name: jump
 metadata:
-  close-contract: "2"
+  close-contract: "3"
 description: >-
-  From any in-progress session, propose continuation archetypes (replay, QA, next
-  plan/EDT step, lateral fork) and emit paste-ready prompts at three context tiers
-  (surgical, operational, autonomous). Owner picks which prompts to generate. May
-  hand a prompt to offload/restart elsewhere. Triggers: "/jump", "where next",
-  "continuation prompts". NOT for session hygiene, scope grilling, or work-graph
-  design.
+  From any in-progress session, propose continuations that fit the context (new
+  inputs, revisit assumptions, QA with another model or harness, related
+  commitments, the next plan step, a lateral fork…) and emit each as a
+  paste-ready block that starts by checking whether the work is already done.
+  Can queue a step for dream. The harness session card is an option after the
+  block, never a replacement. Triggers: "/jump", "where next", "continuation
+  prompts". NOT for session hygiene, scope grilling, or work-graph design.
 user-invocable: true
 ---
 
-## Integration with wind-down
-
-When given `close_context`, reuse its state, decisions, active plan and brief. Do not repeat git scans, read other worktrees or create another brief. The restart prompt names its objective, first file to read and completion criterion. It does not depend on chat history or a harness-specific tool. This rule overrides the collection and writing steps below.
-
 # jump — continuation prompts from live session state
 
-Generate **where next** options and prompts. Does not close the session, push, or merge.
+Proposes **where next** and writes the prompts. Does not close the session, push, or merge.
 
 Doctrine: `rules/skills-contract.md`
 
+## Integration with wind-down
+
+When given `close_context`, reuse its state, decisions, active plan and brief. Do not repeat git scans, read other worktrees or create another brief. Do not open a second round of questions: emit one prompt per open thread with the best-fit continuation, and list other proposals as one line each that the owner can ask for. This rule overrides the **Loop** below.
+
 ## When to use / not use
 
-- **Use:** mid-session continuations; owner wants replay/QA/next-step prompts;
-  end-of-session continuity when there was material work.
+- **Use:** mid-session continuations; end-of-session continuity (via wind-down).
 - **Not:** git/PR hygiene; designing a work graph; locking scope; parking a single
-  already-named idea verbatim (use offload/restart for that).
+  already-named idea verbatim (use offload for that).
 
 ## Scan (read, don't ask)
 
@@ -39,83 +39,71 @@ git branch --show-current
 
 Also read, when present:
 
-- Active conversation artifacts
-- `docs/plans/*.md` or `_diseño/plans/*.md` with `status: active` (prefer `plan_ref`)
+- Active conversation artifacts and what the owner said they still doubt or want
+- `docs/plans/*.md` or `_diseño/plans/*.md` with `status: active` (prefer `plan_ref`); nodes `pending` | `blocked` | `running`
 - cwd `contract.yaml` if `kind: entity` (EDT activities — read-only)
-- `<session-cwd>/.briefs/` briefs in the repo
+- `<main-checkout>/.briefs/*.md` with `status: pending`
+- Open commitments of the owner linked to this topic (`secretary acc`, when available)
+- Open PRs and issues on the same scope
 
-From an active plan: list nodes with `status` in `pending` | `blocked` | `running`.
-Prefer continuations anchored to those node ids.
+## Proposals (no fixed menu)
 
-## Archetypes
+Build proposals from what the scan found, not from a closed list. Kinds that often fit, as examples:
 
-Propose only archetypes that fit. Omit empty ones.
+- **New inputs** — a source that arrived or changed since the work was done (meeting, mail, data cut).
+- **Revisit assumptions** — a decision taken under doubt that a fresh session should test.
+- **QA with another model or harness** — the work is done; a blind second pass catches what this session cannot (`cross-check` when it needs a panel).
+- **Related commitment** — an open commitment of the owner that this work unblocks or advances.
+- **Next plan / EDT step** — a ready node (`node:<id>`) or the next pending activity.
+- **Replay** — the method just used applies to another dataset, client or subject.
+- **Lateral fork** — an adjacent idea that should not derail this thread.
 
-| Id | Name | When |
-|----|------|------|
-| replay | Replay / transfer | Methodology just used; another dataset, client, or subject exists |
-| qa | Deep review / QA | Artifacts were produced; worth audit, tests, or consistency pass |
-| next | Next plan / EDT step | Active plan has a ready node, or entity contract has next pending activity |
-| fork | Lateral fork | Adjacent idea that should not derail this thread |
+Each proposal: one line with intent, why now (the evidence), and where it runs (`here | session | agent | dream`). Omit kinds with no evidence. Rank by usefulness to the owner, not by kind.
 
-Each row: one-line intent + suggested default tier. When anchoring to a plan node,
-cite `node:<id>` in the intent line.
+## Queue for dream (JMP-4)
 
-## Context tiers
+When a proposal can run without the owner (clear inputs, verifiable output, no decision pending), offer `dream` as its destination: open an issue with the `dispatch:execute` label in the destination repo (it must be in `dispatch.executor.repos`), with the prompt as body; or, for work without a repo, append it under `## Pendientes` in `$SECRETARY_INSTANCE/subsystem/dream/queue.md`. Ask before either: both are writes outside the session. Dream evaluates it with its own filters; queuing does not guarantee a PR.
 
-Owner picks **per archetype** (not one global tier).
+## Prompt rules
 
-| Tier | Contents |
-|------|----------|
-| **Surgical** | 1–2 lines. Verb + target. Assumes the next agent reads the repo. |
-| **Operational** | Plan node id and/or EDT id, input paths, expected deliverable. No full contract dump. |
-| **Autonomous** | Self-contained: goal, plan_ref excerpt or contract excerpt, acceptance, no-goals, constraints. Fit for a clean session or offload. |
+Every prompt, whatever its size:
 
-## Loop
+1. **Starts by checking whether the work is already done** elsewhere: merged PRs, other branches or worktrees, newer briefs, the file it would produce. If done, the agent reports where and stops.
+2. Names the destination repo or folder as an absolute path, the objective, the first file to read and an observable completion criterion.
+3. Carries the essentials itself; does not depend on chat history or a harness-specific tool.
+4. References only paths another agent can read: repo files by absolute path, files on a pushed topic branch as `<branch>:<path>` (`git show origin/<branch>:<path>`), Drive URLs. Never scratchpad, `/tmp` or an uncommitted file in a harness worktree.
+5. Cites the brief (absolute path) when there is one, and says to mark it `done` (move to `.briefs/_archivo/`, add `closed:`) when the work it hands over is finished.
+6. States no-goals: do not reshape `docs/plans` graphs or mutate `contract.yaml` without owner OK.
 
-1. Scan. Build the archetype table with a recommended tier each.
-2. Ask which rows to emit, and which tier per row (defaults in the table).
-3. Write only the chosen prompts — paste-ready, no narration inside them.
-4. Offer handoff per prompt:
-   - **Stay** — leave in chat (and optionally `<session-cwd>/.briefs/YYYY-MM-DD-HHMM-<slug>.md`).
-   - **Offload** — pass the prompt to the harness offload/restart playbook (issue +
-     clean-context brief). Jump does not spawn sessions itself.
+Size follows need: a one-line instruction when the next agent only has to read the repo; a 120–200 word self-contained prose block when it starts cold.
 
-## Prompt shapes
+## Output
 
-**Surgical**
+- Each prompt goes in **one fenced `text` block**, with no fence and no rendered markdown inside. When there is one prompt, its block is the **last element** of the answer.
+- Several prompts: one block each, each preceded by a one-line label; the last block ends the answer.
+- After the block(s), never before and never instead: offer the harness session card as an option (`reply "card" to start it as a session here`). Create it only on that reply.
 
-```
-<imperative one-liner>. Repo is already the cwd.
-```
+Prompt shape (prose, no headings inside):
 
-**Operational**
-
-```
-Do <action> for plan node <id> (mode <mode>) — <title>.
-Inputs: <paths>.
-Output: <deliverable path or artifact>.
-Do not reshape docs/plans graph or mutate contract.yaml without owner OK.
+```text
+Before starting, check whether this is already done: <where to look: PRs, branches, newer briefs, the output file>. If it is, report where and stop.
+Repo: <absolute path>. Objective: <one sentence>. Read first: <absolute path of brief or file>.
+<Inputs and context the next agent needs, in prose.>
+Done when: <observable criterion>. Then mark the brief done (move it to .briefs/_archivo/ with closed: <date>).
+Do not <no-goals>.
 ```
 
-**Autonomous** — prose block, no headings inside, ~120–200 words. Include: destination
-cwd or repo, plan_ref and/or EDT id, acceptance, explicit no-goals, "do not mutate
-contract.yaml; append plan Log only".
+## Loop (standalone)
 
-## Continuity fallback (callers)
-
-If jump is unavailable or the session had no material work, callers must not block
-close. Two lines max:
-
-```
-Continuity: local handover in <session-cwd>/.briefs/ <or> none.
-Open issues: <list or none>.
-```
+1. Scan. Build the proposal list (one line each, recommended first).
+2. Ask which to emit, by number or keyword, with a reply block as the last element.
+3. Emit the chosen prompts per **Output**. Offer the card after them.
 
 ## Don't
 
 - Close the session, push, or merge
 - Invent EDT activities or plan nodes
 - Mutate `contract.yaml` or reshape a plan graph
-- Emit all three tiers for every archetype unless asked
-- Offload without owner pick
+- Ask the owner to pick a context tier or archetype
+- Create a harness session card without the owner asking for it
+- Emit a prompt that skips the "already done?" check

@@ -25,7 +25,16 @@ jobs:
         run: python scripts/ci/check_no_leaks.py
 
       # The whole suite, so new tests (routine scripts, skill distribution,
-      # Codex rules) cannot merge untested. secd tests need a real instance
-      # (SECRETARY_INSTANCE) and stay local: `npm --prefix secd test`.
+      # Codex rules) cannot merge untested.
       - name: Test suite
         run: python -m pytest -q tests
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # secd case bundles + extractor memory writes, on synthetic temp
+      # instances. The checks against a real instance stay local:
+      # `npm --prefix secd run test:instance`.
+      - name: secd tests
+        run: npm --prefix secd test

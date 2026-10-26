@@ -1,7 +1,7 @@
 # secd — Secretary local daemon
 
 A tiny loopback-only HTTP server that exposes Secretary's context to a browser
-extension ([Axon](https://github.com/yourusername/axon)) while you read a WhatsApp
+extension ([Axon](https://github.com/alvaroemur/axon)) while you read a WhatsApp
 conversation, and accepts signals back into Secretary. It is the bridge defined
 in **Feature 007 — Axon × Secretary** (RFC in the instance repo at
 `_design/specs/007-axon-secretary-relay/spec.md`).
@@ -90,6 +90,29 @@ Optional estimates read rates from `<instance>/.secd/capture.json`:
 
 Missing rates produce an unavailable estimate, never a fabricated cost.
 
+### Extractor memory
+
+When a case finishes processing (`ready` or `partial`), secd also writes it into
+the WhatsApp extractor memory that `wiki-update` reads, all with
+`pendiente_wiki: true`:
+
+- `extractors/whatsapp/summaries/<date>-<time>-<chat>.md`: frontmatter plus the
+  same transcript as the bundle's `transcript.md`.
+- `extractors/whatsapp/memory/chats.md`: one entry per case, pointing to the summary.
+- `extractors/whatsapp/memory/acciones.md`: only when the payload carries an
+  `accion` object (`accion` required; `responsable`, `deadline`, `contexto`
+  optional). `responsable` defaults to the owner.
+
+Outgoing messages and the default `responsable` use `identity.name` from
+`.secretary.yml` (fallback `yo`). The optional boolean `is_group` sets
+`categoria: proyecto`; without it, a `chat_id` ending in `@g.us` counts as a group.
+
+`manifest.memory` records the summary path and action id. A retry rewrites the
+summary in place and does not append a second `chats.md` entry or action. If
+`wiki-update` already integrated the entry, it does not see the rewrite. A failed
+memory write marks the case `partial` with `memory_write_failed`; retry it like
+any other failure.
+
 ### Start automatically on macOS
 
 ```bash
@@ -119,7 +142,7 @@ LaunchAgents do not normally inherit `OPENAI_API_KEY` from an interactive shell.
 | POST | `/objectives` | yes | create/update an objective (daemon mints id/date) |
 | GET | `/recall?q=` | yes | free-text search over wiki articles |
 | POST | `/relay` | yes | LLM-backed (or stub) intention + objective + reply suggestions |
-| POST | `/signal` | yes | record a durable fact (scaffold → `whatsapp/memory/relay-signals.md`) |
+| POST | `/signal` | yes | record a durable fact (scaffold → `extractors/whatsapp/memory/relay-signals.md`) |
 | POST | `/cases/estimate` | yes | validate a proposed case and return counts, bytes, and configured cost estimate |
 | POST | `/cases` | yes | validate, preserve, process, and return a case manifest |
 | POST | `/capture` | yes | compatibility alias for `POST /cases` |
@@ -153,12 +176,14 @@ secd/
     relay.mjs         deterministic stub (LLM goes here later)
     modules.mjs       module contracts via `secretary modules` CLI (spec 015)
     whatsapp-cases.mjs validation, bundle persistence, processing, retry
+    capture.mjs       extractor memory writes (summaries/, chats.md, acciones.md)
   test/run.mjs        offline checks
 ```
 
 ## Not done yet (see RFC)
 
 - Relay is live on OpenAI; switching to Claude is a config change (`provider: "anthropic"`).
-- `/signal` remains a scaffold; full wiki-lazy integration is P3.
+- `secd` lifecycle (login item / Secretary runtime) — currently run by hand.
+- `/signal` is still a scaffold, not wired into sec-write's wiki annotation flow.
 - Tighter objective↔entity grounding (e.g. relationship objectives linked to the
   people in an org, not just the org) so replies cite the right numbers.

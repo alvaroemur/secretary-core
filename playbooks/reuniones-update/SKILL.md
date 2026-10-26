@@ -388,14 +388,14 @@ ultima_actualizacion: YYYY-MM-DD
 
 <Bullets con las decisiones acordadas. Citar literalmente cuando la frase es contundente y útil para fundamentar decisión futura.>
 
-## Acciones / pendientes
+## Compromisos / pendientes
 
-| # | Quién | Acción | Deadline | Estado |
-|---|-------|--------|----------|--------|
-| 1 | <persona> | <acción concreta> | <YYYY-MM-DD o —> | abierta |
+| # | Quién | Compromiso | Deadline | Estado |
+|---|-------|------------|----------|--------|
+| 1 | <persona> | <compromiso concreto> | <YYYY-MM-DD o —> | abierta |
 
-**Ticket candidate:** si una acción es un pedido nuevo de un cliente
-(no seguimiento de trabajo ya acordado), marcarla con "📎 posible ticket" en la tabla. Nunca
+**Ticket candidate:** si un compromiso es un pedido nuevo de un cliente
+(no seguimiento de trabajo ya acordado), marcarlo con "📎 posible ticket" en la tabla. Nunca
 escribir en `subsystem/contratos/tickets.md` directamente — el dueño decide qué cuenta como
 trabajo facturable/trackeable y lo registra a mano.
 
@@ -553,10 +553,12 @@ Per processed group:
 ### Phase 6 — Final report
 
 The report (Markdown) is not printed standalone: write to a temp file and pass as **PR body**
-(Phase 7). Content:
+(Phase 7). Owner-facing text (report, summaries) says **compromisos**, never "acciones"; the
+`acc-…` IDs, `acciones.md` and `secretary acc` keep their names. Content:
 - Number of groups processed.
 - Number of shell files discarded.
 - List of summaries generated (paths).
+- New and updated commitments: counts plus one line per new owner commitment (`acc-…` + title).
 - Drive move errors (if any).
 - Files in "awaiting stability" state (modified <10min ago) for next run to pick up.
 - **Haiku delegation (pilot D15.8):** per group, whether 2a passed validation, needed the retry,

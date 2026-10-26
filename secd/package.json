@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node server.mjs",
-    "test": "node test/run.mjs"
+    "test": "node test/capture.mjs && node test/run.mjs"
   },
   "engines": {
     "node": ">=20"

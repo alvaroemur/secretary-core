@@ -8,8 +8,9 @@
 // LLM) does the synthesis into wiki prose when it integrates, same as it
 // already does for other extractors' raw consolidated facts.
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { configScalar } from './config.mjs';
 import { resolveEntity } from './resolver.mjs';
 
 function memoryDir(instance) {
@@ -18,6 +19,18 @@ function memoryDir(instance) {
 
 function summariesDir(instance) {
   return join(instance, 'extractors', 'whatsapp', 'summaries');
+}
+
+/** Create the extractor contract dirs (memory/, summaries/) before any write. */
+function ensureContractDirs(instance) {
+  for (const dir of [memoryDir(instance), summariesDir(instance)]) {
+    mkdirSync(dir, { recursive: true });
+  }
+}
+
+/** Instance owner's display name, read at runtime from `identity.name` in `.secretary.yml`. */
+function ownerName(instance) {
+  return configScalar(instance, 'identity.name', 'yo');
 }
 
 function pad2(n) {
@@ -62,7 +75,7 @@ function periodFromMessages(messages) {
 }
 
 /** Render the raw transcript body (frontmatter + message list) written to summaries/. */
-function renderTranscript({ chatId, alias, jid, isGroup, categoria, messages }) {
+function renderTranscript({ owner, chatId, alias, jid, isGroup, categoria, messages }) {
   const fm = [
     '---',
     'fuente: axon',
@@ -78,7 +91,7 @@ function renderTranscript({ chatId, alias, jid, isGroup, categoria, messages }) 
   ].join('\n');
 
   const lines = messages.map((m) => {
-    const who = m.type === 'message-out' ? 'Álvaro' : (m.senderName || alias || 'contacto');
+    const who = m.type === 'message-out' ? owner : (m.senderName || alias || 'contacto');
     const ts = m.backupTimestamp || (typeof m.timestamp === 'number' ? new Date(m.timestamp).toISOString() : '—');
     let content = m.content;
     if (content == null) content = `[${m.format || 'contenido'}]`;
@@ -103,8 +116,8 @@ export function appendChatCapture(instance, { chatId, alias, jid, isGroup, messa
   // monitoring) doesn't apply to an attended read.
   const categoria = isGroup ? 'proyecto' : 'persona';
 
+  ensureContractDirs(instance);
   const dir = summariesDir(instance);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   const stamp = todayStamp();
   const slug = slugify(alias || chatId);
   let summaryFile = `${stamp}-${timeStamp()}-${slug}.md`;
@@ -116,7 +129,7 @@ export function appendChatCapture(instance, { chatId, alias, jid, isGroup, messa
     summaryPath = join(dir, summaryFile);
     n += 1;
   }
-  writeFileSync(summaryPath, renderTranscript({ chatId, alias, jid, isGroup, categoria, messages }));
+  writeFileSync(summaryPath, renderTranscript({ owner: ownerName(instance), chatId, alias, jid, isGroup, categoria, messages }));
 
   // temas: only emit a wikilink when it resolves to an *existing* wiki
   // article (the resolver's index is built from real articles, so this is
@@ -138,7 +151,13 @@ export function appendChatCapture(instance, { chatId, alias, jid, isGroup, messa
     '- pendiente_wiki: true',
     '',
   ].join('\n');
-  appendFileSync(chatsFile, entry);
+  try {
+    appendFileSync(chatsFile, entry);
+  } catch (err) {
+    // no orphan summary: chats.md is the index wiki-update reads
+    rmSync(summaryPath, { force: true });
+    throw err;
+  }
 
   return {
     chatsFile: `extractors/whatsapp/memory/chats.md`,
@@ -164,12 +183,13 @@ function nextAccionId(instance, stamp) {
  */
 export function appendAccion(instance, { responsable, accion, deadline, contexto, origen }) {
   if (!accion) throw new Error('accion required');
+  ensureContractDirs(instance);
   const id = nextAccionId(instance, compactStamp());
   const file = join(memoryDir(instance), 'acciones.md');
   const entry = [
     '',
     `## ${id}`,
-    `- responsable: ${responsable || 'Álvaro Mur'}`,
+    `- responsable: ${responsable || ownerName(instance)}`,
     `- accion: ${accion}`,
     `- deadline: ${deadline || '—'}`,
     '- estado: pendiente',

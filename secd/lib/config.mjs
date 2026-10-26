@@ -47,3 +47,33 @@ export function loadOrCreateToken(instance) {
   writeFileSync(file, token + '\n', { mode: 0o600 });
   return token;
 }
+
+/**
+ * Read one scalar from the instance `.secretary.yml` by dotted key (e.g.
+ * `identity.name`), the same lookup as `secretary config get`. Zero-dep: only
+ * handles nested maps of plain scalars. Returns `fallback` when the file or
+ * key is missing, so the core never hardcodes instance values.
+ */
+export function configScalar(instance, key, fallback = null) {
+  const file = join(instance, '.secretary.yml');
+  if (!existsSync(file)) return fallback;
+  const lines = readFileSync(file, 'utf8').split('\n');
+  const parts = key.split('.');
+  let depth = 0;
+  let indent = -1;
+  for (const line of lines) {
+    if (!line.trim() || line.trimStart().startsWith('#')) continue;
+    const m = line.match(/^(\s*)([^:#\s][^:]*):\s*(.*?)\s*$/);
+    if (!m) continue;
+    const lineIndent = m[1].length;
+    if (depth > 0 && lineIndent <= indent) return fallback; // left the parent map
+    if (m[2].trim() !== parts[depth]) continue;
+    if (depth === parts.length - 1) {
+      const v = m[3].replace(/\s+#.*$/, '').replace(/^['"]|['"]$/g, '').trim();
+      return v || fallback;
+    }
+    depth += 1;
+    indent = lineIndent;
+  }
+  return fallback;
+}

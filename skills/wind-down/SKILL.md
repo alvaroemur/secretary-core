@@ -37,7 +37,11 @@ Every output another session or harness must read (briefs, analysis reports, pro
 
 - Briefs: `<main-checkout>/.briefs/`. Analysis: `<main-checkout>/.analysis/<topic>/`. Both are ignored globally (`~/.gitignore_global`); they are local working files, not repo content.
 - The paste-ready prompt carries the essentials itself; it may cite these absolute paths, never a scratchpad, `/tmp` or harness-worktree path.
-- **Harness guard.** Some harnesses block file tools from a harness worktree to the main checkout (Claude Code: "This session is running in an isolated git worktree…"). Do not work around it with shell redirection. Write the output in the worktree, then rescue it in Stage 0 (copy step), which reports the copy; if the copy is blocked too, put the full content in the paste-ready block and mark the session as not archivable until the owner saves it.
+- **Harness guard (XCK-4).** Some harnesses block file tools from a harness worktree to the main checkout (Claude Code: "This session is running in an isolated git worktree…"). Never work around it with the shell.
+  - Read-only sessions (evaluators, reviews) run without a worktree and write straight to the main checkout.
+  - A session in a harness worktree writes the output inside its worktree and puts, in the paste-ready block, the absolute path **and the full content**.
+  - The rescue is done by a session that runs in the main checkout: the original session when it ingests the block, or wind-down run from there. It copies the content to `<main-checkout>/.briefs/` or `.analysis/` and says the other session can be archived.
+  - `.briefs/` and `.analysis/` are never committed. Only the topic's own files go on the topic branch.
 
 ### Related work sweep (read-only)
 
@@ -144,11 +148,12 @@ Scan repos touched, then do, in order, and record each result as a ✓ (or ⚠�
    - Topic work on the main checkout → commit on a topic branch, `git switch main` in the main checkout, `git worktree add <repo>/.wt/<branch-slug> <branch>`.
    - Harness-managed worktree → do not move it: commit + push, `git switch --detach` there, then `git worktree add <repo>/.wt/<branch-slug> <branch>`.
    Stop on that topic only (report, propose the command) when another live session uses the folder, there are uncommitted changes not from this session, or the destination exists.
-2. **Rescue uncommitted files (XCK-3).** In the session's worktree, `git status --porcelain --ignored` and classify each file:
+2. **Rescue uncommitted files (XCK-3, XCK-4).** In the session's checkout, `git status --porcelain --ignored` and classify each file:
    - Part of the topic → commit on the topic branch.
-   - Output for another session (`.briefs/`, `.analysis/`, reports, prompts) → copy to the same relative path in the main checkout; report source → destination.
+   - Output for another session (`.briefs/`, `.analysis/`, reports, prompts) → never committed. If this session runs in the main checkout, it is already in place. If it runs in a harness worktree, it cannot copy across the guard: list each file with its absolute source path and target `<main-checkout>/<same relative path>`, and put its full content in the paste-ready block.
    - Neither (build cache, scratch) → leave it, list nothing.
-   Anything that could not be rescued blocks archiving (Stage 2: "can you archive?" = no).
+   When wind-down runs **from the main checkout**, it also rescues the outputs of harness worktrees in the touched repos (pasted blocks it received, or files under `<repo>/.claude/worktrees/*/.briefs|.analysis`): copy to the main checkout, report source → destination, and say which session can now be archived.
+   Any output left unrescued blocks archiving (Stage 2: "can you archive?" = no, with the list of what to copy and where).
 3. **Commit, push, PR.** Commit per topic (Conventional Commits per instance `AGENTS.md`), push, open the PR not draft, update the body if it drifted. Sign per **GitHub signature**.
 4. **Cleanup.** Apply the **Cleanup rule** to every integrated worktree in the touched repos.
 5. **Briefs.** Apply the **Brief lifecycle** to briefs this session resumed or wrote.
@@ -198,7 +203,7 @@ Render only sections with items. Each item carries its ✓ from Stage 0. Numbere
 
 ### Continuity
 - ✓ brief `<abs path>` (pending) · ✓ previous brief `<abs path>` → superseded
-- ✓ rescued `<file>` → `<abs path in main checkout>`
+- ✓ rescued `<file>` → `<abs path in main checkout>` (or ⚠️ to copy: `<abs source>` → `<abs target>`, content in the block below)
 - Restart prompt below; the harness card is offered after the close
 
 Reply with numbers (`1 3`), `all`, or `none`, or edit the block:
@@ -219,7 +224,7 @@ Run what the owner accepted: merges through `desk-merge` (merge commit, then cle
 
 - **yes** — nothing in progress, everything committed or rescued, no merge pending on this session.
 - **yes, with conditions** — archivable once the owner does something outside the session (merge a PR, read the brief, check a related session). Name each condition.
-- **no** — something could not be rescued, work is mid-edit, or a running process depends on this folder. Say why.
+- **no** — an output is still only in a harness worktree, work is mid-edit, or a running process depends on this folder. Say why and list what to copy and where.
 
 **GitHub signature (mandatory)** before any `gh pr create`, `gh issue create`, or
 `gh issue comment` this skill emits — prefer `secretary signature wind-down

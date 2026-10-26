@@ -24,7 +24,7 @@ For a standalone invocation, collect current checkout status, branch, commit, re
 Infer a short title and destination from the request. Ask once if a material choice cannot be inferred. Do not ask again for inputs or permission already provided.
 
 - Briefs go to the **main checkout** of the repo, under an absolute path: `<main-checkout>/.briefs/YYYY-MM-DD-HHMM-<slug>.md`, where `<main-checkout>` is the parent of `git rev-parse --path-format=absolute --git-common-dir`. Never a harness worktree, scratchpad or `/tmp`: archiving a harness session discards its uncommitted files.
-- If the harness blocks writing from its worktree to the main checkout, do not work around it with shell redirection: write the brief at the same relative path in the worktree and report it, so wind-down rescues it (copy to the main checkout) or the owner saves it.
+- If the harness blocks writing from its worktree to the main checkout, never work around it with the shell: write the brief at the same relative path in the worktree and return its absolute path **and full content** in a paste-ready block, so a session running in the main checkout copies it (the original session, or wind-down run from there).
 - `.briefs/` is ignored globally (`~/.gitignore_global`): briefs are local working files, readable by any harness on this machine, never committed.
 - Standalone: respect an explicit destination. A person-facing handover may use `docs/handovers/` when requested.
 - Keep briefs for work repos in those repos. Never place them in the instance brief tree.

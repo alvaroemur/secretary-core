@@ -7,7 +7,7 @@ on:
 
 jobs:
   leak-guard:
-    name: Leak guard + example drift
+    name: Leak guard + test suite
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,12 +16,16 @@ jobs:
         with:
           python-version: "3.11"
 
+      # pytest also runs the unittest-style tests. The gwork submodule from
+      # requirements-dev.txt is not needed by the suite, so it is not installed.
       - name: Install package
-        run: pip install -e .
+        run: pip install -e . "pytest>=8"
 
       - name: Leak guard (no sensitive literals in tracked files)
         run: python scripts/ci/check_no_leaks.py
 
-      # Drift check: the private playbooks/ and skills/ sources are gitignored and
-      # not present in CI, so `export-examples --check` cannot run here. It is a
-      # local / pre-commit gate. See cli/README.md.
+      # The whole suite, so new tests (routine scripts, skill distribution,
+      # Codex rules) cannot merge untested. secd tests need a real instance
+      # (SECRETARY_INSTANCE) and stay local: `npm --prefix secd test`.
+      - name: Test suite
+        run: python -m pytest -q tests

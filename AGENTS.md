@@ -1,9 +1,28 @@
-# Agent Discipline
+# Instrucciones para agentes de secretary-core
 
-Agents operating within `secretary-core` (e.g., Claude Code, routines, or subagents) must adhere to the following discipline:
+Este repo contiene el engine reutilizable. Los datos, políticas y configuración privada pertenecen a la instancia. No commitees rutas personales, emails reales, claves, nombres de clientes ni datasets privados.
 
-## Workflow
-- **Branching**: Agents must work on thread branches, never directly on `main`.
-- **Delivery**: When work is completed or requires review, agents must deliver a PR and include a detailed report or `walkthrough.md`.
-- **Blocking / Doubts**: If an agent encounters ambiguity, missing information, or is blocked, they must NOT guess or make sweeping assumptions. Instead, they should push doubts to `needs-triage` issues, ensuring deduplication and allowing for periodic triage by the human operator.
-- **Artifacts**: Use markdown artifacts to present structured plans, walkthroughs, and checklists to the human operator.
+## Desarrollo
+
+- Python >=3.11; CLI Typer en `secretary/main.py`. Instala con `pip install -e .` o `uv pip install -e .`.
+- El builder de wiki usa solo la biblioteca estándar de Python.
+- Node usa ES Modules. Instala el daemon con `npm install --prefix secd`; el motor WhatsApp con `npm install --prefix whatsapp/src`.
+- El daemon escucha únicamente en `127.0.0.1:8910` y exige Bearer token, salvo `/health`. Ejecuta con `node secd/server.mjs`.
+- CLI: `secretary --help`, `secretary validate`; wiki: `python3 wiki/serve.py`.
+- Pruebas: `python -m unittest discover -s tests`; daemon: `npm --prefix secd test`. Ejecuta las apropiadas al cambio.
+
+## Trabajo y entrega
+
+- Git se rige por la política de la instancia, `canon/rules/git/` (convenciones, worktrees en `.wt/<rama-slug>`, integración con merge commit). Nunca commitees código directamente a main.
+- Scopes existentes: `wiki`, `routines`, `whatsapp`, `mail`, `core`, `docs`, `skills`. Una rama por PR y un hilo por entrega.
+- Entrega por PR con problema, comportamiento resultante, verificaciones y bloqueos. No inventes resultados.
+- Ante una ambigüedad material, registra una pregunta concreta en un issue `needs-triage`, comprobando duplicados. No hagas suposiciones amplias.
+
+## Contexto portable
+
+- `AGENTS.md` guarda instrucciones estables; el estado transitorio vive en un brief de continuidad del repo.
+- Skills y playbooks tienen una sola fuente versionada en `skills/` y `playbooks/`, sin datos personales: los valores de instancia se leen con `secretary config get <clave>`. Lo propio de la instancia vive en su `canon/skills/` y `canon/playbooks/`.
+- `wind-down` recoge una vez el contexto y produce un brief único. Hace lo seguro sin preguntar (commit, push, PR listo, rescate de salidas sin commit, borrado de worktrees ya integrados), recomienda mergear por defecto y cierra diciendo si la sesión se puede archivar. La continuidad pasa por `jump` y termina en un bloque para pegar. `desk-merge` ejecuta el merge (merge commit) y borra la rama remota, la local y el worktree.
+- Briefs y análisis: `.briefs/` y `.analysis/` se versionan. Estados `pending` → `done` o `superseded` (estos dos en `.briefs/_archivo/`). En repos públicos (como este) quedan locales e ignorados. Con rama del tema, la salida para otra sesión se commitea en esa rama; sin rama, la rescata una sesión en el checkout principal. Nunca scratchpad ni `/tmp`.
+- `secretary efficiency` ofrece snapshot y métricas opcionales dentro del CLI; ningún skill requiere un runtime adicional.
+- Instalación de skills: una copia en `~/.agents/skills`, symlinks en `~/.claude/skills`, sin copias del core en otros harnesses. El leak-guard de CI bloquea datos personales en archivos versionados (`cli/README.md`).

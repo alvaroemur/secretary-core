@@ -122,7 +122,8 @@ def collect_user_doctrine(config: dict[str, Any] | None = None) -> dict[str, Any
     cfg = config if config is not None else (load_config() if (instance_root() / ".secretary.yml").is_file() else {})
 
     sources_to_try: list[Path] = [
-        Path.home() / ".claude" / "CLAUDE.md",
+        Path.home() / ".agents" / "AGENTS.md",
+        Path.home() / ".codex" / "AGENTS.md",
         Path.home() / ".gemini" / "config" / "AGENTS.md",
         Path.home() / ".cursorrules",
         instance_root() / "canon" / "rules" / "session" / "estilo-voz.md",
@@ -238,7 +239,10 @@ def collect_system_taxonomy(config: dict[str, Any] | None = None) -> dict[str, A
 def collect_skills(config: dict[str, Any] | None = None) -> list[SkillInfo]:
     """Scan and list all active skills across known directories."""
     skill_dirs: list[Path] = [
+        Path.home() / ".agents" / "skills",
+        Path.home() / ".codex" / "skills",
         Path.home() / ".claude" / "skills",
+        Path.home() / ".cursor" / "skills",
         Path.home() / ".gemini" / "config" / "skills",
         Path.home() / ".cursor" / "skills-cursor",
         core_root() / "skills",
@@ -246,6 +250,10 @@ def collect_skills(config: dict[str, Any] | None = None) -> list[SkillInfo]:
 
     seen_names: set[str] = set()
     skills: list[SkillInfo] = []
+    registry = Path(__file__).parent / "data" / "desk_names.json"
+    aliases = json.loads(registry.read_text()).get("skills", {}) if registry.is_file() else {}
+    installed = {entry.name for folder in skill_dirs if folder.is_dir()
+                 for entry in folder.iterdir() if (entry / "SKILL.md").is_file()}
 
     for sdir in skill_dirs:
         if not sdir.is_dir():
@@ -261,6 +269,9 @@ def collect_skills(config: dict[str, Any] | None = None) -> list[SkillInfo]:
                 continue
 
             name = entry.name if entry.is_dir() else entry.parent.name
+            # Compatibility aliases are callable, but not extra procedures.
+            if name in aliases and aliases[name] in installed:
+                continue
             if name in seen_names:
                 continue
 
@@ -319,7 +330,8 @@ def collect_routines(config: dict[str, Any] | None = None) -> dict[str, Any]:
         if not isinstance(r, dict):
             continue
         rid = r.get("id", "")
-        status = "disabled" if rid in disabled_list else "active"
+        # `enabled: false` in the manifest and dispatch.routines.disabled both turn a routine off.
+        status = "disabled" if rid in disabled_list or r.get("enabled") is False else "active"
         routines_list.append(
             RoutineInfo(
                 id=rid,
@@ -347,7 +359,7 @@ def collect_git_policy(config: dict[str, Any] | None = None) -> dict[str, Any]:
         "worktree_discipline": "~/.secretary checkout principal permanece en main; ramas de trabajo en worktrees",
         "references": "Solo citar #N cuando corresponde a un issue/PR real de GitHub (nunca placeholders como #00 o #TBD)",
         "signatures": {
-            "generator": "~/.claude/scripts/sec-signature.sh <contexto>",
+            "generator": "secretary signature <contexto> --runtime <runtime>",
             "mark": "<!-- agent-generated:<contexto> runtime=<runtime> -->",
             "footer": "🤖 _Generado por <runtime> — <contexto> · <fecha>_",
         },
@@ -475,7 +487,7 @@ def collect_host_context(cwd: Path | None = None) -> HostRepoContext:
 
     local_rules_path: Optional[str] = None
     local_rules_content: Optional[str] = None
-    for cand in [target_dir / "AGENTS.md", target_dir / "CLAUDE.md", target_dir / ".cursorrules"]:
+    for cand in [target_dir / "AGENTS.md", target_dir / ".cursorrules"]:
         if cand.is_file():
             local_rules_path = str(cand)
             local_rules_content = _safe_read_text(cand)
@@ -753,7 +765,9 @@ def format_compact(context_data: dict[str, Any]) -> str:
     host = context_data.get("host_context", {})
     user = context_data.get("user_doctrine", {})
     skills_count = len(context_data.get("skills", []))
-    routines_count = len(context_data.get("routines", {}).get("routines", []))
+    routines_count = sum(
+        1 for r in context_data.get("routines", {}).get("routines", []) if r.get("status") == "active"
+    )
     cursor_rules_count = len(host.get("cursor_rules", []))
     claude_mem = host.get("claude_memory")
     mem_str = f" | Claude Memory: {len(claude_mem.get('bullets', []))} bullets" if claude_mem else ""

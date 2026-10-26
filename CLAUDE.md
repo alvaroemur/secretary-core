@@ -35,7 +35,7 @@ Guidelines and commands for developing in `secretary-core`.
 - Keep daemon dependencies minimal.
 
 ### Git & Workflow
-- **Branching**: Do NOT commit directly to `main`. Always work on thread feature branches (`feat/*`, `fix/*`).
+- **Branching**: Do NOT commit directly to `main`. One topic per worktree at `.wt/<branch-slug>`, branch `<scope>/<desc>` cut from `origin/main`, one PR, merged with a merge commit. Policy: instance `canon/rules/git/`.
 - **Commits**: Follow Conventional Commits format: `<type>(<scope>): <message>`.
   - Valid scopes: `wiki`, `routines`, `whatsapp`, `mail`, `core`, `docs`, `skills`.
 - **Anonymity**: The core repository (`secretary-core`) is public-ready. Do NOT commit private paths, personal emails, keys, or business/personal names. Use `.example` files and keep custom configs gitignored.

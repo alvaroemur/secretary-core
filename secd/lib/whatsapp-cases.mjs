@@ -437,7 +437,20 @@ async function describeImage(instance, path, mime, caption, fetchImpl) {
   };
 }
 
-async function processBundle(instance, bundlePath, fetchImpl = globalThis.fetch) {
+// One in-flight pass per bundle: concurrent callers share it instead of
+// starting a second round of model calls and racing writes on the same files.
+const inFlight = new Map();
+
+function processBundle(instance, bundlePath, fetchImpl) {
+  const key = resolve(bundlePath);
+  const running = inFlight.get(key);
+  if (running) return running;
+  const pass = runBundle(instance, bundlePath, fetchImpl).finally(() => inFlight.delete(key));
+  inFlight.set(key, pass);
+  return pass;
+}
+
+async function runBundle(instance, bundlePath, fetchImpl = globalThis.fetch) {
   const manifestPath = join(bundlePath, 'manifest.json');
   const manifest = readJson(manifestPath);
   const messages = readFileSync(join(bundlePath, 'messages.jsonl'), 'utf8')

@@ -273,3 +273,46 @@ test('marks partial failures and retries idempotently', async () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('serializes deferred processing and a concurrent retry on the same bundle', async () => {
+  const root = instance();
+  try {
+    let calls = 0;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    let firstCall;
+    const started = new Promise((resolve) => { firstCall = resolve; });
+    const gatedFetch = async (...args) => {
+      calls += 1;
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      firstCall();
+      await gate;
+      inFlight -= 1;
+      return imageFetch(...args);
+    };
+    const processing = await createCase(root, fixture(), { fetchImpl: gatedFetch, defer: true });
+    const bundleName = processing.bundle_path.split('/').at(-1);
+    await started;
+    const retry = retryCase(root, bundleName, { fetchImpl: gatedFetch });
+    const recreate = createCase(root, fixture(), { fetchImpl: gatedFetch });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(calls, 1);
+    release();
+    const [retried, recreated] = await Promise.all([retry, recreate]);
+    assert.equal(calls, 1);
+    assert.equal(maxInFlight, 1);
+    assert.equal(retried.status, 'ready');
+    assert.equal(recreated.status, 'ready');
+    const stored = readCase(root, bundleName);
+    assert.equal(stored.status, 'ready');
+    assert.equal(stored.processed_counts.media, 1);
+    const lines = readFileSync(join(processing.bundle_path, 'messages.jsonl'), 'utf8').trim().split('\n');
+    assert.equal(lines.length, 1);
+    assert.equal(JSON.parse(lines[0]).media.processing.description, 'A synthetic diagram.');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

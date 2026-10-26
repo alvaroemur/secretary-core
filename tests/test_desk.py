@@ -63,7 +63,7 @@ class DeskTests(unittest.TestCase):
             root = Path(tmp); source = root/'source'; target = root/'installed'
             data = source/'secretary/data'; data.mkdir(parents=True)
             (data/'desk_names.json').write_text('{"skills": {}}')
-            for name in ['desk.py', 'brief_html.py', 'signatures.py']:
+            for name in ['desk.py', 'brief_html.py', 'signatures.py', 'dream_hook.py']:
                 (source/'secretary'/name).write_text('# runtime fixture\n')
             current = '---\nname: wind-down\nmetadata:\n  close-contract: "2"\n---\ncurrent close'
             for folder, text in [('skills', current), ('portable/skills', 'obsolete close')]:

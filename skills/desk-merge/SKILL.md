@@ -28,8 +28,8 @@ Haptics: `secretary` CLI or instance harness scripts for compuerta/delivery sign
 ## What this is NOT
 
 - **Not babysit.** Babysit brings PR to merge-ready and stops. desk-merge merges on confirm.
-- **Not cleanup.** It never deletes worktree folders or local branches. Cleanup is a separate
-  step, proven with `git merge-base --is-ancestor <branch> origin/main`.
+- **Not a general cleanup.** After its own merge it removes that PR's remote branch, local
+  branch and worktree (step 5c). Other integrated worktrees are wind-down's job.
 - **Not for autonomous routines.** Without a human present, mode is inert; `auto-*` merges stay with
   `wiki-update` W0.
 - **Not third-party sends.** Mail/WhatsApp gates are separate.
@@ -120,14 +120,24 @@ wait for remote CI or explicit owner override.
    - high, local-gate: diff first, then `🚧 _secretary: <PR title> ready (local gate) — make official?_`
    - high, remote-green: diff first, then same gate as low remote-green.
 5. **On confirm:** `gh pr merge <N> --merge`. Merge commit only: squash and rebase are disabled
-   by policy. Do not pass `--delete-branch` — GitHub deletes the remote branch on merge, and the
-   flag would also delete the local branch. If the repo still rejects merge commits
+   by policy. Do not pass `--delete-branch`: step 5c removes the branches after checking the
+   worktree. If the repo still rejects merge commits
    (`gh api repos/<owner/repo> -q .allow_merge_commit` is false), stop and report; never fall
    back to squash.
 5b. **Update the local main:** in the repo's main checkout, only if it is on `main` and clean:
    `git -C <main-checkout> fetch origin && git -C <main-checkout> merge --ff-only origin/main`.
-   Otherwise report why it was skipped. Do not touch the topic worktree.
-6. **Signal delivery:** `📬 _secretary delivered — #N merged (merge commit), main updated_`.
+   Otherwise report why it was skipped.
+5c. **Remove what the merge integrated** (CLN-2). After `git fetch origin`, confirm
+   `git merge-base --is-ancestor <branch> origin/main`, then:
+   - remote branch: `git push origin --delete <branch>` if `git ls-remote --exit-code --heads origin <branch>` finds it;
+   - worktree `<repo>/.wt/<branch-slug>`: `git worktree remove <wt>` only if it is clean
+     (`git -C <wt> status --porcelain` empty, untracked included), no process has its cwd there
+     (`lsof -a -d cwd -Fn | grep -F <wt>` empty) and it is not the folder this session runs in;
+   - local branch: `git branch -d <branch>` once no worktree holds it.
+   If a condition fails, keep that piece and name the condition in the delivery line. Never remove a
+   harness-managed worktree (`.claude/worktrees`, `~/.codex/worktrees`, `~/.cursor/worktrees`).
+6. **Signal delivery:** `📬 _secretary delivered — #N merged (merge commit), main updated, branch and worktree removed_`
+   (or name what was kept and why).
 7. **Fold linked actions:** if PR or heartbeat cites `acc-id` with open state in meetings memory:
 
 ```bash
@@ -136,12 +146,14 @@ ACTIONS=$(secretary config path meetings.memory 2>/dev/null)
 # Use instance harness acc-fold script if configured — see AGENTS.md
 ```
 
-8. **Refresh heartbeat:** invoke `desk-heartbeat`, **commit+push `main`**.
+8. **Heartbeat:** the heartbeat routine (`playbooks/sec-heartbeat/procedure.md`) picks the merge
+   up on its next run; do not run it by hand.
 
-## Owner override → lesson (desk-dream/desk-drone PRs only)
+## Owner override → lesson (dream/desk-drone PRs only)
 
 Detectable signal for `cowork-secretary#509` (loop de aprendizajes): at step 4 (raise gate), if the
-PR's branch is `dream/*` (or otherwise authored by desk-dream/desk-drone) **and** the owner's response
+PR's branch is `dream/*` (or otherwise authored by the dream routine, `playbooks/sec-dream/procedure.md`,
+or desk-drone) **and** the owner's response
 is a **substantive correction** rather than a plain confirmation ("yes", "dale", "ok") — e.g. they
 point out a wrong interpretation, ask to re-verify a claim, or edit the deliverable's content before
 merging — treat that as an owner override. Append a stub entry to
@@ -160,8 +172,7 @@ override — do not log noise.
 - Gate OK must be explicit for *that* PR.
 - Default off for `~/Dev` sessions unless activated there, or invoked by wind-down after the
   owner confirms that PR's merge.
-- Post-merge heartbeat push is mandatory.
-- Never squash, never `--delete-branch`, never remove the worktree folder.
+- Never squash, never `--delete-branch`; remove branches and worktree only through step 5c.
 
 ## Output
 

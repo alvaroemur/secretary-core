@@ -1,6 +1,6 @@
 ---
 name: housekeeping
-description: Revisión diaria de higiene del ecosistema — CLAUDE.md reviews, memoria, PRs pendientes, archivos sin commitear. Organiza lo seguro y reporta lo que necesita decisión humana.
+description: Revisión diaria de higiene del ecosistema — CLAUDE.md reviews, memoria, compromisos vencidos, PRs pendientes y sin revisión, archivos sin commitear. Organiza lo seguro y reporta lo que necesita decisión humana.
 ---
 
 # housekeeping — Mantenimiento diario del ecosistema de repos
@@ -73,6 +73,20 @@ Clasificar cada PR:
 - **PRs automáticos** (rama matchea `^(correo|reuniones|whatsapp|wiki|housekeeping)/auto-`): ¿tiene comentarios sin resolver? ¿está listo para merge? ¿hace cuánto se creó?
 - **PRs manuales**: listar para visibilidad.
 - **PRs stale** (>7 días sin actividad): flaggear.
+- **PRs sin revisión (≥1 día)**: abiertos hace 24 h o más y sin revisión (`reviewDecision` vacío o
+  `REVIEW_REQUIRED`). Incluye los PRs de dream y de rutinas. Dream ya no revisa PRs ajenos: esta lista
+  es la única marca de PRs esperando al owner.
+
+```bash
+CORTE="$(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ)"
+jq -r --arg c "$CORTE" '.[] | select(.state=="OPEN" and .createdAt<=$c
+  and ((.reviewDecision // "") | IN("", "REVIEW_REQUIRED")))
+  | [.url, .title, .headRefName, .createdAt] | @tsv' "$SCRATCH"/scan/*/prs.json "$SCRATCH/scan/.secretary/prs.json" \
+  > "$SCRATCH/prs-sin-revision.tsv"
+```
+
+Días sin revisión = días desde `createdAt`. Cada PR de esa lista va a "🔴 Atención primero" como 🟡
+(uno por línea con link; con más de 5, una línea con el conteo y la lista completa en "PRs pendientes").
 
 ### 1.3 CLAUDE.md existentes
 
@@ -109,94 +123,134 @@ Chequeos:
 
 Solo aplicar cambios que sean claramente correctos. Reportar los ambiguos.
 
-## Fase 3.5 — Reconciliación de acciones (spec 007)
+## Fase 3.5 — Reconciliación de compromisos (spec 007)
 
-Barrido diario de `extractors/*/memory/acciones.md` contra evidencia externa. **Solo se aplican por sí mismos los tres casos de "Aplicación automática acotada" (abajo), vía `secretary acc fold` en el worktree del PR de housekeeping — nunca directo a `main`.** Todo lo demás se reporta como propuesta en el PR y, si aplica, en `subsystem/housekeeping/memory/acc-reconciliation-YYYYMMDD.md`.
+En todo texto que lee el owner esto se llama **compromisos**. Los IDs `acc-…`, el archivo
+`acciones.md` y el comando `secretary acc` no cambian.
+
+Barrido diario de `extractors/*/memory/acciones.md` contra evidencia externa. Housekeeping **aplica**
+lo que clasifica `compromisos.py` (abajo), vía `secretary acc fold` en el worktree del PR de
+housekeeping, nunca directo a `main`. Todo lo demás se reporta como propuesta en el PR y, si aplica,
+en `subsystem/housekeeping/memory/acc-reconciliation-YYYYMMDD.md`.
 
 > No hardcodear la ruta ni la forma de `acciones.md`: resolverla con `secretary config path` / `secretary acc fold` (el archivo se está partiendo en piezas más pequeñas y su layout cambiará). Las cerradas fuera de retención viven en `acciones/archivo/YYYY-MM.md`: para consultar un id que no está en el activo usa `secretary acc show <acc-id>`; `secretary acc fold` sobre un id archivado falla a propósito.
 
 ### Alcance
 
-Acciones con `estado` ∈ `{abierta, en-curso, pendiente}` y `dueño` ∈ `{mía, compartida}` en los últimos **45 días** de `detectado` (ignorar backfill histórico salvo flag explícito).
+Compromisos con estado vigente ∈ `{abierta, en-curso, pendiente}` (el del último `[update]`, no solo
+el del bloque base) y `dueño` ∈ `{mía, compartida}`. **Sin ventana de `detectado`:** entra todo el
+ledger. La ventana anterior de 45 días dejaba sin revisar los compromisos más viejos y los acumulaba.
 
-### Reglas de caducidad (proponer `caducada`)
+### Clasificación (`compromisos.py`)
 
-| Condición | `evidencia_cierre` propuesta |
-|-----------|------------------------------|
-| `deadline` < hoy − 14 días, sin `[update]` ni `sec-status` en brief reciente | `manual:housekeeping-caducidad` |
-| `deadline` < `detectado` (nació muerta) | `manual:housekeeping-nacio-muerta` |
-| `tipo: idea` con deadline vencido >30d | `manual:housekeeping-idea-stale` |
+```bash
+CMP_PY="${SECRETARY_CORE:-$HOME/Dev/secretary-core}/playbooks/housekeeping/compromisos.py"
+TERMINADOS="$(secretary config get housekeeping.proyectos_terminados 2>/dev/null | jq -r 'join(",")' || true)"
+python3 "$CMP_PY" \
+  --ledger "$(secretary config path meetings.memory)/acciones.md" \
+  --summaries "$(secretary config path meetings.summaries)" \
+  --terminados "$TERMINADOS" > "$SCRATCH/compromisos.json"
+# .aplicar[]  → acc, estado, evidencia: se aplican con fold (abajo)
+# .proponer[] → acc, regla, motivo: van al reporte como propuesta
+# .proyectos_con_reunion → proyecto: fecha de su última reunión (≤14 días)
+```
 
-### Aplicación automática acotada
+Reglas, en este orden:
 
-Housekeeping **aplica** (no solo propone) exactamente estos tres casos, dentro de su PR diario:
+| Regla | Condición | Resultado | `evidencia_cierre` |
+|-------|-----------|-----------|--------------------|
+| Proyecto terminado | `proyecto` ∈ `housekeeping.proyectos_terminados` (config de la instancia, lista de slugs; opcional) | aplica `cancelada` | `manual:housekeeping-proyecto-terminado` |
+| Nació muerta | `deadline` < `detectado` | aplica `caducada` | `manual:housekeeping-nacio-muerta` |
+| Idea vencida | `tipo: idea` con `deadline` vencido >30 días | aplica `caducada` | `manual:housekeeping-idea-stale` |
+| Vencida y quieta | `deadline` vencido >30 días **y** sin movimiento >30 días (último `detectado` del bloque base o de un `[update]`) | aplica `caducada` | `manual:housekeeping-caducidad-30d` |
+| Vencida | `deadline` vencido >14 días y no cumple lo anterior | propone `caducada` | — |
 
-| Caso | Condición |
-|------|-----------|
-| **Nació muerta** | `deadline` < `detectado` |
-| **Idea vencida** | `tipo: idea` con `deadline` vencido >30 días |
-| **Evento-sesión vencido** | Acción atada a una sesión/reunión/entrevista con `deadline` vencido >30 días, sin `[update]` ni `sec-status` en ningún brief |
+**Excepción CMP-3 — proyecto con reunión en 14 días.** Si el proyecto tiene una reunión en los
+últimos 14 días, las reglas de caducidad (nació muerta, idea, vencida y quieta) **no se aplican solas**:
+el compromiso pasa a propuesta con motivo `proyecto con reunión el <fecha>` y entra al resumen semanal.
+Señal: algún compromiso del proyecto nació de un resumen de los últimos 14 días (`origen`). El campo
+`organizaciones` del resumen suele venir vacío, por eso no se usa. La excepción no frena la regla de
+proyecto terminado.
 
-Antes de aplicar un **evento-sesión**, verificar que el evento **no ocurrió**: carpeta en
-`Cowork/*/proyectos/**/entrevistas/` o resumen en `extractors/meetings/summaries/` (±2 días del
-deadline). Si hay rastro de que ocurrió → no caducar; pasa a "Proponer cerrar".
+Antes de aplicar una caducidad a un compromiso de agenda (agendar, reunión, visita, entrevista),
+verificar que el evento **no ocurrió**: carpeta en `Cowork/*/proyectos/**/entrevistas/` o resumen en
+`extractors/meetings/summaries/` (±2 días del deadline). Si hay rastro de que ocurrió → no caducar;
+pasa a "Proponer cerrar".
 
-Si una acción cita un PR como evidencia (cualquier regla), **comprobar que el título del PR
-corresponde a la acción** (`gh pr view <n> --json title`). Un número de PR que aparece en un brief no
+Si un compromiso cita un PR como evidencia (cualquier regla), **comprobar que el título del PR
+corresponde al compromiso** (`gh pr view <n> --json title`). Un número de PR que aparece en un brief no
 prueba nada si el tema es otro (error real del 2026-09-20: una acción citaba el número de un PR de otro tema).
 
-**Guard (obligatorio, por acción):** leer el `estado:` actual del bloque canónico en el worktree y
-llamar a `fold` **solo** si es `abierta`, `en-curso` o `pendiente`. Si ya está cerrada, saltarla sin
+### Aplicación
+
+**Guard (obligatorio, por compromiso):** leer el `estado:` actual del bloque canónico en el worktree y
+llamar a `fold` **solo** si es `abierta`, `en-curso` o `pendiente`. Si ya está cerrado, saltarlo sin
 error (no es un candidato).
 
 **Tope: máximo 10 aplicaciones por corrida.** Del candidato 11 en adelante no se aplica: pasa a
-"Proponer caducar" con la nota `tope de 10 alcanzado`, y el tope alcanzado va a "🔴 Atención primero"
-como 🟡. Si `fold` devuelve error, no cuenta para el tope y la acción se reporta como "Conflicto".
+"Proponer caducar" con la nota `tope de 10 alcanzado` y la corrida siguiente lo retoma. Si `fold`
+devuelve error, no cuenta para el tope y el compromiso se reporta como "Conflicto".
+
+Cada aplicación y cada propuesta CMP-3 se registra en
+`subsystem/housekeeping/memory/compromisos-caducados.jsonl`. El briefing de los lunes lee ese registro
+para la sección "🗂️ Compromisos caducados esta semana" (últimos 7 días). Una línea por evento:
+`{"fecha","acc","proyecto","titulo","estado","regla"}`, con `estado` ∈ `{caducada, cancelada, propuesta}`.
+Una propuesta no se repite si el mismo `acc` ya tiene una línea `propuesta` en los últimos 7 días.
 
 ```bash
-# desde $WT; una llamada por acc-id; candidatos ya verificados
-export SECRETARY_INSTANCE="$WT" SEC_ACC_ESTADO=caducada
+# desde $WT
+export SECRETARY_INSTANCE="$WT"
 ACC="$(secretary config path meetings.memory)/acciones.md"   # no hardcodear: el layout cambiará
+REG="$WT/subsystem/housekeeping/memory/compromisos-caducados.jsonl"; touch "$REG"
+HOY="$(date +%Y-%m-%d)"; DESDE="$(date -v-7d +%Y-%m-%d)"
 APLICADAS=0
-for entry in "<acc-id> <etiqueta-evidencia> [YYYY-MM-DD]" ...; do
-  set -- $entry; id=$1
+while IFS=$'\t' read -r id estado evidencia proyecto titulo; do
   actual=$(awk -v h="## $id" '$0==h{f=1;next} f&&/^- estado:/{sub(/^- estado: */,"");print;exit} /^## /{f=0}' "$ACC")
   case "$actual" in abierta|en-curso|pendiente) ;; *) continue ;; esac      # guard
   [ "$APLICADAS" -ge 10 ] && { echo "tope alcanzado: $id → propuesta"; continue; }   # tope
-  if secretary acc fold "$@"; then APLICADAS=$((APLICADAS+1)); else echo "fold falló: $id → conflicto"; fi
-done
-#   etiquetas: manual:housekeeping-nacio-muerta | manual:housekeeping-idea-stale | manual:housekeeping-evento-vencido
+  if SEC_ACC_ESTADO="$estado" secretary acc fold "$id" "$evidencia"; then
+    APLICADAS=$((APLICADAS+1))
+    jq -nc --arg f "$HOY" --arg a "$id" --arg p "$proyecto" --arg t "$titulo" --arg e "$estado" \
+      --arg r "${evidencia#manual:housekeeping-}" '{fecha:$f,acc:$a,proyecto:$p,titulo:$t,estado:$e,regla:$r}' >> "$REG"
+  else echo "fold falló: $id → conflicto"; fi
+done < <(jq -r '.aplicar[] | [.acc,.estado,.evidencia,.proyecto,.titulo] | @tsv' "$SCRATCH/compromisos.json")
+# propuestas CMP-3 (proyecto con reunión), sin repetir en 7 días
+jq -c --arg f "$HOY" --arg d "$DESDE" --slurpfile reg <(cat "$REG") '
+  ($reg | map(select(.estado=="propuesta" and .fecha>=$d) | .acc)) as $vistos
+  | .proponer[] | select(.motivo|startswith("proyecto con reunión")) | select(.acc as $a | $vistos|index($a)|not)
+  | {fecha:$f,acc,proyecto,titulo,estado:"propuesta",regla}' "$SCRATCH/compromisos.json" >> "$REG"
 ```
 
-Todo lo demás (caducidad por deadline >14d en acciones que no son evento-sesión, cierres `hecha`,
-conflictos) **sigue como propuesta**. Lo aplicado se lista en el reporte como "Aplicado".
+Los cierres `hecha` y los conflictos **siguen como propuesta**. Lo aplicado se lista en el reporte
+como "Aplicado".
 
 ### Reglas de cierre (proponer `hecha`)
 
 | Evidencia | Condición |
 |-----------|-----------|
 | Brief `sec-status` ✅ para el `acc-id` | Cerrar — `sec-status` |
-| Calendario | Acción de scheduling (agendar/coordinar/confirmar reunión) con evento match en ±2d (`gog calendar`, barrido multi-calendario) — misma lógica que briefing Fase 2.1 |
+| Calendario | Compromiso de agenda (agendar/coordinar/confirmar reunión) con evento match en ±2d (`gog calendar`, barrido multi-calendario) — misma lógica que briefing Fase 2.1 |
 | Correo | Ítem en `extractors/mail/state.md` o PR `correo/auto-*` marca enviado/cancelado para el mismo hilo |
 | PR mergeado | `acc-id` en body del PR o heartbeat `🔗 linked` — aplicar vía `sec-acc-fold.sh` (sec-merge / sesión) |
 | Reunión posterior | Resumen en `extractors/meetings/summaries/` posterior al `detectado` cierra explícitamente el `acc-id` |
 
 ### Salida en reporte (Fase 5)
 
-Sección **🔄 Reconciliación acciones (007)** con tablas:
+Sección **🔄 Compromisos (007)** con tablas:
 
-- **Aplicado** (acc-id, caso, evidencia) — lo de "Aplicación automática acotada"
+- **Aplicado** (acc-id, regla, proyecto) — lo que aplicó la corrida
+- **Proyecto con reunión reciente** (acc-id, proyecto, fecha de reunión) — propuestas CMP-3
 - **Proponer caducar** (acc-id, motivo, deadline)
 - **Proponer cerrar** (acc-id, evidencia path)
 - **Conflicto** (acc-id, fuente A vs fuente B — para heartbeat/briefing)
 
-**Solo delta:** listar únicamente las acciones que entraron a "vencidas" desde el último
-`acc-reconciliation-*.md` (comparar acc-id contra el más reciente). Las que ya estaban en ese
+**Solo delta:** listar únicamente los compromisos que entraron a "vencidos" desde el último
+`acc-reconciliation-*.md` (comparar acc-id contra el más reciente). Los que ya estaban en ese
 archivo se resumen en una línea con el conteo y el enlace al archivo previo; no repetir la tabla
 completa cada día. Si el delta es 0, el bloque queda en una línea y no cuenta como "algo que decidir".
 
-Álvaro o una sesión de `reuniones-update` / `sec-status` / **`sec-acc-fold`** (post-merge en
-`sec-merge`) aplica el resto de cierres. Housekeeping aplica solo el bloque acotado de arriba.
+El owner o una sesión de `reuniones-update` / `sec-status` / **`sec-acc-fold`** (post-merge en
+`sec-merge`) aplica el resto de cierres. Housekeeping aplica solo lo de "Aplicación".
 
 > **Nota (2026-07-27):** el automatismo de `knowledge/catalog/automatismos.md` (proyecto+persona,
 > enviar/actualizar-acta/enviar-resumen/compartir-transcripcion) vivió acá brevemente por
@@ -315,6 +369,7 @@ Si no hay nada, una sola línea: `🟢 Nada urgente — todo en verde.`
 - 🔴 [lo más urgente — bloqueante o con deadline] → [acción concreta]
 - 🟡 [pendiente que conviene atender] → [acción]
 - ⚠️ [stale / cuidado] → [acción]
+- 🟡 [PR #N](url) — título — N días sin revisión → revisar o cerrar
 
 ## Estado de repos
 
@@ -326,6 +381,9 @@ Si no hay nada, una sola línea: `🟢 Nada urgente — todo en verde.`
 
 ### ⚠️ PRs auto acumulados (mergear pronto)
 - [PR #N](url) — `correo/auto-...` — creado hace X días, sin comentarios
+
+### 🟡 PRs sin revisión (≥1 día)
+- [PR #N](url) — título — `rama` — N días sin revisión
 
 ### PRs manuales abiertos
 - [PR #N](url) — título — última actividad hace X días
@@ -354,9 +412,23 @@ Una línea por review "Sin cambios necesarios" procesado (el archivo de review y
 - `~/.secretary/extractors/whatsapp/*`, `memory/*` — review de salidas de `whatsapp-monitor` → sin cambios (datos generados, sin convención nueva)
 - ...
 
-## 🔄 Reconciliación acciones (007)
+## 🔄 Compromisos (007)
 
-Propuestas de caducidad/cierre desde Fase 3.5 (no aplicadas automáticamente a `acciones.md`).
+Lo aplicado y lo propuesto en la Fase 3.5. Tablas vacías se omiten.
+
+**Aplicado**
+
+| acc-id | regla | proyecto |
+|--------|-------|----------|
+| acc-… | caducidad-30d / nació muerta / idea / proyecto terminado | slug |
+
+**Proyecto con reunión reciente (no caducan solos; van al resumen semanal)**
+
+| acc-id | proyecto | reunión |
+|--------|----------|---------|
+| acc-… | slug | YYYY-MM-DD |
+
+**Propuestas**
 
 | acc-id | propuesta | evidencia |
 |--------|-----------|-----------|
@@ -405,7 +477,8 @@ Candidatos detectados en Fase 3.6 — spec cambió después del último update d
 ## Resumen ejecutivo
 
 - 🟢/🟡/🔴 una línea de salud global del ecosistema
-- X repos revisados · X PRs pendientes (Y 🔴 urgentes)
+- X repos revisados · X PRs pendientes (Y 🔴 urgentes) · Z sin revisión ≥1 día
+- X compromisos caducados, Y cancelados, Z propuestos
 - X cambios de CLAUDE.md aplicados, Z pendientes de decisión
 - X memorias consolidadas
 - Próxima corrida: mañana 06:00

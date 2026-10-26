@@ -32,3 +32,7 @@ whatsapp/qr.png
 .claude/skills/
 .cursor/skills/
 .agents/skills/
+
+# Briefs y análisis: este repo es público; se quedan locales (excepción a BRF-6)
+.briefs/
+.analysis/

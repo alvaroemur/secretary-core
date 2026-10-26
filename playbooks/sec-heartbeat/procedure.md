@@ -1,20 +1,14 @@
----
-name: desk-heartbeat
-description: Consolidate short-term memory into subsystem/heartbeat/ — scheduled + invocable in session. Pulse reads; heartbeat writes.
----
+# sec-heartbeat — procedure
 
-# desk-heartbeat
+Internal procedure of the scheduled routine `sec-heartbeat`. It is no longer an invocable skill: there is no `/desk-heartbeat`. To force a beat from a session, run `HEARTBEAT_SLOT=session bash "$SECRETARY_CORE/secretary/routines/run-routine.sh" sec-heartbeat` (same routine, headless).
 
-Consolidates environment signals into **`subsystem/heartbeat/`** (`latest.md` + daily log). Split from `desk-overview`:
-- `desk-overview` **reads**.
-- `desk-heartbeat` **writes**.
+Consolidates environment signals into **`subsystem/heartbeat/`** (`latest.md` + daily log). `desk-overview` and the briefing **read**; this routine **writes**.
 
 ## Triggers
 
-- Scheduled: `reuniones-update` **:00** → `desk-heartbeat` **:10** (pre-brief, q2h, close slots — see instance routine manifest).
+- Scheduled: `reuniones-update` **:00** → `sec-heartbeat` **:10** (pre-brief, q2h, close slots — see instance routine manifest).
   Runtime: `$SECRETARY_INSTANCE/scripts/routines/run-routine.sh sec-heartbeat` → harness scheduled-task `run.sh`.
-- Session: "heartbeat", "what changed in the environment", "consolidate short-term", "update desk-overview".
-- Chained: after material changes in `wind-down` and `desk-merge`.
+- Chained: after material changes, `wind-down` and `desk-merge` run the routine with `HEARTBEAT_SLOT=session bash "$SECRETARY_CORE/secretary/routines/run-routine.sh" sec-heartbeat`.
 
 ## Write store (only destination)
 
@@ -108,7 +102,7 @@ Doctrine: `canon/operational/routines/heartbeat-match-model.md`
 
 **Mandatory section.** In scheduled runs, `run.sh` precomputes via `extractor-freshness.sh` — **copy verbatim** into `latest.md` and the daily append (do not paraphrase unless correcting a factual error with a note in Operational notes).
 
-In interactive session (without `run.sh`): after writing `latest.md`, run
+Without `run.sh` (validation mode): after writing `latest.md`, run
 `$SECRETARY_CORE/secretary/routines/ops/inject-heartbeat-freshness.sh` (same relocation as above).
 
 ## Pending human

@@ -20,6 +20,7 @@ class CloseDistributionTests(unittest.TestCase):
                            ('secretary/desk.py', '# fixture'),
                            ('secretary/brief_html.py', '# fixture'),
                            ('secretary/signatures.py', '# fixture'),
+                           ('secretary/dream_hook.py', '# fixture'),
                            ('skills/wind-down/SKILL.md', skill(2)),
                            ('skills/notes/SKILL.md', '---\nname: notes\n---\nnotes\n')]:
             path = source/name
@@ -143,7 +144,30 @@ class CloseDistributionTests(unittest.TestCase):
         offenders = [str(p.relative_to(REPO)) for root in ('skills', 'playbooks')
                      for p in (REPO/root).rglob('*.md') if '--squash' in p.read_text(encoding='utf-8')]
         self.assertEqual(offenders, [])
-        self.assertGreaterEqual(close_contract(REPO/'skills/wind-down/SKILL.md'), 3)
+        self.assertGreaterEqual(close_contract(REPO/'skills/wind-down/SKILL.md'), 4)
+
+    def test_close_skills_carry_lifecycle_and_continuity_rules(self):
+        """dream-utilidad F3: cleanup, brief lifecycle, paste block and archive answer."""
+        from secretary.skill_sources import close_contract
+        read = lambda name: (REPO/'skills'/name/'SKILL.md').read_text(encoding='utf-8')
+        self.assertGreaterEqual(close_contract(REPO/'skills/jump/SKILL.md'), 3)
+        self.assertGreaterEqual(close_contract(REPO/'skills/handover/SKILL.md'), 3)
+        wind_down, jump, handover, merge = map(read, ['wind-down', 'jump', 'handover', 'desk-merge'])
+        for text in (wind_down, merge):
+            self.assertIn('merge-base --is-ancestor', text)
+            self.assertIn('push origin --delete', text)
+            self.assertIn('lsof -a -d cwd', text)
+        for text in (wind_down, handover):
+            self.assertIn('_archivo/', text)
+            self.assertIn('superseded', text)
+        self.assertIn('Can you archive this session?', wind_down)
+        self.assertIn('already done', jump)
+        self.assertIn('fenced `text` block', jump)
+        self.assertNotIn('tier per row', jump)
+        for name, text in [('wind-down', wind_down), ('jump', jump),
+                           ('handover', handover), ('desk-merge', merge)]:
+            self.assertNotIn('skills/desk-dream', text, name)
+            self.assertNotIn('invoke `desk-heartbeat`', text, name)
 
 
 if __name__ == '__main__':

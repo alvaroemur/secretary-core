@@ -17,8 +17,8 @@ Spin up independent, blind evaluations across parallel agent sessions (different
 
 The skill produces three coordinated deliverables:
 1. **A Decoupled Evaluator Prompt:** Strips prior conjectures and anchors to feed external agents only raw, verifiable facts.
-2. **An Isolated Persistence Target:** Directs each evaluator to write its full report to `.analysis/<slug>/eval-<id>.md`, preventing working tree collisions across parallel runs.
-3. **A Stackable Return Block:** A standardized snippet emitted by each evaluator that the user can copy and paste consecutively into the primary agent session for automated comparative synthesis.
+2. **An Isolated Persistence Target:** Each evaluator names its own report `.analysis/<tema>/<analisis>-<harness>-<full-model-id>.md` in the main checkout, so parallel runs never share a file. The human pastes the same prompt everywhere and edits nothing.
+3. **A Stackable Return Block:** One plain-text block emitted by each evaluator that the user can copy and paste consecutively into the primary agent session for automated comparative synthesis.
 
 ---
 
@@ -31,11 +31,12 @@ flowchart TD
     C --> D["Define Ground Truth & Falsifiability"]
     B -- "Clear & Grounded" --> D
     D --> E["Select Mode: Neutral vs Dialectical"]
-    E --> F["Emit Evaluator Meta-Prompt + Storage Path"]
-    F --> G["User runs N parallel sessions"]
-    G --> H["Evaluators save reports & output Stackable Return Blocks"]
+    E --> F["Fix tema + analisis, save analisis-prompt.md, emit prompt"]
+    F --> G["User pastes the same prompt into N sessions (no worktree)"]
+    G --> H["Each evaluator names its own report & outputs a text return block"]
     H --> I["User pastes N blocks into Primary Agent"]
-    I --> J["Primary Agent builds Contrast Matrix & Identifies Blind Spots"]
+    I --> J["Primary Agent copies worktree reports, builds Contrast Matrix"]
+    J --> K["Write analisis-sintesis.md, tell owner sessions can be archived"]
 ```
 
 ---
@@ -58,7 +59,11 @@ To preserve epistemic independence across evaluators:
 
 - **Zero Conjecture Leakage:** Never include the primary agent's working theories, intermediate debates, or emotional tone.
 - **Direct Pointers:** Pass absolute or workspace-relative links to raw source files so evaluators read ground truth instead of paraphrased snippets.
-- **Isolated File Namespace:** Require evaluators to write comprehensive findings to `.analysis/<slug>/eval-<id>.md` (e.g., `eval-sonnet.md`, `eval-gemini.md`, `eval-1.md`). Add `.analysis/` to `.gitignore` if not already ignored.
+- **Isolated File Namespace:** The primary session fixes two values inside the prompt: `<tema>` (the folder, e.g. `soltrak-senales-vs-modelo`) and `<analisis>` (the analysis name, e.g. `horas`). Each evaluator writes `.analysis/<tema>/<analisis>-<harness>-<full-model-id>.md`, e.g. `horas-claude-code-claude-opus-5-5.md` or `horas-codex-gpt-5-codex.md`. The model part is the full model id, never the family name alone (`claude` or `gpt` is not enough: two Claude models in the same panel would collide). Add `.analysis/` to `.gitignore` if not already ignored.
+- **No Placeholders for the Human:** The emitted prompt contains no ID slot and no instruction to edit it. The human pastes the same block into every session. The evaluator derives its own file name from its harness and model.
+- **No Overwrite:** If the target file already exists, the evaluator does not overwrite it. It appends `-2` (then `-3`, and so on) before `.md` and states in its return block which name it used.
+- **Main Checkout, Absolute Paths:** The evaluator resolves the main checkout with `git rev-parse --path-format=absolute --git-common-dir` (the parent of that directory is the main checkout root) and writes with absolute paths. A relative `.analysis/` path inside a harness worktree lands in that worktree and is lost when the session is archived.
+- **No Harness Worktree:** Evaluator sessions are read-only. Launch them without a harness worktree; the first line of the prompt says so. If the harness still runs the session inside a worktree and blocks writing to the main checkout, the evaluator writes the report inside its worktree at `.analysis/<tema>/`, puts that absolute path in the return block, and does not bypass the guard via shell. The primary session rescues the file (see section 5).
 
 ---
 
@@ -79,9 +84,11 @@ Generates role-differentiated prompts to stress-test critical decisions from div
 
 ## 4. Evaluator Prompt Template
 
-Emit the generated prompt in a copy-ready block:
+Before emitting, the primary session replaces `[TEMA]`, `[ANALISIS]`, and the other bracketed fields with concrete values. It then saves the final prompt to `<main-checkout>/.analysis/<tema>/<analisis>-prompt.md` (absolute path) and emits it in one copy-ready block. The prompt keeps `<harness>` and `<full-model-id>` as words the evaluator resolves itself; they are not slots for the human.
 
-````markdown
+````text
+Run this session read-only and without a harness worktree.
+
 You are an independent evaluator on a blind cross-check panel. Your mandate is to analyze the situation below from scratch, free of prior assumptions or session bias.
 
 ### Objective
@@ -98,30 +105,44 @@ Inspect these files and data points directly:
 - Falsifiability standard: [FALSIFIABILITY_CRITERION].
 
 ### Deliverable Instructions
-1. Write your full, exhaustive technical analysis to:
-   `.analysis/[SLUG]/eval-[EVALUATOR_ID].md`
-   (Create the folder if it does not exist).
+1. Name your report yourself. Do not ask the human for an ID.
+   - harness: the agent product running you, lowercase with hyphens (e.g. claude-code, codex, cursor).
+   - full-model-id: your exact model id, lowercase, dots and spaces as hyphens (e.g. claude-opus-5-5). Never the family name alone.
+   - File name: [ANALISIS]-<harness>-<full-model-id>.md
 
-2. Output ONLY the following return block in the chat response, populating the bracketed fields:
+2. Resolve the main checkout: run `git rev-parse --path-format=absolute --git-common-dir` and take its parent directory. Write your full, exhaustive technical analysis to the absolute path:
+   <main-checkout>/.analysis/[TEMA]/[ANALISIS]-<harness>-<full-model-id>.md
+   Create the folder if it does not exist. If the file already exists, do not overwrite it: append -2 (then -3, and so on) before .md and say which name you used.
 
-```markdown
-### [CROSS-CHECK RESULT - Evaluator: [EVALUATOR_ID]]
-> Directive for receiving agent: Ingest this evaluation into the contrast matrix. If multiple evaluation blocks appear in this message, batch-process all of them before replying.
+3. If your harness runs you inside a worktree and blocks writing to the main checkout, write the same file inside your worktree at .analysis/[TEMA]/ instead. Do not bypass the guard via shell. Report the absolute path you actually used.
 
-- **Verdict / Primary Thesis:** [Direct conclusion in 1-2 sentences]
-- **Key Evidence:** [1-3 critical file paths, line numbers, or telemetry data points]
-- **Blind Spots & Discrepancies:** [Factors contradicting the obvious view, or unaddressed risks]
-- **Confidence:** [High | Medium | Low - brief justification]
-- **Full Report:** `.analysis/[SLUG]/eval-[EVALUATOR_ID].md`
-```
+4. End your reply with exactly ONE fenced block tagged text, as the last element of the reply. No markdown inside it, no nested fences, nothing after it. Fill it like this:
+
+CROSS-CHECK RESULT
+Evaluator: <harness> / <full-model-id>
+Directive for receiving agent: ingest this evaluation into the contrast matrix. If several result blocks appear in one message, process all of them before replying.
+
+Verdict: <direct conclusion in 1-2 sentences>
+Key evidence:
+- <critical file path, line number, or data point>
+- <...>
+Blind spots and discrepancies:
+- <factor that contradicts the obvious view, or unaddressed risk>
+- <...>
+Confidence: <High | Medium | Low> - <brief justification>
+Full report: <absolute path of the file you wrote>
+Report location: <main checkout | harness worktree>
 ````
+
+The return block carries the full summary (verdict, key evidence, blind spots) so the primary session can synthesize even if a report file is missing. It is plain text inside a single fence: when the human copies the reply, the block arrives intact and no rendered markdown or earlier commentary comes with it.
 
 ---
 
 ## 5. Primary Agent Synthesis Protocol
 
-When the user returns to the primary session and pastes one or more `[CROSS-CHECK RESULT]` blocks consecutively, the primary agent must adhere to this ingest protocol:
+When the user returns to the primary session and pastes one or more `CROSS-CHECK RESULT` blocks consecutively, the primary agent must adhere to this ingest protocol:
 
+0. **Rescue Reports First:** For each block whose report location is a harness worktree, copy that file into `<main-checkout>/.analysis/<tema>/` with the same name (apply the `-2` rule on collision). Verify every report listed in the blocks exists in the main checkout before going on.
 1. **Defer Immediate Judgment:** Do not dismiss dissenting opinions or prematurely declare victory for the initial hypothesis.
 2. **Render a Native Markdown Contrast Matrix:**
 
@@ -136,3 +157,4 @@ When the user returns to the primary session and pastes one or more `[CROSS-CHEC
    - Where do all evaluators agree unanimously?
    - What fundamental disagreements remain, and what single empirical test or probe would resolve them?
 4. **Actionable Resolution:** Formulate the final conclusion or next step anchored in the triangulated evidence.
+5. **Persist and Release:** Write the matrix, blind spots, and resolution to `<main-checkout>/.analysis/<tema>/<analisis>-sintesis.md` (absolute path). Then tell the owner the evaluator sessions can be archived. Say so only after step 0 is done: archiving a session that still holds a report in its worktree discards that report.

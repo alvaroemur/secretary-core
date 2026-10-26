@@ -20,6 +20,7 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
     `links` are harness skill dirs that cannot read `targets` (they get one symlink
     per skill into the first target). `prunes` are harness dirs that already read
     `targets`; their copies of these skills are removed so each skill appears once.
+    Skills listed in `retired_skills` of `desk_names.json` are removed from every dir.
     """
     playbooks = source/'playbooks'
     origins = skill_origins(source, instance_skills)
@@ -31,6 +32,7 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
     copies.append((source/'secretary/desk.py', runtime/'desk.py'))
     copies.append((source/'secretary/brief_html.py', runtime/'brief_html.py'))
     copies.append((source/'secretary/signatures.py', runtime/'signatures.py'))
+    copies.append((source/'secretary/dream_hook.py', runtime/'dream_hook.py'))
     if scheduled:
         # Preserve the existing audit; append the gated conditional-reorganization contract.
         tidy_contract = source/'routine-overlays/tidy-up/conditional.md'
@@ -84,6 +86,12 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
                 if not dst.is_symlink():
                     check_close_destination(origin/'SKILL.md', dst/'SKILL.md')
                 layout.append((kind, dst))
+    names = source/'secretary/data/desk_names.json'
+    retired = json.loads(names.read_text()).get('retired_skills', []) if names.is_file() else []
+    for folder in [*targets, *links, *prunes]:
+        for name in retired:
+            if name not in origins and ((folder/name).exists() or (folder/name).is_symlink()):
+                layout.append(('retire', folder/name))
     revision = subprocess.run(['git', '-C', str(source), 'rev-parse', 'HEAD'],
                               capture_output=True, text=True)
     source_commit = revision.stdout.strip() if revision.returncode == 0 else None
@@ -104,7 +112,7 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
         want = primary/dst.name if kind == 'link' else None
         if kind == 'link':
             changed = not (dst.is_symlink() and dst.resolve() == want.resolve())
-        else:
+        else:  # 'prune' and 'retire' remove whatever is installed there.
             changed = dst.exists() or dst.is_symlink()
         plan.append({kind: str(dst), 'changed': changed, **({'target': str(want)} if want else {})})
         if apply and changed:

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Global git hook dispatcher (installed under every hook name in the global
+# core.hooksPath). A global core.hooksPath hides each repo's .git/hooks, so this
+# script first runs the secretary check for its hook name, then chains to the
+# repo's own hook if one exists. Repos with a local core.hooksPath ignore it.
+set -u
+
+name="$(basename "$0")"
+here="$(cd "$(dirname "$(readlink "$0" || echo "$0")")" && pwd)"
+input=""
+if [ "$name" = "pre-push" ] || [ "$name" = "pre-receive" ] || [ "$name" = "post-rewrite" ]; then
+  input="$(cat)"
+fi
+
+if [ "$name" = "pre-push" ]; then
+  printf '%s\n' "$input" | python3 "$here/push_leak_guard.py" "$@" || exit 1
+fi
+
+local_hook="$(git rev-parse --git-common-dir 2>/dev/null)/hooks/$name"
+if [ -x "$local_hook" ]; then
+  if [ -n "$input" ]; then
+    printf '%s\n' "$input" | "$local_hook" "$@"
+  else
+    "$local_hook" "$@"
+  fi
+  exit $?
+fi
+exit 0

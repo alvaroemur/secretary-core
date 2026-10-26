@@ -111,7 +111,7 @@ Read soul **before** host mapping:
 [ -f "$SOUL_PATH" ] && sed -n '/^## purpose/,/^## /p' "$SOUL_PATH" | head -40
 ```
 
-Read the dream lessons store too — same store `desk-dream` writes to, applies to any agent
+Read the dream lessons store too — same store the `sec-dream` routine writes to, applies to any agent
 interpreting client/owner data (issue cowork-secretary#509):
 
 ```bash
@@ -273,7 +273,7 @@ append to `soul.md`'s `## memory`:
 
 - Owner/business facts go to `desk-write` (wiki or module memory), not here.
 - Don't rewrite `purpose`, `objectives`, or `alignment` during a normal run — only append to
-  `memory`. Structured soul evolution belongs to `desk-dream`.
+  `memory`. Structured soul evolution needs an owner-approved PR; the `sec-dream` routine no longer proposes it.
 - No commit unless the owner asks.
 - Cap at ~20 recent bullets; prune only on explicit soul review.
 

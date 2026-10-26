@@ -8,9 +8,11 @@ resolves that script and shells out to it, the same pattern used for
 
 from __future__ import annotations
 
+import json
+import re
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from secretary.config import instance_root
@@ -57,3 +59,63 @@ def run_emit_metrics(since: str | None = None, dry_run: bool = False) -> int:
 
     result = subprocess.run(cmd)
     return result.returncode
+
+
+# Reportes de la propia corrida: no son trabajo que una sesión pueda pisar.
+REPORT_PREFIX = 'subsystem/dream/'
+ENTREGA_MARK = re.compile(r'<!--\s*dream:entrega\s+(\{.*?\})\s*-->', re.S)
+
+
+def entrega_meta(body: str) -> dict:
+    """Metadato `<!-- dream:entrega {...} -->` del body: tipo, compromiso, verificación."""
+    match = ENTREGA_MARK.search(body or '')
+    if not match:
+        return {}
+    try:
+        meta = json.loads(match.group(1))
+    except ValueError:
+        return {}
+    return meta if isinstance(meta, dict) else {}
+
+
+def open_dream_prs(repos: list[dict], run=subprocess.run) -> list[dict]:
+    """PRs abiertos con rama `dream/*` en los repos de `dispatch.executor.repos`."""
+    fields = 'number,title,url,headRefName,files,createdAt,reviews,reviewDecision,body'
+    prs = []
+    for entry in repos:
+        result = run(['gh', 'pr', 'list', '--repo', entry['repo'], '--state', 'open',
+                      '--limit', '100', '--json', fields], capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"dream open-prs: {entry['repo']}: {result.stderr.strip()}", file=sys.stderr)
+            continue
+        for pr in json.loads(result.stdout or '[]'):
+            if not pr.get('headRefName', '').startswith('dream/'):
+                continue
+            prs.append({
+                'repo': entry['repo'], 'path': entry.get('path'), 'number': pr['number'],
+                'title': pr.get('title', ''), 'url': pr.get('url', ''), 'branch': pr['headRefName'],
+                'created_at': pr.get('createdAt'),
+                'reviewed': bool(pr.get('reviews') or pr.get('reviewDecision')),
+                'files': [f['path'] for f in pr.get('files') or []
+                          if not f['path'].startswith(REPORT_PREFIX)],
+                'entrega': entrega_meta(pr.get('body', '')),
+            })
+    return prs
+
+
+def run_open_prs(write: bool = False) -> int:
+    """Lista los PRs abiertos de dream; con `write`, refresca la caché que lee el hook U9."""
+    from secretary.config import dispatch_executor_repos
+    from secretary.dream_hook import cache_path
+
+    prs = open_dream_prs(dispatch_executor_repos())
+    data = {'generated_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+            'unreviewed': sum(not pr['reviewed'] for pr in prs), 'prs': prs}
+    if write:
+        path = cache_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + '.tmp')
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+        tmp.replace(path)
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+    return 0

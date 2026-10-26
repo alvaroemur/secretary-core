@@ -9,6 +9,17 @@ Los skills dependientes de Secretary usan `desk-*`. `delegate` captura y deriva 
 
 `python -m secretary.desk_deploy --source <core> --target ~/.agents/skills --link ~/.claude/skills --prune ~/.codex/skills --prune ~/.cursor/skills --instance-skills <instancia>/canon/skills --runtime <runtime> --scheduled <playbooks-instalados> --bin-dir <bin>` muestra el plan. `--target` recibe la única copia física; `--link` crea un symlink por skill para el harness que no lee `~/.agents/skills` (Claude Code); `--prune` quita las copias del core en harnesses que ya leen `~/.agents/skills`. `--apply` instala con backups por hash y crea `secretary-desk`.
 
+Los skills de `retired_skills` (en `desk_names.json`) se quitan de `--target`, `--link` y `--prune`, con backup. Hoy: `desk-dream`, `desk-heartbeat` y sus alias `sec-dream`/`sec-heartbeat`, que pasaron a `procedure.md` de sus playbooks (`playbooks/sec-dream/`, `playbooks/sec-heartbeat/`): solo corren como rutina.
+
+## Aviso de solape con dream
+
+`secretary dream open-prs --write` guarda los PRs abiertos de dream (ramas `dream/*`) con sus archivos en `~/.local/share/secretary/dream/open-prs.json` (`SECRETARY_STATE_DIR` cambia la base). La rutina la refresca en cada corrida. Desk instala `dream_hook.py` junto al runtime; registrado como hook `PreToolUse` de Claude Code sobre `Edit|Write|MultiEdit|NotebookEdit`, avisa una vez por sesión y PR cuando la sesión edita un archivo que también cambia un PR de dream. No bloquea, no usa red y calla si la lista tiene más de 36 h.
+
+```json
+{"matcher": "Edit|Write|MultiEdit|NotebookEdit",
+ "hooks": [{"type": "command", "command": "f=~/.local/share/secretary/desk-runtime/dream_hook.py; [ -f \"$f\" ] && python3 \"$f\" || true"}]}
+```
+
 Una sola fuente versionada en `skills/` y `playbooks/`, sin datos personales; los valores de instancia se leen con `secretary config get <clave>`. Los skills y playbooks propios de la instancia viven en su `canon/skills/` y `canon/playbooks/`; un nombre repetido con core es error. Los playbooks privados de ventas reciben solo `routine-overlays/`: no se reemplazan sus procedimientos de negocio o scripts.
 
 ## Interfaces

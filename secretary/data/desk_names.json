@@ -7,10 +7,8 @@
     "sec-cowork-fit": "desk-cowork-fit",
     "sec-design": "desk-design",
     "sec-disco": "desk-disco",
-    "sec-dream": "desk-dream",
     "sec-drive": "desk-drive",
     "sec-drone": "desk-drone",
-    "sec-heartbeat": "desk-heartbeat",
     "sec-learn": "desk-learn",
     "sec-mail": "desk-mail",
     "sec-meeting": "desk-meeting",
@@ -35,5 +33,11 @@
     "pulse-headless": "brief-update",
     "sec-heartbeat": "desk-heartbeat",
     "sec-dream": "desk-dream"
-  }
+  },
+  "retired_skills": [
+    "desk-dream",
+    "desk-heartbeat",
+    "sec-dream",
+    "sec-heartbeat"
+  ]
 }

@@ -215,7 +215,7 @@ Decision summary (detail in settings file):
 ## Report
 
 Header: `📬 **Mail — <intent>** · account <personal|inspiro>`. Compact table or list (from, subject,
-age, action). For drafts: copy-ready body + note it lives in Gmail Drafts, not sent. Include **MD
+age, action). For drafts: copy-ready body in one fenced ```text block + note it lives in Gmail Drafts, not sent. Include **MD
 mirror path** if persisted. Line: **Typos corrected:** … or **No typos detected.**
 
 If responding to a brief item:

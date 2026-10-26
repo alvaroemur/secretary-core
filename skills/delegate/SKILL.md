@@ -35,7 +35,7 @@ client (Cursor discovers `~/.agents/skills/` too). If the `spawn_task` tool exis
 toolset → chip playbook below. If not (Cursor, plain CLI) → Cursor/core playbook: create the
 issue, write the self-contained brief (`.briefs/` when in Cursor; resolve via
 `secretary config path session.briefs` in an instance, else literal `.briefs/`), and hand the
-owner a paste-ready restart prompt. Never call tools you don't have.
+owner a paste-ready restart prompt in one fenced ```text block, last in the reply. Never call tools you don't have.
 
 ## Instance setup
 

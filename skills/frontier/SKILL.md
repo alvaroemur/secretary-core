@@ -5,7 +5,7 @@ description: >-
   shared understanding is locked. Uses a decision tree with frontier logic: ask only
   what already has prerequisites resolved, in batched rounds with a recommended
   answer each; investigate code/environment instead of asking verifiable facts.
-  Always visualize the decision tree. After explicit confirmation, hand off to
+  Always show the decision tree as a text tree. After explicit confirmation, hand off to
   execution design (work graph). Triggers: "/frontier", "grill this", "stress-test
   this idea". NOT for writing a paste-ready meta-prompt for another session alone.
 user-invocable: true
@@ -26,11 +26,17 @@ parents resolve. Keep the tree as the source of truth for what to ask next.
 **Always materialize the tree** at the end of each round and again at the confirmation
 gate:
 
-- **Mermaid** flowchart by default
-- **Text** `A -> B -> C` when the tree is trivial (< 4 nodes) or the owner asks for text
+- **In chat:** an indented text tree with state marks (✅ resolved · ❓ on the frontier ·
+  ⏳ blocked by a parent · ✖️ discarded or superseded). Never Mermaid in chat: some
+  harnesses do not render it.
+- **In the scope record:** Mermaid is allowed (and the text tree is fine too).
 
-Show the tree in chat and persist its current state in the scope record below.
-A separate diagram artifact is optional.
+```text
+CMP-1 ✅ name: "compromisos"
+├─ CMP-2 ✅ one-off cleanup
+└─ CMP-3 ❓ auto-expiry exception
+   └─ CMP-4 ⏳ weekly summary format
+```
 
 ## Frontier logic
 
@@ -43,15 +49,39 @@ Before asking anything verifiable in code or the environment, investigate it.
 Use non-blocking explore subagents when useful; keep asking other frontier
 questions that do not depend on that result.
 
+## Question IDs
+
+Each question gets a short ID: a 3-letter prefix for the front it belongs to plus a number
+(`CMP-2`, `PLT-5`). Pick prefixes the owner can read without a key (`CMP` commitments,
+`PLT` templates), keep them stable across rounds, and never reuse a closed ID for a new
+question; a variant takes a suffix (`PLT-5b`).
+
 ## Round structure
 
-Present **all** current frontier questions at once, numbered, each with its own
-recommended answer. Prefer discrete option UIs when the harness provides them;
-otherwise numbered text. Wait for the owner's answers before the next round.
+Present **all** current frontier questions at once. Each round, in this order:
 
-If the complete round exceeds the UI limits, present the entire round as numbered
-text. Do not truncate or split the frontier to fit a form. Follow the active
-harness rules for pending questions and waiting.
+1. **First line:** `plan_ref` as a link to the scope record (the owner should not have to
+   search for it). If the record is blocked, say so on this line.
+2. **Legend:** one line with the prefixes used in this round and their meaning.
+3. **Questions:** each with `ID — title`, context in a few lines, options when discrete,
+   and the recommended answer with its reason.
+4. **Tree:** the updated text tree.
+5. **Reply block:** last element, one fenced ```text block with every ID prefilled with
+   the recommendation, ready to copy and edit. No nested fences.
+
+```text
+CMP-3: sí
+PLT-5: opción 2
+PLT-7: <recomendación>
+```
+
+The owner may answer by ID with numbers or keywords (`CMP-3 sí`, `PLT-5: 2`) or by
+editing the block. Prefer discrete option UIs when the harness provides them; still emit
+the reply block.
+
+If the complete round exceeds the UI limits, present the entire round as text. Do not
+truncate or split the frontier to fit a form. Follow the active harness rules for pending
+questions and waiting.
 
 Do not ask one-by-one when several questions are already on the frontier.
 
@@ -69,7 +99,7 @@ At start (and refresh when goal/scope shifts), emit:
 **constraints:** <or none>
 **open_questions:** <count or list>
 **plan_ref:** <path | null>
-**decision_tree:** <mermaid block or A -> B text>
+**decision_tree:** <text tree>
 ```
 
 Use these field names. `plan_ref` points to the actual scope record, even while it
@@ -123,6 +153,13 @@ it with available newer messages; recover omitted decisions from accessible hist
 instead of asking them again. Flag any unresolved gap. Carry the actual path into
 the final handoff so execution design can consume the agreed scope.
 
+## Final summary
+
+When the frontier is empty, present the final summary grouped by front. Each point cites
+the source IDs (`CMP-2, CMP-3`) so the owner can return to that round and adjust. Open
+with `plan_ref` as a link, as in every round, and close with a ```text reply block
+(`confirmo` or the IDs to reopen).
+
 ## Confirmation gate
 
 Before designing execution or acting (code, formal execution plan, execution),
@@ -131,10 +168,9 @@ the owner must **explicitly** confirm the shared understanding. Mid-grill "ok" /
 
 After that yes: **stop grilling**. Hand off to work-graph execution design (same
 field names as that skill's header: goal, cwd, plan_ref, …). If that design step
-is unavailable, fallback binary only:
-
-1. Direct in session (`in_session`)
-2. Autonomous agent
+is unavailable, route each front with the common reply format
+`<ID>: aquí | sesión | agente | dream` (this session · new parallel session · subagent ·
+dream queue), prefilled in a ```text block.
 
 Do not start agents until the owner picks an execution graph (or the fallback).
 

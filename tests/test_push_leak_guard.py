@@ -89,6 +89,21 @@ class PushLeakGuardTests(unittest.TestCase):
     def test_branch_deletion_publishes_nothing(self):
         self.assertEqual(guard.push_ranges(f"(delete) {ZERO} refs/heads/x {self.base}\n", "origin"), [])
 
+    def test_update_range_excludes_commits_already_on_remote(self):
+        rows = guard.push_ranges(f"refs/heads/x {self.base} refs/heads/x {'1' * 40}\n", "origin")
+        self.assertEqual(rows, [[self.base, "--not", "--remotes=origin", "1" * 40]])
+
+    def test_merged_public_commit_is_not_flagged(self):
+        # A commit already on a remote-tracking ref (e.g. origin/main) is public:
+        # merging it into the pushed branch must not block the push.
+        public = self.commit(f"ya publicado {FAKE_EMAIL}\n")
+        git(self.repo, "update-ref", "refs/remotes/origin/main", public)
+        (self.repo / "c.md").write_text("cambio limpio\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-qm", "fix")
+        tip = git(self.repo, "rev-parse", "HEAD")
+        self.assertEqual(self.run_guard(tip, "PUBLIC"), 0)
+
     def test_new_branch_range_excludes_remote_commits(self):
         rows = guard.push_ranges(f"refs/heads/x {self.base} refs/heads/x {ZERO}\n", "origin")
         self.assertEqual(rows, [[self.base, "--not", "--remotes=origin"]])

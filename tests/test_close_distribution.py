@@ -20,6 +20,7 @@ class CloseDistributionTests(unittest.TestCase):
                            ('secretary/desk.py', '# fixture'),
                            ('secretary/brief_html.py', '# fixture'),
                            ('secretary/signatures.py', '# fixture'),
+                           ('secretary/dream_hook.py', '# fixture'),
                            ('skills/wind-down/SKILL.md', skill(2)),
                            ('skills/notes/SKILL.md', '---\nname: notes\n---\nnotes\n')]:
             path = source/name

@@ -628,6 +628,18 @@ def dream_emit_metrics(
     raise typer.Exit(run_emit_metrics(since=since, dry_run=dry_run))
 
 
+@dream_app.command("open-prs")
+def dream_open_prs(
+    write: Annotated[
+        bool, typer.Option("--write", help="Refrescar la caché local que lee el hook de solape (U9).")
+    ] = False,
+) -> None:
+    """List open dream/* PRs with their files; --write refreshes the overlap-hook cache."""
+    from secretary.dream import run_open_prs
+
+    raise typer.Exit(run_open_prs(write=write))
+
+
 @modules_app.command("list")
 def modules_list(
     out_fmt: OutputFormat = typer.Option(

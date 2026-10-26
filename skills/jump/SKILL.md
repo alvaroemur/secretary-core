@@ -71,7 +71,7 @@ Every prompt, whatever its size:
 1. **Starts by checking whether the work is already done** elsewhere: merged PRs, other branches or worktrees, newer briefs, the file it would produce. If done, the agent reports where and stops.
 2. Names the destination repo or folder as an absolute path, the objective, the first file to read and an observable completion criterion.
 3. Carries the essentials itself; does not depend on chat history or a harness-specific tool.
-4. References only paths another agent can read: the main checkout (`.briefs/`, `.analysis/`, repo files), Drive URLs. Never scratchpad, `/tmp` or a harness worktree.
+4. References only paths another agent can read: repo files by absolute path, files on a pushed topic branch as `<branch>:<path>` (`git show origin/<branch>:<path>`), Drive URLs. Never scratchpad, `/tmp` or an uncommitted file in a harness worktree.
 5. Cites the brief (absolute path) when there is one, and says to mark it `done` (move to `.briefs/_archivo/`, add `closed:`) when the work it hands over is finished.
 6. States no-goals: do not reshape `docs/plans` graphs or mutate `contract.yaml` without owner OK.
 

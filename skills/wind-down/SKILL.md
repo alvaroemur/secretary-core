@@ -33,15 +33,15 @@ Pass this object to project sync, handover and jump. They reuse it instead of re
 
 ### Outputs for another session (survive the archive)
 
-Every output another session or harness must read (briefs, analysis reports, prompts) lives in the **main checkout**, under an absolute path, never in a harness worktree, scratchpad or `/tmp`: archiving a harness session discards the uncommitted files of its worktree.
+Every output another session or harness must read (briefs, analysis reports, prompts) must survive the archive: archiving a harness session discards the uncommitted files of its worktree. Never use scratchpad or `/tmp` for them.
 
-- Briefs: `<main-checkout>/.briefs/`. Analysis: `<main-checkout>/.analysis/<topic>/`. Both are ignored globally (`~/.gitignore_global`); they are local working files, not repo content.
-- The paste-ready prompt carries the essentials itself; it may cite these absolute paths, never a scratchpad, `/tmp` or harness-worktree path.
+- Briefs: `.briefs/`. Analysis: `.analysis/<topic>/`. Both are versioned (BRF-6).
+- The paste-ready prompt carries the essentials itself; it cites the file by absolute path and, when it lives on a topic branch, as `<branch>:<path>` (readable with `git show origin/<branch>:<path>` before the merge).
 - **Harness guard (XCK-4).** Some harnesses block file tools from a harness worktree to the main checkout (Claude Code: "This session is running in an isolated git worktree…"). Never work around it with the shell.
   - Read-only sessions (evaluators, reviews) run without a worktree and write straight to the main checkout.
   - A session in a harness worktree writes the output inside its worktree and puts, in the paste-ready block, the absolute path **and the full content**.
-  - The rescue is done by a session that runs in the main checkout: the original session when it ingests the block, or wind-down run from there. It copies the content to `<main-checkout>/.briefs/` or `.analysis/` and says the other session can be archived.
-  - `.briefs/` and `.analysis/` are never committed. Only the topic's own files go on the topic branch.
+  - With a topic branch, the session commits its output in `.briefs/` or `.analysis/` on that branch and pushes it. That is the rescue.
+  - Without a topic branch, the rescue is done by a session that runs in the main checkout: the original session when it ingests the block, or wind-down run from there. It copies the content to `<main-checkout>/.briefs/` or `.analysis/`, routes the commit, and says the other session can be archived.
 
 ### Related work sweep (read-only)
 
@@ -118,7 +118,7 @@ At close:
 
 - The brief this session resumed from → `done` when its work is finished here; keep `pending` and point to the new brief otherwise (the new one supersedes it: set the old one `superseded` with `superseded_by: <new path>`).
 - A new brief for a thread that already had a `pending` brief supersedes it the same way.
-- Moving to `_archivo/` adds `closed: <YYYY-MM-DD>`. Briefs are untracked local files: move, never delete.
+- Moving to `_archivo/` adds `closed: <YYYY-MM-DD>`. Move, never delete: `git mv` when tracked, and commit the move with the session's work.
 
 ## Skill chain
 
@@ -150,7 +150,7 @@ Scan repos touched, then do, in order, and record each result as a ✓ (or ⚠�
    Stop on that topic only (report, propose the command) when another live session uses the folder, there are uncommitted changes not from this session, or the destination exists.
 2. **Rescue uncommitted files (XCK-3, XCK-4).** In the session's checkout, `git status --porcelain --ignored` and classify each file:
    - Part of the topic → commit on the topic branch.
-   - Output for another session (`.briefs/`, `.analysis/`, reports, prompts) → never committed. If this session runs in the main checkout, it is already in place. If it runs in a harness worktree, it cannot copy across the guard: list each file with its absolute source path and target `<main-checkout>/<same relative path>`, and put its full content in the paste-ready block.
+   - Output for another session (`.briefs/`, `.analysis/`, reports, prompts) → commit on the topic branch when there is one. Without a topic branch: in the main checkout it is already in place (route its commit with the rest); in a harness worktree it cannot cross the guard, so list each file with its absolute source path and target `<main-checkout>/<same relative path>`, and put its full content in the paste-ready block.
    - Neither (build cache, scratch) → leave it, list nothing.
    When wind-down runs **from the main checkout**, it also rescues the outputs of harness worktrees in the touched repos (pasted blocks it received, or files under `<repo>/.claude/worktrees/*/.briefs|.analysis`): copy to the main checkout, report source → destination, and say which session can now be archived.
    Any output left unrescued blocks archiving (Stage 2: "can you archive?" = no, with the list of what to copy and where).

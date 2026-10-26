@@ -23,9 +23,10 @@ For a standalone invocation, collect current checkout status, branch, commit, re
 
 Infer a short title and destination from the request. Ask once if a material choice cannot be inferred. Do not ask again for inputs or permission already provided.
 
-- Briefs go to the **main checkout** of the repo, under an absolute path: `<main-checkout>/.briefs/YYYY-MM-DD-HHMM-<slug>.md`, where `<main-checkout>` is the parent of `git rev-parse --path-format=absolute --git-common-dir`. Never a harness worktree, scratchpad or `/tmp`: archiving a harness session discards its uncommitted files.
-- If the harness blocks writing from its worktree to the main checkout, never work around it with the shell: write the brief at the same relative path in the worktree and return its absolute path **and full content** in a paste-ready block, so a session running in the main checkout copies it (the original session, or wind-down run from there).
-- `.briefs/` is ignored globally (`~/.gitignore_global`): briefs are local working files, readable by any harness on this machine, never committed.
+- Briefs are versioned: `.briefs/YYYY-MM-DD-HHMM-<slug>.md` in the repo, committed like any other file. Never scratchpad or `/tmp`.
+- **With a topic branch** (the session runs in a `.wt/` or harness worktree): write the brief in that checkout and commit it on the topic branch; it reaches `main` with the PR. Cite it as `<branch>:.briefs/<file>` plus its absolute path, so another session can read it with `git show origin/<branch>:.briefs/<file>` before the merge.
+- **Without a topic branch** (the session runs in the main checkout): write it in `<main-checkout>/.briefs/`, where `<main-checkout>` is the parent of `git rev-parse --path-format=absolute --git-common-dir`. wind-down routes the commit (topic branch and PR; the instance repo commits to `main`).
+- If the harness blocks writing outside its worktree, never work around it with the shell: write inside the worktree and commit there.
 - Standalone: respect an explicit destination. A person-facing handover may use `docs/handovers/` when requested.
 - Keep briefs for work repos in those repos. Never place them in the instance brief tree.
 - Use a lowercase slug, strip diacritics, collapse punctuation to hyphens and limit it to 60 characters.
@@ -52,7 +53,7 @@ branch: <branch>
 
 - When this handover continues a thread that already has a `pending` brief, mark the old one `superseded` with `superseded_by` and move it to `_archivo/`.
 - A session that resumes from a brief and finishes its work marks it `done` and moves it (wind-down does this at close).
-- Move, never delete: briefs are untracked local files.
+- Move, never delete: `git mv` when the brief is tracked, plain `mv` otherwise, and commit the move with the rest of the session's work.
 
 ## Required content
 
@@ -77,6 +78,6 @@ Return the absolute path and a short summary. Follow the configured signature po
 
 ## Git and boundaries
 
-Do not change AGENTS.md or harness memory. Do not push. Briefs are not committed. During wind-down, leave git work to its orchestrator.
+Do not change AGENTS.md or harness memory. Do not push. During wind-down, leave git work (including the brief's commit) to its orchestrator.
 
 Jump consumes this brief and does not create a second one.

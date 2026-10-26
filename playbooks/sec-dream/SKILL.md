@@ -14,7 +14,7 @@ Resumen del procedimiento:
 1. Métricas y freno por límite de uso.
 2. Estado de los PRs de dream: refresca la lista del hook de solape, evalúa la utilidad de los de 7 días o más y respeta el tope de 10 sin revisar.
 3. Fuentes en orden: encargos `dispatch:execute`, cola del propietario (opcional), síntesis entre señales, decisiones pendientes del brief, issues con plazo, minado de backlog. La revisión de PRs ajenos no es fuente.
-4. Seis filtros de utilidad antes de abrir un PR no pedido; si fallan, registra el motivo y no abre nada.
+4. Seis filtros de utilidad antes de abrir un PR no pedido; si fallan, registra el motivo y no abre nada. Si ningún candidato pasa, toma un trabajo de memoria (duplicados, datos contradictorios o viejos, enlaces de wiki, poda de `lessons.md`) como PR con evidencia.
 5. Entrega en un worktree `<repo>/.wt/<rama-slug>`, PR con metadato `dream:entrega`.
 6. Reporte por worktree temporal + commit + push, sin PR de reporte; aviso en el brief.
 7. `secretary dream emit-metrics`.

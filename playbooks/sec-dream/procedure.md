@@ -84,7 +84,7 @@ Formato de `utilidad.jsonl` (una línea por PR, nunca se reescribe):
 {"fecha": "2026-10-26", "pr": "owner/repo#42", "tipo": "diagnostico", "compromiso": "acc-…", "resultado": "util", "senal": "merged", "dias": 3}
 ```
 
-`tipo` sale del metadato `dream:entrega` del body (Paso 5). Tipos: `entregable`, `diagnostico`, `borrador-correo`, `propuesta-decision`, `wiki`, `arreglo-rutina`, `triage`. Un PR antiguo sin metadato se clasifica por su contenido.
+`tipo` sale del metadato `dream:entrega` del body (Paso 5). Tipos: `entregable`, `diagnostico`, `borrador-correo`, `propuesta-decision`, `wiki`, `arreglo-rutina`, `triage`, `memoria` (Paso 4b). Un PR antiguo sin metadato se clasifica por su contenido.
 
 **Tasa por tipo.** Con 3 o más resultados de un tipo, si menos de 1/3 son `util`, ese tipo baja en el scoring y no pasa el filtro 6 de U1.
 
@@ -102,7 +102,7 @@ Lee también, antes de sintetizar nada:
 - `subsystem/dream/utilidad.jsonl`: tasas por tipo (Paso 1).
 - `subsystem/heartbeat/latest.md`: estado git/PR y acc ↔ git, como insumo.
 
-La consolidación de memoria y wiki no es trabajo de dream: la hacen `wiki-update` y `desk-consolidate`. Dream solo lee sus resultados.
+La integración de memoria de extractores en artículos y de anotaciones `sec:pending` es de `wiki-update`; dream no la toca. Dream solo hace trabajo de memoria como último recurso (Paso 4b).
 
 ## Paso 3 — fuentes de trabajo, en este orden
 
@@ -120,7 +120,7 @@ La consolidación de memoria y wiki no es trabajo de dream: la hacen `wiki-updat
 
 La revisión de PRs ajenos **no** es fuente de dream (A1): la marca housekeeping en su reporte.
 
-Toda fuente, salvo un encargo `owner-authorized`, pasa los filtros de U1 antes de abrir un PR. Si las seis fuentes no dejan un trabajo que pase U1, la corrida termina sin entrega (U7).
+Toda fuente, salvo un encargo `owner-authorized`, pasa los filtros de U1 antes de abrir un PR. Si las seis fuentes no dejan un trabajo que pase U1, la corrida toma un trabajo de memoria (Paso 4b); si tampoco hay, termina sin entrega (U7).
 
 ## Paso 4 — filtros antes de entregar (U1)
 
@@ -140,6 +140,24 @@ Un trabajo que el propietario no pidió se entrega solo si pasa **los seis** fil
 Si un candidato falla, registra en el reporte el candidato, el filtro que falló y la evidencia (`candidatos_descartados[]`), y pasa al siguiente. No abras nada.
 
 Los encargos `owner-authorized` no pasan U1: los pidió el propietario. Los encargos `policy-authorized` y lo que una sesión dejó en la cola o con `dispatch:execute` sin autorización del propietario sí pasan U1.
+
+## Paso 4b — trabajo de memoria (DRM-14)
+
+Solo cuando **ningún** candidato pasó los seis filtros de U1. Si hay un candidato útil para el propietario, este paso no aplica. Es el uso de las corridas que antes terminaban en `skipped_no_owner_job`.
+
+Toma **un** trabajo de memoria:
+
+- unir entradas duplicadas (memoria de módulos, wiki, `lessons.md`);
+- marcar datos contradictorios o viejos, citando las dos fuentes y la fecha de cada una;
+- enlazar artículos de la wiki que hablan de lo mismo;
+- podar `lessons.md`: unir reglas repetidas, quitar las que una regla posterior reemplazó.
+
+Reglas:
+
+1. Va como PR (Paso 5), tipo `memoria` en `dream:entrega`. El body lleva, por cada cambio, la evidencia de por qué es correcto: rutas, líneas y fechas citadas literalmente.
+2. No toca lo que integra `wiki-update`: memoria de extractores → artículos y anotaciones `sec:pending`.
+3. Pasa los filtros 4 (sin solape) y 6 (tipo útil) de U1; el filtro 1 se cumple con la evidencia del duplicado, la contradicción o el dato viejo. Con menos de 1/3 de PRs `memoria` integrados, el tipo baja en el scoring como cualquier otro y la corrida termina sin entrega.
+4. Respeta el tope de U5b.
 
 ## Rutina dueña (U2)
 
@@ -268,7 +286,7 @@ Conflictos al rebasar: `latest.json` = la corrida más nueva; `log/YYYY-MM-DD.md
 
 `entregas[]` es lo que muestran el briefing y `desk-overview` en "🤖 Dream entregó" (U8): una línea por PR con compromiso, utilidad y verificación en menos de 2 minutos. Dream lo escribe; no pinta esas vistas.
 
-`dream_job.status`: `staged`, `merge_ready`, `blocked`, `updating_existing` (U5b), `skipped_rate_limit_brake` o `sin_entrega` (U7).
+`dream_job.status`: `staged`, `merge_ready`, `blocked`, `updating_existing` (U5b), `skipped_rate_limit_brake` o `sin_entrega` (U7). Un trabajo de memoria (Paso 4b) es una entrega más: `staged` o `merge_ready` con `source: memoria`.
 
 **Aviso en el brief** con `secretary-desk publish-event --routine desk-dream --body-file <texto>`:
 
@@ -297,4 +315,5 @@ Antes de elegir trabajo, recoge las decisiones de utilidad de rutinas ya reporta
 - Abrir un PR para el reporte de la corrida (U7) o escribir en el checkout principal (DRM-12).
 - Crear worktrees fuera de `<repo>/.wt/` (U10).
 - Enviar correo o integrar PRs.
-- Declarar `sin_entrega` sin haber mirado las seis fuentes.
+- Declarar `sin_entrega` sin haber mirado las seis fuentes y el trabajo de memoria (Paso 4b).
+- Tomar trabajo de memoria cuando hay un candidato que pasó U1.

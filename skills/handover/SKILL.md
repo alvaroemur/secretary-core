@@ -24,6 +24,7 @@ For a standalone invocation, collect current checkout status, branch, commit, re
 Infer a short title and destination from the request. Ask once if a material choice cannot be inferred. Do not ask again for inputs or permission already provided.
 
 - Briefs are versioned: `.briefs/YYYY-MM-DD-HHMM-<slug>.md` in the repo, committed like any other file. Never scratchpad or `/tmp`.
+- **Public repos are the exception.** Briefs carry personal data. If `gh repo view --json visibility -q .visibility` is `PUBLIC`, the repo ignores `.briefs/` and `.analysis/` in its `.gitignore`: write the brief in the main checkout, never commit it, and say so in the close.
 - **With a topic branch** (the session runs in a `.wt/` or harness worktree): write the brief in that checkout and commit it on the topic branch; it reaches `main` with the PR. Cite it as `<branch>:.briefs/<file>` plus its absolute path, so another session can read it with `git show origin/<branch>:.briefs/<file>` before the merge.
 - **Without a topic branch** (the session runs in the main checkout): write it in `<main-checkout>/.briefs/`, where `<main-checkout>` is the parent of `git rev-parse --path-format=absolute --git-common-dir`. wind-down routes the commit (topic branch and PR; the instance repo commits to `main`).
 - If the harness blocks writing outside its worktree, never work around it with the shell: write inside the worktree and commit there.

@@ -35,7 +35,7 @@ Pass this object to project sync, handover and jump. They reuse it instead of re
 
 Every output another session or harness must read (briefs, analysis reports, prompts) must survive the archive: archiving a harness session discards the uncommitted files of its worktree. Never use scratchpad or `/tmp` for them.
 
-- Briefs: `.briefs/`. Analysis: `.analysis/<topic>/`. Both are versioned (BRF-6).
+- Briefs: `.briefs/`. Analysis: `.analysis/<topic>/`. Both are versioned (BRF-6), except in public repos: there they stay local and ignored (`.gitignore`), and a session in a harness worktree hands them over with the paste-ready block.
 - The paste-ready prompt carries the essentials itself; it cites the file by absolute path and, when it lives on a topic branch, as `<branch>:<path>` (readable with `git show origin/<branch>:<path>` before the merge).
 - **Harness guard (XCK-4).** Some harnesses block file tools from a harness worktree to the main checkout (Claude Code: "This session is running in an isolated git worktree…"). Never work around it with the shell.
   - Read-only sessions (evaluators, reviews) run without a worktree and write straight to the main checkout.

@@ -15,13 +15,11 @@ dist/
 build/output/
 wiki/articulos/
 wiki/output/
-playbooks/
-skills/
 
-# Private redaction literals for `secretary core export-examples` — NEVER commit
-# (real emails, repo slugs, Drive folder ids). Template: *.example.yml.
+# Private literals for the leak-guard — NEVER commit. Template: leak_guard_secrets.example.yml.
+leak_guard_secrets.yml
+# Legacy name from the retired exporter; keep ignored until local copies are gone.
 export_examples_secrets.yml
-
 
 # WhatsApp session credentials & personal data — NEVER commit (public repo)
 whatsapp/auth/
@@ -31,8 +29,10 @@ whatsapp/qr.png
 .wt/
 
 # Spec Kit runner skills (local only — not shared across worktrees/cloud).
-# Covered by the existing `skills/` rule; listed for clarity.
 .claude/skills/
 .cursor/skills/
 .agents/skills/
 
+# Briefs y análisis: este repo es público; se quedan locales (excepción a BRF-6)
+.briefs/
+.analysis/

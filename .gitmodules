@@ -1,0 +1,3 @@
+[submodule "plugins/gwork"]
+	path = plugins/gwork
+	url = https://github.com/alvaroemur/gwork.git

@@ -16,7 +16,7 @@ instancia. Usar `$SECRETARY_INSTANCE`, `$SECRETARY_CORE`, placeholders y archivo
 
 ### II. Engine vs instancia
 
-`secretary-core` es el engine (CLI, secd, playbooks.example, contratos de código).
+`secretary-core` es el engine (CLI, secd, skills y playbooks versionados, contratos de código).
 La instancia (`$SECRETARY_INSTANCE`) guarda estado, memoria y datos reales.
 Una spec de engine describe comportamiento portable; no fija layout personal.
 

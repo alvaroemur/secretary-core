@@ -121,6 +121,7 @@ echo "SECRETARY_CORE=$CORE  SECRETARY_INSTANCE=$INSTANCE"
 mkdir -p "$LOG_DIR"
 
 python3 - "$MANIFEST" "$INSTANCE/.secretary.yml" "$LAUNCHD_DIR" "$RUN_SCRIPT" "$LOG_DIR" "$INSTANCE" "$CORE" "$ROUTINES_EXECUTOR" "$ROUTINES_MODEL" "$ROUTINES_API_KEY_ENV" "${API_KEY_VALUE:-}" <<'PY'
+import os
 import plistlib
 import re
 import sys
@@ -131,6 +132,9 @@ try:
     import yaml
 except ImportError:
     yaml = None
+
+sys.path.insert(0, os.environ["ROUTINES_ROOT"])
+from launchd_cron import parse_cron
 
 (
     manifest_path,
@@ -177,58 +181,11 @@ for line in text.splitlines():
 if current:
     routines.append(current)
 
-WEEKDAY_MAP = {"0": 0, "7": 0, "sun": 0, "mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6}
-
 runtime_map = {
     "cursor-cron": "cursor",
     "api-cron": "api",
     "claude-scheduled": "claude",
 }
-
-
-def parse_cron(cron: str) -> list[dict]:
-    parts = cron.split()
-    if len(parts) != 5:
-        raise ValueError(f"unsupported cron: {cron}")
-    minute_s, hour_s, _dom, _mon, dow_s = parts
-
-    def expand(field: str, lo: int, hi: int) -> list[int]:
-        if field == "*":
-            return list(range(lo, hi + 1))
-        out: list[int] = []
-        for chunk in field.split(","):
-            if "/" in chunk:
-                base, step = chunk.split("/", 1)
-                vals = expand(base, lo, hi)
-                out.extend(vals[:: int(step)])
-            elif chunk.isdigit():
-                out.append(int(chunk))
-            else:
-                raise ValueError(f"unsupported cron field: {field}")
-        return sorted(set(out))
-
-    minutes = expand(minute_s, 0, 59)
-    hours = expand(hour_s, 0, 23)
-
-    intervals: list[dict] = []
-    if dow_s != "*":
-        weekdays = []
-        for chunk in dow_s.split(","):
-            if chunk.isdigit():
-                weekdays.append(int(chunk))
-            elif chunk.lower() in WEEKDAY_MAP:
-                weekdays.append(WEEKDAY_MAP[chunk.lower()])
-            else:
-                raise ValueError(f"unsupported weekday: {chunk}")
-        for wd in weekdays:
-            for h in hours:
-                for m in minutes:
-                    intervals.append({"Hour": h, "Minute": m, "Weekday": wd})
-    else:
-        for h in hours:
-            for m in minutes:
-                intervals.append({"Hour": h, "Minute": m})
-    return intervals
 
 
 def plist_for(routine_id: str, cron: str) -> dict:

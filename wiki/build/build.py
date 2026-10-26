@@ -28,7 +28,8 @@ SECRETARY = Path(os.environ.get("SECRETARY_DATA") or Path(__file__).absolute().p
 # rutina aislada (ej. wiki-update en un git worktree) construya desde sus propios
 # artículos vía `SECRETARY_DATA=<worktree>`. Por defecto resuelve a la misma ruta
 # de siempre (instance/wiki/articulos). OUTPUT y ASSETS siguen colgando del engine.
-ARTICULOS = SECRETARY / "wiki" / "articulos"
+_cand_knowledge = SECRETARY / "knowledge" / "wiki" / "articulos"
+ARTICULOS = _cand_knowledge if _cand_knowledge.is_dir() else (SECRETARY / "wiki" / "articulos")
 ASSETS = ROOT / "assets"
 OUTPUT = ROOT / "output"
 

@@ -22,7 +22,8 @@ Requires **Python 3.11+**.
 ```bash
 export SECRETARY_CORE=~/Dev/secretary-core
 export SECRETARY_INSTANCE=~/.secretary
-pip install -e ~/Dev/secretary-core
+git -C ~/Dev/secretary-core submodule update --init plugins/gwork
+pip install -r ~/Dev/secretary-core/requirements-dev.txt
 secretary --version
 ```
 
@@ -60,6 +61,7 @@ secretary fresh mail                 # Paso 0 fresh-first (tabla)
 secretary fresh meeting --format json
 secretary fresh all --local          # incluye diff working vs main
 secretary fresh all --format markdown  # bloque heartbeat
+secretary gog-health                   # refresh token de cada cuenta gog (exit 1 si alguna falla)
 secretary modules list --format json
 secretary modules health
 secretary modules health --module mail --format json
@@ -74,66 +76,43 @@ secretary acc fold acc-… pr:owner/repo#N
 secretary portal aggregate          # snapshot → subsystem/portal/live-data.json
 secretary portal aggregate --serve  # static server + POST /api/refresh
 
-secretary core export-examples          # regen playbooks.example/ + skills.example/
-secretary core export-examples --check  # CI/pre-commit: fail on drift (no writes)
+secretary config get brief.repo        # one instance value (scalar, or JSON for lists/maps)
 
 secretary routines setup            # interactive router + LaunchAgent wizard
+secretary gwork --help              # passthrough to the gwork plugin CLI
 ```
 
 `secretary dispatch locate` exits `0` with the matching repo(s) on stdout, or `1` with
 empty stdout when `cwd` isn't nested under any `dispatch.executor.repos` path — replaces
 the `jq`-based bash loop that used to live in `sec-drone`'s SKILL.md.
 
-## Public/private example export
+## Single source for skills and playbooks
 
-The engine keeps a public/private split: `playbooks/` and `skills/` are gitignored (the
-**real**, private sources — real names, emails, Drive/Tactiq ids), while
-`playbooks.example/` and `skills.example/` are the committed, **sanitized** copies that
-`secretary/routines/setup.py` falls back to.
-
-`secretary core export-examples` regenerates the `.example` dirs deterministically:
-
-- Wipes and rebuilds `playbooks.example/` from `playbooks/` and `skills.example/` from
-  `skills/`, so drift is impossible (examples = a pure function of sources + rules).
-- Applies the redaction rules to every **text** file (binaries copied verbatim).
-- Never touches `docs/`, `README.md`, `CLAUDE.md`, `AGENTS.md`, or `CONTRIBUTING.md`
-  (hand-authored prose).
-- If a real source dir is missing it **stops** (exit 2) instead of writing garbage — so
-  it is a local/pre-commit tool, not a CI step (CI has no private sources).
-- `--check` regenerates into a temp area and diffs against the committed `.example` dirs,
-  exiting non-zero on any difference. Use it as a pre-commit gate after editing the real
-  playbooks/skills.
-
-### Public map vs private secrets (no sensitive literals in the repo)
-
-The redaction config is **split** so the public repo never contains real sensitive
-literals:
-
-| File | Committed? | Holds |
-|------|-----------|-------|
-| `secretary/data/export_examples_map.yml` | ✅ public | `detect:` (generic PII regexes for the guard), `redact:` (only non-sensitive rules, e.g. a generic phone regex), and the `preserve:` allowlist (`Álvaro`, `alvaroemur/secretary-core`, and the placeholder values). |
-| `export_examples_secrets.yml` | ❌ **gitignored** | the REAL literals → placeholders (owner emails, the private instance repo slug + other instance-specific repo slugs, Drive mount path, Tactiq + other Drive folder ids). |
-| `export_examples_secrets.example.yml` | ✅ public | template (placeholders only) documenting the private-file schema. |
-
-Set up the private file once (per clone):
+`skills/` and `playbooks/` are the only, versioned source. They hold no personal data:
+anything instance-specific (accounts, Drive mount and folder ids, private repo slugs) is
+read at runtime from the instance's `.secretary.yml`:
 
 ```bash
-cp export_examples_secrets.example.yml export_examples_secrets.yml
-# edit export_examples_secrets.yml with your real values (it is in .gitignore)
+gh pr list --repo "$(secretary config get brief.repo)"
+GDRIVE="$(secretary config get drive.mount)"
 ```
 
-The exporter merges **private rules first, then public rules**. If the private file is
-absent (fresh clone / CI), it still runs the public rules but prints a clear **WARNING**
-that sensitive redactions were skipped — so you never silently ship un-redacted examples.
+The instance's own skills and playbooks live in its `canon/skills/` and
+`canon/playbooks/`. A name present in both core and the instance is an install error,
+never an override.
 
-### CI leak-guard
+Installation (`secretary routines setup`, or `python -m secretary.desk_deploy`) keeps one
+physical copy per skill in `~/.agents/skills` (read by Codex and Cursor), one symlink per
+skill in `~/.claude/skills` (Claude Code does not read `~/.agents/skills`), and removes
+core copies from `~/.codex/skills` and `~/.cursor/skills`, with backups. Each harness then
+sees each skill once, and every installed file equals the versioned source.
 
-`scripts/ci/check_no_leaks.py` scans git-tracked files and fails on leaked PII. It works
-**without** the private file by using the map's generic `detect:` regexes (any email,
-Google-Drive-style folder id, phone) plus the `preserve:` allowlist to avoid flagging the
-public placeholders. When the private file **is** present locally it also scans for those
-exact literals for precision. It skips the public map, the template, itself, dependency
-lock files, and binaries. Runs in `.github/workflows/ci.yml` on every push/PR.
+### Leak guard
+
+`scripts/ci/check_no_leaks.py` fails if a tracked file contains PII. CI uses the generic
+`detect:` regexes and `preserve:` allowlist in `secretary/data/leak_guard.yml`. Locally,
+an optional gitignored `leak_guard_secrets.yml` (template:
+`leak_guard_secrets.example.yml`) adds your exact literals.
 
 ## Routines setup
 

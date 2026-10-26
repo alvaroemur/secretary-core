@@ -1,0 +1,43 @@
+{
+  "skills": {
+    "sec-compose": "desk-compose",
+    "sec-consolidate": "desk-consolidate",
+    "sec-context": "desk-context",
+    "sec-cowork-audit": "desk-cowork-audit",
+    "sec-cowork-fit": "desk-cowork-fit",
+    "sec-design": "desk-design",
+    "sec-disco": "desk-disco",
+    "sec-drive": "desk-drive",
+    "sec-drone": "desk-drone",
+    "sec-learn": "desk-learn",
+    "sec-mail": "desk-mail",
+    "sec-meeting": "desk-meeting",
+    "sec-merge": "desk-merge",
+    "sec-project-bootstrap": "desk-project-bootstrap",
+    "sec-project-sync": "desk-project-sync",
+    "sec-recall": "desk-recall",
+    "sec-refresh": "desk-refresh",
+    "sec-state": "desk-state",
+    "sec-sys-annotate": "desk-sys-annotate",
+    "sec-sys-integrate": "desk-sys-integrate",
+    "sec-tablero": "desk-tablero",
+    "sec-transcribe": "desk-transcribe",
+    "sec-whatsapp": "desk-whatsapp",
+    "sec-workspace": "desk-workspace",
+    "sec-write": "desk-write",
+    "pulse": "desk-overview",
+    "dispatch": "delegate"
+  },
+  "routines": {
+    "dispatch-executor": "work-runner",
+    "pulse-headless": "brief-update",
+    "sec-heartbeat": "desk-heartbeat",
+    "sec-dream": "desk-dream"
+  },
+  "retired_skills": [
+    "desk-dream",
+    "desk-heartbeat",
+    "sec-dream",
+    "sec-heartbeat"
+  ]
+}

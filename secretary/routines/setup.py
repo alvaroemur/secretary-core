@@ -369,42 +369,69 @@ def _mcp_note(executor: str) -> None:
         print("  to avoid duplicate PRs while using local LaunchAgents.")
 
 
+def _harness_skill_dirs() -> dict[str, list[Path]]:
+    """One physical copy in `~/.agents/skills` (read by Codex and Cursor).
+
+    Claude Code does not read `~/.agents/skills`, so it gets one symlink per skill.
+    Codex and Cursor copies of these skills are pruned so each appears once.
+    """
+    home = Path.home()
+    return {"targets": [home/".agents/skills"], "links": [home/".claude/skills"],
+            "prunes": [home/".codex/skills", home/".cursor/skills"]}
+
+
+def _instance_dir(name: str) -> Path | None:
+    try:
+        from secretary.config import instance_root
+        path = instance_root()/"canon"/name
+    except Exception:
+        return None
+    return path if path.is_dir() else None
+
+
 def _sync_playbooks_and_skills() -> None:
     import shutil
-    print("\n  Syncing playbooks and skills to host (~/.claude/)...")
+    print("\n  Syncing playbooks and skills to harness skill dirs...")
     core_dir = Path(__file__).resolve().parent.parent.parent
-    
-    # Sync Playbooks
-    src_pb = core_dir / "playbooks"
-    if not src_pb.is_dir():
-        src_pb = core_dir / "playbooks.example"
-        
-    dst_pb = Path.home() / ".claude" / "scheduled-tasks"
-    if src_pb.is_dir():
-        dst_pb.mkdir(parents=True, exist_ok=True)
-        for item in src_pb.iterdir():
-            if item.is_dir():
-                target = dst_pb / item.name
-                if target.exists():
-                    shutil.rmtree(target)
-                shutil.copytree(item, target)
-        print(f"  ✓ Synced {src_pb.name} -> {dst_pb}")
+    dirs = _harness_skill_dirs()
+    runtime = Path.home()/".local/share/secretary/desk-runtime"
+    instance_skills = _instance_dir("skills")
 
-    # Sync Skills
-    src_sk = core_dir / "skills"
-    if not src_sk.is_dir():
-        src_sk = core_dir / "skills.example"
-        
-    dst_sk = Path.home() / ".claude" / "skills"
-    if src_sk.is_dir():
-        dst_sk.mkdir(parents=True, exist_ok=True)
-        for item in src_sk.iterdir():
-            if item.is_dir():
-                target = dst_sk / item.name
-                if target.exists():
-                    shutil.rmtree(target)
-                shutil.copytree(item, target)
-        print(f"  ✓ Synced {src_sk.name} -> {dst_sk}")
+    # Check sources, collisions and installed contracts before any copy can
+    # mutate a playbook or skill. Desk performs the whole skill install.
+    from secretary.desk_deploy import deployment as deploy_desk
+    deploy_desk(core_dir, dirs["targets"], runtime, instance_skills=instance_skills,
+                links=dirs["links"], prunes=dirs["prunes"])
+
+    # Sync Playbooks: core `playbooks/` plus the instance's own `canon/playbooks/`.
+    dst_pb = Path.home() / ".claude" / "scheduled-tasks"
+    sources = [core_dir / "playbooks"]
+    instance_playbooks = _instance_dir("playbooks")
+    if instance_playbooks is not None:
+        sources.append(instance_playbooks)
+    seen: dict[str, Path] = {}
+    for src_pb in sources:
+        for item in sorted(src_pb.iterdir()) if src_pb.is_dir() else []:
+            if (item/"SKILL.md").is_file():
+                if item.name in seen:
+                    raise ValueError(f"Playbook duplicado entre core e instancia: {item.name}")
+                seen[item.name] = item
+    dst_pb.mkdir(parents=True, exist_ok=True)
+    for name, item in seen.items():
+        target = dst_pb / name
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(item, target)
+    print(f"  ✓ Synced {len(seen)} playbooks -> {dst_pb}")
+
+    # Desk is the final overlay: native scheduler IDs remain untouched.
+    deploy_desk(core_dir, dirs["targets"], runtime, True, dst_pb, Path.home()/".local/bin",
+                instance_skills=instance_skills, links=dirs["links"], prunes=dirs["prunes"])
+    print("  ✓ Skills installed once; Claude Code links and harness duplicates reconciled")
+    from secretary.conversation_deploy import deploy as deploy_conversations
+    deploy_conversations(core_dir, dst_pb, dirs["targets"], runtime, True)
+    print("  ✓ Conversation contracts deployed; activation follows instance config")
+
 
 
 def run_setup() -> int:

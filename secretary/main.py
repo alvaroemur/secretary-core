@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from enum import Enum
@@ -15,11 +16,13 @@ from rich.console import Console
 from rich.table import Table
 
 from secretary import __version__
-from secretary.acc import fold_action
+from secretary.acc import archive_actions, fold_action, show_action
 from secretary.build_root import run_wiki_build, run_wiki_serve
 from secretary.config import (
     all_resolved_paths,
     config_show_dict,
+    core_root,
+    get_value,
     instance_root,
     locate_host,
     resolve_path_key,
@@ -68,7 +71,6 @@ modules_app = typer.Typer(help="Module contracts and health (spec 015).")
 contract_app = typer.Typer(help="Read or update module contract.yaml.")
 dream_app = typer.Typer(help="sec-dream deterministic collection (spec 020).")
 portal_app = typer.Typer(help="Operator portal (spec 019).")
-core_app = typer.Typer(help="Engine maintenance ops (public/private example export).")
 dispatch_app = typer.Typer(help="dispatch.executor allowlist ops (no LLM).")
 app.add_typer(config_app, name="config")
 app.add_typer(context_app, name="context")
@@ -79,7 +81,6 @@ app.add_typer(routines_app, name="routines")
 app.add_typer(modules_app, name="modules")
 app.add_typer(dream_app, name="dream")
 app.add_typer(portal_app, name="portal")
-app.add_typer(core_app, name="core")
 modules_app.add_typer(contract_app, name="contract")
 
 
@@ -188,9 +189,9 @@ def config_show(
     """Dump resolved instance config (paths absolute)."""
     data = config_show_dict()
     if yaml_out:
-        console.print(yaml.dump(data, allow_unicode=True, default_flow_style=False))
+        typer.echo(yaml.dump(data, allow_unicode=True, default_flow_style=False), nl=False)
     else:
-        console.print(json.dumps(data, ensure_ascii=False, indent=2))
+        typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
 
 
 @config_app.command("path")
@@ -203,7 +204,23 @@ def config_path(
     except KeyError as exc:
         err_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from exc
-    console.print(str(path))
+    typer.echo(str(path))
+
+
+@config_app.command("get")
+def config_get(
+    key: Annotated[str, typer.Argument(help="Dotted key, e.g. drive.mount or accounts.personal")],
+) -> None:
+    """Print one instance value: scalars as plain text, lists and maps as JSON."""
+    try:
+        value = get_value(key)
+    except KeyError as exc:
+        err_console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    if isinstance(value, (dict, list)):
+        typer.echo(json.dumps(value, ensure_ascii=False))
+    else:
+        typer.echo("" if value is None else str(value))
 
 
 @dispatch_app.command("locate")
@@ -241,6 +258,7 @@ def dispatch_locate(
 def env_cmd() -> None:
     """Emit shell exports for instance bootstrap (eval "$(secretary env)")."""
     print(f'export SECRETARY_INSTANCE="{instance_root()}"')
+    print(f'export SECRETARY_CORE="{core_root()}"')
 
 
 @app.command("menu")
@@ -248,6 +266,25 @@ def menu_cmd() -> None:
     """Launch the interactive guided menu."""
     from secretary.tui import run_menu
     run_menu()
+
+
+@app.command(
+    "gwork",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    add_help_option=False,
+)
+def gwork_cmd(ctx: typer.Context) -> None:
+    """Pass all arguments to the standalone gwork CLI."""
+    executable = shutil.which("gwork")
+    if executable is None:
+        err_console.print(
+            "[red]Error:[/red] gwork is not installed. "
+            "Initialize the plugins/gwork submodule and install it with "
+            "`python -m pip install -e plugins/gwork`."
+        )
+        raise typer.Exit(127)
+    result = subprocess.run([executable, *ctx.args], check=False)
+    raise typer.Exit(result.returncode)
 
 
 @app.command("paths")
@@ -267,12 +304,15 @@ def paths_list() -> None:
 def status_cmd(
     emoji: Annotated[str, typer.Argument(help="✅ 🔄 ⏳ 🚫")],
     ref: Annotated[str, typer.Argument(help="#N del brief o acc-id (vacío si no aplica)")],
-    note: Annotated[str, typer.Argument(help="Nota del avance")],
+    note: Annotated[str, typer.Argument(help="Resultado concreto del avance")],
+    state: Annotated[str, typer.Option(help="Estado actual del trabajo")] = "",
+    evidence: Annotated[str, typer.Option(help="PR, issue, archivo o comprobación")] = "",
+    next_step: Annotated[str, typer.Option("--next", help="Siguiente paso o decisión pendiente")] = "",
 ) -> None:
     """Persist progress on today's brief (atomic sec-status)."""
     try:
-        _, summary = post_status(emoji, ref, note)
-    except (RuntimeError, subprocess.CalledProcessError) as exc:
+        _, summary = post_status(emoji, ref, note, state=state, evidence=evidence, next_step=next_step)
+    except (RuntimeError, ValueError, subprocess.CalledProcessError) as exc:
         err_console.print(f"[red]secretary status:[/red] {exc}")
         raise typer.Exit(1) from exc
     console.print(summary)
@@ -454,14 +494,63 @@ def acc_fold(
         Optional[str],
         typer.Argument(help="YYYY-MM-DD (default: hoy)"),
     ] = None,
+    module: Annotated[
+        str, typer.Option("--module", help="Módulo dueño del ledger (meetings | whatsapp).")
+    ] = "meetings",
 ) -> None:
     """Fold canonical action closure into acciones.md."""
     try:
-        msg = fold_action(acc_id, evidencia, cerrado=cerrado)
+        msg = fold_action(acc_id, evidencia, cerrado=cerrado, module=module)
     except (FileNotFoundError, LookupError, ValueError) as exc:
         err_console.print(f"[red]secretary acc fold:[/red] {exc}")
         raise typer.Exit(1) from exc
     console.print(msg)
+
+
+@acc_app.command("show")
+def acc_show(
+    acc_id: Annotated[str, typer.Argument(help="acc-YYYYMMDD-NNN")],
+    module: Annotated[str, typer.Option("--module", help="meetings | whatsapp")] = "meetings",
+) -> None:
+    """Show an action by id: active ledger first, then the monthly archive."""
+    try:
+        hits = show_action(acc_id, module=module)
+    except (FileNotFoundError, LookupError) as exc:
+        err_console.print(f"[red]secretary acc show:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    for location, block in hits:
+        console.print(f"[dim]# {location}[/dim]")
+        console.print(block.raw.rstrip(), markup=False, highlight=False)
+
+
+@acc_app.command("archive")
+def acc_archive(
+    apply: Annotated[
+        bool, typer.Option("--apply", help="Escribir. Sin esta bandera solo muestra el plan.")
+    ] = False,
+    retention_days: Annotated[
+        int, typer.Option("--retention-days", help="Días que una cerrada se queda en el activo.")
+    ] = 14,
+    module: Annotated[str, typer.Option("--module", help="meetings | whatsapp")] = "meetings",
+    verbose: Annotated[bool, typer.Option("--verbose", help="Listar acc-ids omitidos.")] = False,
+) -> None:
+    """Move closed entries to acciones/archivo/YYYY-MM.md (plan by default; --apply writes)."""
+    try:
+        plan, stats = archive_actions(module=module, apply=apply, retention_days=retention_days)
+    except (FileNotFoundError, ValueError) as exc:
+        err_console.print(f"[red]secretary acc archive:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    mode = "APLICADO" if apply and plan.moves else "PLAN (no se escribió nada)"
+    console.print(f"[bold]{mode}[/bold] · retención {retention_days} d")
+    for month in sorted(plan.moves):
+        console.print(f"  archivo/{month}.md  +{len(plan.moves[month])} bloques")
+    console.print(
+        f"  bloques: {stats['blocks_before']} → {stats['blocks_after']} en el activo · "
+        f"bytes: {stats['bytes_before']:,} → {stats['bytes_after']:,}"
+    )
+    for reason, ids in sorted(plan.skipped.items()):
+        shown = f": {', '.join(ids[:10])}{' …' if len(ids) > 10 else ''}" if verbose else ""
+        console.print(f"  omitidas · {reason}: {len(ids)}{shown}")
 
 
 @routines_app.command("setup")
@@ -523,35 +612,6 @@ def dream_collect(
     raise typer.Exit(run_collect(write_collect=write_collect))
 
 
-@core_app.command("export-examples")
-def core_export_examples(
-    check: Annotated[
-        bool,
-        typer.Option(
-            "--check",
-            help="No escribir: regenerar en temporal y comparar con los *.example commiteados (CI/pre-commit).",
-        ),
-    ] = False,
-) -> None:
-    """Regenerar playbooks.example/ y skills.example/ desde los dirs privados aplicando el mapa de anonimización."""
-    from secretary.export_examples import export_examples
-
-    try:
-        rc, messages = export_examples(check=check)
-    except (FileNotFoundError, ValueError) as exc:
-        err_console.print(f"[red]secretary core export-examples:[/red] {exc}")
-        raise typer.Exit(1) from exc
-    for line in messages:
-        style = "green" if line.strip().endswith("al día.") or "regenerado" in line else ""
-        console.print(f"[{style}]{line}[/{style}]" if style else line)
-    if check and rc != 0:
-        err_console.print(
-            "[red]Drift:[/red] los *.example no coinciden con la fuente. "
-            "Corré `secretary core export-examples` y commiteá.",
-        )
-    raise typer.Exit(rc)
-
-
 @dream_app.command("emit-metrics")
 def dream_emit_metrics(
     since: Annotated[
@@ -566,6 +626,18 @@ def dream_emit_metrics(
     from secretary.dream import run_emit_metrics
 
     raise typer.Exit(run_emit_metrics(since=since, dry_run=dry_run))
+
+
+@dream_app.command("open-prs")
+def dream_open_prs(
+    write: Annotated[
+        bool, typer.Option("--write", help="Refrescar la caché local que lee el hook de solape (U9).")
+    ] = False,
+) -> None:
+    """List open dream/* PRs with their files; --write refreshes the overlap-hook cache."""
+    from secretary.dream import run_open_prs
+
+    raise typer.Exit(run_open_prs(write=write))
 
 
 @modules_app.command("list")
@@ -618,7 +690,7 @@ def modules_health(
 
     if out_fmt == OutputFormat.json:
         if module:
-            console.print(json.dumps(data, ensure_ascii=False, indent=2))
+            typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
         else:
             console.print(json.dumps(rows, ensure_ascii=False, indent=2))
         return
@@ -684,6 +756,65 @@ def modules_contract_put(
         err_console.print(f"[red]secretary modules contract put:[/red] {exc}")
         raise typer.Exit(1) from exc
     console.print(json.dumps({"ok": True, "module": module_id, "contract": merged}, ensure_ascii=False))
+
+
+@app.command("gog-health")
+def gog_health_cmd(
+    out_fmt: FreshFormat = typer.Option(
+        FreshFormat.table, "--format", "-f", help="Output format."
+    ),
+) -> None:
+    """Probe every gog account's refresh token (read-only, no OAuth prompt). Exit 1 if any fails."""
+    from secretary.gog_health import check_accounts
+    from secretary.gog_health import format_markdown as gog_markdown
+
+    report = check_accounts()
+    if out_fmt == FreshFormat.json:
+        console.print(json.dumps(report, ensure_ascii=False, indent=2))
+    elif out_fmt == FreshFormat.markdown:
+        console.print(gog_markdown(report), end="")
+    else:
+        if report.get("error"):
+            err_console.print(f"[red]secretary gog-health:[/red] {report['error']}")
+        table = Table("account", "state", "detail / action")
+        for a in report.get("accounts") or []:
+            if a["ok"]:
+                table.add_row(a["account"], "[green]ok[/green]", a["detail"])
+            else:
+                table.add_row(a["account"], "[red]fail[/red]", f"{a['detail']} → {a['fix']}")
+        console.print(table)
+        for p in report.get("problems") or []:
+            console.print(f"[yellow]{p['check']}[/yellow]: {p['detail']}")
+    raise typer.Exit(0 if report["ok"] else 1)
+
+
+
+@app.command("signature")
+def signature_command(
+    context: str = typer.Argument('sesion'),
+    runtime: Optional[str] = typer.Option(None, '--runtime'),
+    mark: bool = typer.Option(False, '--mark'),
+    footer: bool = typer.Option(False, '--footer'),
+):
+    """Genera la marca y la firma visible para el runtime indicado."""
+    from secretary.config import load_config
+    from secretary.signatures import signature
+    if mark and footer:
+        raise typer.BadParameter('Elige --mark o --footer')
+    try:
+        head, tail = signature(context, runtime=runtime,
+                               timezone=load_config().get('timezone') or 'UTC')
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(head if mark else tail if footer else head+'\n\n---\n'+tail)
+
+
+@app.command("efficiency", add_help_option=False,
+             context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+def efficiency_command(ctx: typer.Context):
+    """Optional close snapshots and local usage metrics; experimental routine gates."""
+    from secretary.efficiency import main
+    raise typer.Exit(main(ctx.args))
 
 
 def run() -> None:

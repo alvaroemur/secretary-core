@@ -190,6 +190,11 @@ Render only sections with items. Each item carries its ✓ from Stage 0. Numbere
 - **<repo>** `.wt/<old-branch-slug>` — ✓ integrated · ✓ worktree, local and remote branch removed
 - **<repo>** `.wt/<branch-slug>` — ⚠️ integrated, kept: <failing condition>
 
+### Issues and project
+- ✓ issues checked both ways: #<N> <comment posted | already consistent>
+  <n>. 🔗 Update issue #<N> (`## Relacionado`)? Recommended: yes
+- ✓ project sync: <AGENTS.md | scratch purge | layout | EDT drift> — <result>
+
 ### Related work
 - 🟠 close before: PR #<N> (`<branch>`) — touches `<files>`
   2. 🔀 Merge PR #<N> too? Recommended: yes. Check: `<check>`
@@ -199,24 +204,28 @@ Render only sections with items. Each item carries its ✓ from Stage 0. Numbere
 
 ### Memory and plan
   4. 📝 Note `<milestone>` in the `<topic>` wiki theme? Recommended: yes
+  5. 🧠 Log harness friction `<what>` as an issue (`desk-learn`)? Recommended: yes
 - ✓ plan `<plan_ref>` node <id>: <old> → <new>, Log row added
 
 ### Continuity
 - ✓ brief `<abs path>` (pending) · ✓ previous brief `<abs path>` → superseded
 - ✓ rescued `<file>` → `<abs path in main checkout>` (or ⚠️ to copy: `<abs source>` → `<abs target>`, content in the block below)
-- Restart prompt below; the harness card is offered after the close
+- Restart prompt in the last block; the harness card is offered after the close
 
 Reply with numbers (`1 3`), `all`, or `none`, or edit the block:
 
 ```text
-1 merge PR #<N>: yes
-2 merge PR #<N>: yes
-3 co-change: yes
-4 wiki: yes
+<n> <kind> <ref>: yes
+```
+
+Paste this in a new session (any harness) to continue:
+
+```text
+<restart prompt from jump>
 ```
 ````
 
-The reply block is the last element of the answer: one fenced `text` block, no fence inside it, no rendered markdown inside it. Emojis mark the kind of item: 🔀 merge, 🧩 co-change, 📝 memory, 🟠 blocks, ⚪ related, ⏳ waiting, ⚠️ kept or failed.
+The reply block has exactly one line per numbered item, in the same order and numbering (`<n> merge PR #<N>: yes`, `<n> co-change: yes`, `<n> wiki: yes`, …); the line above is the shape, not a list to copy. It is one fenced `text` block, no fence inside it, no rendered markdown inside it. When something continues, the restart prompt block follows it and is the last element of the answer; with nothing continuing, the reply block is the last. Emojis mark the kind of item: 🔀 merge, 🔗 issue, 🧩 co-change, 📝 memory, 🧠 friction, 🟠 blocks, ⚪ related, ⏳ waiting, ⚠️ kept or failed.
 
 ### Stage 2 — Execute and confirm
 

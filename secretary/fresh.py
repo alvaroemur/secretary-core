@@ -409,6 +409,21 @@ def _drive_fuente_viva() -> dict[str, Any]:
 
 
 def _whatsapp_fuente_viva() -> dict[str, Any]:
+    try:
+        from secretary.whatsapp_review import probe, read_config
+        cfg = read_config(instance_root())
+        live = probe(cfg)
+        live["unresolved_contacts"] = cfg.get("unresolved_contacts", [])
+        state = resolve_path_key("whatsapp.state")
+        if state.is_file():
+            live["report_excerpt"] = state.read_text().splitlines()[:12]
+        return live
+    except FileNotFoundError:
+        pass  # Legacy instances without local configuration retain their old report.
+    except (ValueError, KeyError):
+        pass
+    except Exception as error:
+        return {"source": "macos-sqlite", "readable": False, "error": type(error).__name__}
     state_path = _rel_path(_MODULE_STATE_KEY["whatsapp"])
     main_text = git_show_main(state_path)
     out: dict[str, Any] = {}
@@ -528,6 +543,10 @@ def format_markdown_heartbeat(data: dict[str, Any]) -> str:
         if key == "mail" and fv.get("latest_email"):
             le = fv["latest_email"]
             parts.append(f"vivo: último correo {le.get('date', '—')}")
+        if key == "whatsapp" and fv.get("source") == "macos-sqlite":
+            parts.append("local: " + ("readable" if fv.get("readable") else "access failed"))
+            parts.append("latest captured message: " + str(fv.get("latest_message_at", "unknown")))
+            parts.append("account synchronization: unknown")
         if key == "meeting":
             docs = fv.get("tactiq_pending_docs") or []
             if docs:

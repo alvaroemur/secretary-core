@@ -821,5 +821,11 @@ def run() -> None:
     app()
 
 
+@app.command("whatsapp", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+def whatsapp_command(ctx: typer.Context):
+    """Read local WhatsApp: probe, chats, collect, audio, transcribe, record."""
+    from secretary.whatsapp_review import main as whatsapp_main
+    raise typer.Exit(whatsapp_main(ctx.args))
+
 if __name__ == "__main__":
     run()

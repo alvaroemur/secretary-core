@@ -44,7 +44,7 @@ def deployment(source: Path, targets: list[Path], runtime: Path, apply: bool = F
             copies.append((tidy_contract, tidy_target))
         # Existing IDs and paths remain stable; no extra schedule is registered.
         for name in ['dispatch-executor','pulse-headless','secretary-briefing','sec-dream',
-                     'sec-heartbeat','job-search-crawler']:
+                     'sec-heartbeat','job-search-crawler','whatsapp-review']:
             origin = playbooks/name
             if origin.is_dir():copies.extend((p, scheduled/name/p.relative_to(origin)) for p in origin.rglob('*') if p.is_file())
         # Sales owns its private business procedure and supporting scripts.

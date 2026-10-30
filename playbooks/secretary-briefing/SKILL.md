@@ -39,3 +39,8 @@ No crea encargos ejecutables ni modifica su autorización. Notificar no equivale
 ## Correo al propietario
 
 Si `desk.notifications.brief_email` está habilitado, prepara texto breve con decisiones, urgencias/bloqueos, avances y URL real del brief; firma con helper y guarda cuerpo temporal. Ejecuta `secretary-desk notify-brief --repo <brief.repo> --issue <n> --body-file <archivo>`. El helper solo permite la cuenta personal configurada, el brief de hoy y una notificación diaria; no admite destinatarios arbitrarios. Un resultado incierto se reconcilia en Enviados, no se reintenta a ciegas. Reporta fallo de notificación sin ocultar que el brief sí existe. Esta autorización no se extiende a terceros, otros correos o WhatsApp.
+
+
+## Local WhatsApp review input
+
+Read the configured WhatsApp state report and new `extractors/whatsapp/memory/reviews/` evidence, including pending routine PRs. Surface material commitments, decisions, source/media gaps and metadata-based suggestions for contacts worth saving. Do not label an unnamed WhatsApp chat as definitely missing from the address book without a contact lookup. Do not run the extractor from the briefing or read excluded chat bodies. Do not repeat unchanged non-actionable failures on every brief. Preserve the instance language in owner-facing copy.

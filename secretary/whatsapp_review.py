@@ -350,10 +350,10 @@ def record(cfg, instance, output, batch_path, review_path):
             if not t.get('text','').strip() or m.get('audio_error'):
                 raise ValueError('Audio sin transcripción; no avanzar cobertura')
     summary=review['summary'].strip()
-    marker, footer = signature('whatsapp-review')
-    summary = marker + '\n\n' + summary + '\n\n' + footer
     if not summary:
         raise ValueError('Resumen vacío')
+    marker, footer = signature('whatsapp-review')
+    summary = marker + '\n\n' + summary + '\n\n' + footer
     tag=hashlib.sha256(json.dumps(sorted((k,rows[k]['fingerprint']) for k in keys)).encode()).hexdigest()[:20]
     root=Path(output).resolve()/'extractors/whatsapp'
     dest=root/'summaries'/f'{datetime.now(timezone.utc).date()}-review-{tag}.md'

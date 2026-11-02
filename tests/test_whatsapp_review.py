@@ -84,6 +84,12 @@ class ReviewTests(unittest.TestCase):
         with self.assertRaises(ValueError):record(self.cfg,self.root,self.root,bp,rp)
         self.assertEqual(len(self.batch()['messages']),2)
 
+    def test_empty_summary_is_rejected_without_receipts(self):
+        b=self.batch();bp=self.root/'batch.json';bp.write_text(json.dumps(b))
+        rp=self.root/'review.json';rp.write_text(json.dumps({'message_keys':[b['messages'][0]['key']],'summary':'   '}))
+        with self.assertRaises(ValueError):record(self.cfg,self.root,self.root,bp,rp)
+        self.assertEqual(len(self.batch()['messages']),2)
+
     def test_api_fallback_requires_explicit_configuration(self):
         from secretary.whatsapp_review import transcribe
         self.cfg['transcription']={'default':'local','fallback':None}

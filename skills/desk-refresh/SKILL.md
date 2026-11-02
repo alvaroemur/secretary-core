@@ -200,7 +200,7 @@ with the `sec-heartbeat` pre-brief slot.
 |---|---|
 | `revision-correo` (send) | Drafts OK; **send** needs explicit OK |
 | `wiki-update` | Heavy; default off in morning pipeline |
-| `whatsapp-monitor` | Report only if stream down |
+| `whatsapp-review` | Check local source access and review coverage; do not infer sync from message silence |
 
 If pipeline cannot run, delegate individual routines via `run-routine.sh <id>`.
 

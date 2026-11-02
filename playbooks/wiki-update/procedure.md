@@ -439,9 +439,9 @@ Si el item cita un id de documento concreto (`id: 1ABC...`), usar `ref: drive:<i
 
 **Estado:** si `secretary/extractors/drive/memory/` no existe o está vacía, saltarla sin fallar.
 
-### 1.7 WhatsApp — captura atendida vía Axon (`secretary/extractors/whatsapp/`)
+### 1.7 WhatsApp — local review and legacy captures (`secretary/extractors/whatsapp/`)
 
-**Actualización 2026-07-02 (Feature 007 pivote local-first, ver `_diseño/specs/007-axon-secretary-relay/`):** el extractor `whatsapp-monitor` (Baileys, headless) está **jubilado** — `auth/` ausente desde ~2026-05-20. La fuente actual es **Axon** (extensión Chrome que Álvaro usa para leer WhatsApp Web): cuando lee un chat, hace `POST /capture` contra el daemon local `secd`, que escribe en los mismos archivos consolidados que usaba Baileys. La estructura del archivo no cambió; lo que cambió es **quién escribe** y **qué tan sintetizado llega el contenido** (ver más abajo).
+**Legacy source (2026-07-02; applies only to Axon captures, not whatsapp-review):** (Feature 007 pivote local-first, ver `_diseño/specs/007-axon-secretary-relay/`):** el extractor `whatsapp-monitor` (Baileys, headless) está **jubilado** — `auth/` ausente desde ~2026-05-20. La fuente actual es **Axon** (extensión Chrome que Álvaro usa para leer WhatsApp Web): cuando lee un chat, hace `POST /capture` contra el daemon local `secd`, que escribe en los mismos archivos consolidados que usaba Baileys. La estructura del archivo no cambió; lo que cambió es **quién escribe** y **qué tan sintetizado llega el contenido** (ver más abajo).
 
 **Archivos a consumir:**
 
@@ -511,6 +511,13 @@ Chequeos a ejecutar:
 6. **Fechas `ultima_actualizacion` en el futuro o con formato incorrecto.** Si alguna fecha es posterior a hoy o no matchea `^\d{4}-\d{2}-\d{2}$`, reportar.
 
 Criterio general: **arregla sin preguntar lo que sea puramente cosmético/consistencia** (titulo desactualizado, frontmatter con typo, enlace a slug con prefijo incorrecto). **Reporta y no toques** lo que implique juicio (recategorizar, rebautizar slugs, inventar datos). Cada arreglo automático debe loguearse en `indices/YYYY-MM.md` igual que los del Paso 4.
+
+#### Local review memory (whatsapp-review)
+
+In addition to legacy capture files, enumerate `extractors/whatsapp/memory/reviews/*.md`. Each file with `pendiente_wiki: true` contains a synthesized partial review, source message IDs/timestamps, and `resumen_path`. Read that summary before integration. Integrate supported relationship context, decisions and commitment changes through the same existing entity/commitment contracts; do not invent identities or reactivate old obligations. Resolve existing commitment IDs before creating new ones.
+
+After integration, flip that file's pending flag to `pendiente_wiki: false` with an integration date; do not delete it. A local review is not a raw Axon transcript. The retired Baileys status does not describe the local database source. Daily and on-demand reviews share message-level receipts, so preserve their evidence and avoid duplicating a fact from a pending or previously integrated review.
+
 
 ### Delegación a Haiku (piloto D15.8) — escaneo mecánico del tidy-up
 
@@ -608,7 +615,7 @@ Antes de leer métricas o ramas necesitas saber, por cada artículo de `modulos/
 | `correo` | `revision-correo` (contract.yaml) | `correo/auto-` | instancia (`$OWNER/$NAME`) |
 | `reuniones` | `reuniones-update` (contract.yaml); también `reuniones-scheduler` (poller mecánico, sin PR propio) | `reuniones/auto-` | instancia (`$OWNER/$NAME`) |
 | `drive` | `drive-crawler` (contract.yaml) | `drive/auto-` | instancia (`$OWNER/$NAME`) |
-| `whatsapp` | `whatsapp-monitor` (contract.yaml) — **pausado**, ver nota abajo | `whatsapp/auto-` | instancia (`$OWNER/$NAME`) |
+| `whatsapp` | Read the module contract: `whatsapp-review` for local review, legacy `whatsapp-monitor` only for historical runs | `whatsapp/auto-` | instancia (`$OWNER/$NAME`) |
 | `job-search` | `job-search-crawler` (contract.yaml) | `job-search/auto-` | instancia (`$OWNER/$NAME`) |
 | `calendario` | — (sin rutina propia, corre inline en wiki-update vía MCP) | N/A | N/A |
 | `wiki-update` | `wiki-update` | `wiki/auto-` | instancia (`$OWNER/$NAME`) |
@@ -618,7 +625,7 @@ Antes de leer métricas o ramas necesitas saber, por cada artículo de `modulos/
 
 **job-search — nota (aprendizaje 2026-07-26):** el prefijo real de rama es `job-search/auto-`, no `loops/job-search/auto-` (verificado contra `gh pr list`: PRs #549…#748 usan `job-search/auto-YYYYMMDD-HHMM`, aunque el módulo vive en disco bajo `loops/job-search/`). El prefijo equivocado hacía que Paso 4.3 no encontrara PRs y `modulos/job-search.md` quedara con el último mergeado desactualizado.
 
-**whatsapp — nota:** el `contract.yaml` documenta la rutina retirada (`whatsapp-monitor`, Baileys, sin `auth/` desde ~2026-05-20); la captura actual es event-driven vía Axon→`secd` y no genera `latest-whatsapp-monitor.meta.json` nuevo. Si no hay meta reciente (`mtime` > 30 días o inexistente), la sección 4.2 debe decir explícitamente "sin corridas programadas — captura event-driven vía Axon" en vez de reportar datos viejos como si fueran actuales.
+**WhatsApp source and run history:** read the active module contract and real scheduler state. For local review, use `whatsapp-review` reports and message-level receipts; do not label it paused because Baileys has no auth directory. Preserve historical `whatsapp-monitor` runs as legacy evidence. Do not infer a successful scheduled run from an updated manifest, a readable local database, or an interactive capture. If Axon remains a source, report its event-driven coverage separately.
 
 Si `contract.yaml` no existe para un módulo lector y la tabla tampoco lo cubre, no inventes un `routine_id`: deja las secciones 4.2/4.3 con "routine_id no determinado — revisar mapeo en Paso 4.1 de este SKILL" y repórtalo al final (Paso 7).
 

@@ -130,7 +130,7 @@ Each folder in `playbooks/` contains structured prompts/instructions for schedul
 |---------|----------|-------------|
 | **revision-correo** | Daily AM | Summarizes email, creates draft replies, cleans inbox, tracks follow-ups |
 | **reuniones-update** | Daily PM | Processes new meeting transcriptions, extracts actions and entities |
-| **whatsapp-monitor** | Daily PM | Processes approved chats, triages the rest, surfaces candidates |
+| **whatsapp-review** | Daily PM | Reads approved local Mac chats, transcribes eligible audio, and persists partial evidence for wiki and briefing |
 | **drive-crawler** | Daily PM | Indexes new/modified files, proposes Drive organization improvements |
 | **wiki-update** | Daily late PM | Merges extractor PRs, integrates all evidence into wiki, rebuilds HTML |
 

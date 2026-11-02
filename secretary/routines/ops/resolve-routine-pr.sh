@@ -122,7 +122,7 @@ _routine_branch_hints() {
     wiki-update) printf '%s' "wiki/" ;;
     pm-trainee|tidy-up) printf '%s' "tidy-up/ pm-trainee/" ;;
     job-search-crawler) printf '%s' "job-search/" ;;
-    whatsapp-monitor) printf '%s' "whatsapp/" ;;
+    whatsapp-monitor|whatsapp-review) printf '%s' "whatsapp/" ;;
     *) printf '%s' "${1%%-*}/" ;;
   esac
 }

@@ -34,7 +34,8 @@ TYPES = {"acciones": "accion", "personas": "persona", "organizaciones": "organiz
 
 
 def memory_files(wt: Path) -> list[Path]:
-    files = set(wt.glob("*/memory/*.md")) | set(wt.glob("extractors/*/memory/*.md"))
+    files = (set(wt.glob("*/memory/*.md")) | set(wt.glob("extractors/*/memory/*.md"))
+             | set(wt.glob("extractors/whatsapp/memory/reviews/*.md")))
     return sorted(f for f in files if f.is_file())
 
 

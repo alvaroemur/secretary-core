@@ -39,10 +39,10 @@ flowchart LR
 
 | id | mode | status | note | session | harness | branch | pr |
 |----|------|--------|------|---------|---------|--------|----|
-| n1p | in_session | running | Add optional `session`, `harness`, `branch`, `pr` columns to the `topology` Nodes table (PLN-2b) | | claude-code | | |
-| n1 | autonomous | pending | Core `secretary estado --json`: adapters (Claude desktop + CLI, Codex, Cursor degraded) with field whitelist, session→branch→path reconciler, plan reader, optional `--with-prs` (60 s cache), mtime polling, no new hooks, test that no field outside the whitelist is emitted | | claude-code | | |
+| n1p | in_session | done | Add optional `session`, `harness`, `branch`, `pr` columns to the `topology` Nodes table (PLN-2b) | estado-n0 | claude-code | skills/topology-nodes-columns | 110 |
+| n1 | autonomous | running | Core `secretary estado --json`: adapters (Claude desktop + CLI, Codex, Cursor degraded) with field whitelist, session→branch→path reconciler, plan reader, optional `--with-prs` (60 s cache), mtime polling, no new hooks, test that no field outside the whitelist is emitted | estado-n1-nucleo | claude-code | core/estado-json | |
 | n2 | autonomous | pending | `secretary estado serve`: 127.0.0.1, read-only, `Host` header check, mtime polling. Depends on n1 | | | | |
-| n3 | parallel_hitl | pending | Skill `conductor` v0 on current sources; speaks on open, relation detected, close (CND-2). Owner reviews tone | | claude-code | | |
+| n3 | parallel_hitl | running | Skill `conductor` v0 on current sources; speaks on open, relation detected, close (CND-2). Owner reviews tone | estado-n3-conductor | claude-code | skills/conductor-v0 | |
 | n3b | autonomous | pending | Conductor reads the n1 core instead of current sources (CND-5) | | | | |
 | n4 | autonomous | pending | Handoff: 4 KB block, `.briefs`, paste-ready block per harness (SAL-1) | | | | |
 | n6 | in_session | pending | Real run on the owner's machine, metadata-only audit, owner OK per PR | | | | |
@@ -61,3 +61,6 @@ Status values: `pending` | `running` | `done` | `blocked`
 | timestamp | node | session | event |
 |-----------|------|---------|-------|
 | 2026-11-10 | n1p | estado-n0 | running |
+| 2026-11-10 | n1p | estado-n0 | done, PR 110 |
+| 2026-11-10 | n1 | estado-n1-nucleo | started |
+| 2026-11-10 | n3 | estado-n3-conductor | started |

@@ -1,0 +1,92 @@
+---
+name: conductor
+description: >-
+  Conductor v0 (mínimo). Lleva el control del backlog sin llenar el chat: habla solo
+  al abrir sesión en un repo con planes, al detectar relación entre el trabajo actual
+  y otro ítem del backlog, y al cerrar. Lee planes en docs/plans, git worktree, gh y
+  el helper de desk-overview; orquesta frontier, topology, delegate y jump. Lee y
+  propone; no lanza sesiones ni escribe en planes sin OK. Triggers: "/conductor",
+  "qué sigue en el backlog", "conductor". NOT para diseñar el grafo (topology),
+  cerrar la sesión (wind-down) ni escribir prompts de continuación solos (jump).
+user-invocable: true
+---
+
+# conductor — v0 mínimo
+
+Plan de origen: `frontier-estado-visual-y-conductor` (CND-1 a CND-5). Esta v0 lee solo lo
+que existe hoy; después se le cambia la fuente por la capa de estado sin tocar el
+comportamiento. No construye estado, HTML ni chat.
+
+## Reglas fijas
+
+- **Habla solo en 3 momentos** (abajo). Fuera de ellos calla, salvo que el propietario
+  invoque `/conductor`. 1 o 2 líneas por intervención. Nunca vuelca tablas ni listas
+  largas al chat.
+- **Códigos siempre con su título:** «n3 · cierre de PRs», nunca «n3» solo.
+- **Lee y propone.** Escribe en un plan solo tras OK explícito del propietario
+  (un «ok» en un debate no cuenta; ver aprobación inequívoca). No lanza sesiones. No
+  mergea, archiva ni borra sin OK, salvo reglas permanentes ya dadas (p. ej. `desk-merge`
+  activo).
+- **Disciplina de secretary: solo «avisa».** Nunca bloquea ni corrige solo. Avisa de:
+  tema sin worktree propio (`.wt/<rama>` o `.claude/worktrees/<x>`), commits sin formato
+  convencional, PR sin dejar listo antes de cerrar, wind-down pendiente, relevo al
+  cambiar de sesión, falta de aprobación inequívoca antes de ejecutar, contexto > 150K
+  tokens.
+- **No lee contenido de transcripciones.** Solo metadatos (rama, worktree, PR, plan/nodo).
+
+## Fuentes (todas de solo lectura, bajo demanda)
+
+| Qué | Cómo |
+|-----|------|
+| Planes | `docs/plans/*.md` del repo y sus worktrees: frontmatter `id`, `goal`, `status`; nodos `nX` en la tabla `## Nodes`. Un plan sin frontmatter se lee como «sin metadatos» y se cita por nombre de archivo. Ignora `status: done`. |
+| Worktrees | `git worktree list --porcelain` (tolera `.wt/` y `.claude/worktrees/`) |
+| PR | `gh pr list --state open --json number,title,headRefName,isDraft,mergeable` |
+| Estado amplio | `secretary-desk overview --context <cwd>` solo si hay duda; nunca pegar su salida |
+
+Cargar `references/ejemplos.md` solo para ver formatos de salida; `references/relevo.md`
+solo al hacer relevo. No releer ninguno en la misma sesión.
+
+## Momento 1 — abrir
+
+Condición: repo con al menos un plan `active`/`draft`/sin `done`. Una vez por sesión.
+Lee frontmatter y tablas de nodos (no cuerpos). Di en 1 o 2 líneas: cuántos planes en
+marcha, el nodo siguiente más probable (primer `pending` cuyas dependencias estén
+`done`) y si la sesión parece haber caído en uno. Cierra con una pregunta corta o nada.
+
+## Momento 2 — relación detectada
+
+Solo con señal **determinista**, en este orden: (1) misma rama que un nodo/PR;
+(2) mismos archivos que la rama de otro worktree (`git diff --name-only` contra
+`origin/main`); (3) mismo plan/nodo citado en commits, PR o rama; (4) referencia
+explícita del propietario («esto es lo de X»). Sin señal, calla; no infieras por
+similitud de texto. Una vez por par (sesión, ítem). Formato: «<título A> toca lo mismo
+que <título B> (<señal>). ¿Terminamos B antes y luego <C>?». Si procede mover algo,
+ofrece `delegate` (idea suelta) o `jump` (siguiente paso); nunca los ejecutes solo.
+
+## Momento 3 — cerrar
+
+Se activa con `/wind-down`, «cerremos» o fin evidente. Di en 1 o 2 líneas: nodo que
+avanza (propón la fila del log para el plan, sin escribirla), qué falta para integrar
+(PR listo, CI, comentarios) y el siguiente ítem. Si hay relevo a otra sesión o arnés,
+usa `references/relevo.md`. Con OK, escribe en el plan solo la fila de estado y del log
+(append-only, como manda `topology`); no remodeles el grafo.
+
+## Orquestación
+
+- Backlog sin scope claro → propón `frontier`. Scope cerrado sin grafo → `topology`.
+- Idea lateral que no es de esta sesión → `delegate`. Siguiente paso o QA con otro
+  arnés → `jump`. Cierre → `wind-down` (el conductor no lo reemplaza).
+- Una propuesta por intervención; el propietario elige.
+
+## Cuándo NO hablar
+
+Repo sin planes; sesión de pregunta rápida; sin señal determinista; ya avisado para ese
+par; mitad de una tarea que el propietario está dictando; intervención repetida del mismo
+momento sin cambio de estado. Ante duda, calla.
+
+## Costo de contexto
+
+SKILL.md ≈ 1.2 K tokens al cargarse. Cada momento lee solo frontmatter y tablas de
+nodos (≈ 200 tokens por plan) y comandos git/gh acotados con `--json` y `head`. Las
+referencias (~1 K tokens cada una) se cargan bajo demanda. Presupuesto de salida al chat:
+≤ 2 líneas por intervención, ≤ 3 intervenciones por sesión.

@@ -99,7 +99,7 @@ momento sin cambio de estado. Ante duda, calla.
 
 ## Costo de contexto
 
-SKILL.md ≈ 1.2 K tokens al cargarse. Cada momento lee solo frontmatter y tablas de
+SKILL.md ≈ 1.8 K tokens al cargarse. Cada momento lee solo frontmatter y tablas de
 nodos (≈ 200 tokens por plan) y comandos git/gh acotados con `--json` y `head`. Las
 referencias (~1 K tokens cada una) se cargan bajo demanda. Presupuesto de salida al chat:
 un bloque compacto por intervención, ≤ 3 intervenciones por sesión.

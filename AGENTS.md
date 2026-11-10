@@ -14,6 +14,7 @@ Este repo contiene el engine reutilizable. Los datos, políticas y configuració
 ## Trabajo y entrega
 
 - Git se rige por la política de la instancia, `canon/rules/git/` (convenciones, worktrees en `.wt/<rama-slug>`, integración con merge commit). Nunca commitees código directamente a main.
+- Language: this repository is public. Write PR titles and bodies, issues, commit messages, README, docs and code comments in English, even though this file predates the rule.
 - Scopes existentes: `wiki`, `routines`, `whatsapp`, `mail`, `core`, `docs`, `skills`. Una rama por PR y un hilo por entrega.
 - Entrega por PR con problema, comportamiento resultante, verificaciones y bloqueos. No inventes resultados.
 - Ante una ambigüedad material, registra una pregunta concreta en un issue `needs-triage`, comprobando duplicados. No hagas suposiciones amplias.

@@ -40,3 +40,28 @@ Estado: borrador, ronda 1. Sin aprobación de ejecución. No cambia código. Su 
 - Ronda 13, respuestas: HRN-1 adaptadores, pero con vista HTML en vivo como requisito; HRN-2 Claude Code, Codex y Cursor (uso indistinto); PLN-1 sí (frontmatter `id`, `goal`, `status` y nodos `nX` con `session`, `harness`, `branch`, `pr`); DIS-1 sí (todo en modo «avisa»); SAL-1 sí (relevo estructurado de 4 KB, `.briefs`, bloque pegable por arnés); SUP-1 OK (núcleo con CLI `--json` primero; la vista HTML en vivo entra en la v0 sobre ese núcleo); EVL-1 ok con los requisitos dichos (multi-arnés, ve las sesiones de la app de escritorio, lee planes, no crea worktrees, licencia, mantenimiento, costo de contexto).
 - Ronda 14 (propuesta): HTM-1, PRV-1, CHT-1.
 - Ronda 14, respuestas: HTM-1 (a) HTML en vivo solo local, en un puerto accesible únicamente desde el Mac (el acceso externo se decide aparte); PRV-1 (a) solo metadatos (título, arnés, repo, rama, worktree, PR, estado, hora, plan y nodo), sin contenido de transcripciones; CHT-1 el chat con el estado va después de la v0. Frontera vacía. Estado: resumen final pendiente de «confirmo»; sin ejecución aprobada hasta entonces.
+
+## Round 15 (2026-11-10, in English per the repo language rule)
+
+Status: n0 evaluation approved by the owner and merged (PR #107, `docs/plans/estado-n0-evaluacion-herramientas-2026-11-10.md`). No execution approved beyond n0.
+
+### Findings (field names only; no content read)
+- The Claude desktop app keeps one JSON per session under its application-support folder, `claude-code-sessions/<account>/<workspace>/local_<id>.json` (2,720 files at check time). Keys: `sessionId`, `cliSessionId` (links to the transcript in `~/.claude/projects`), `title`, `cwd`, `originCwd`, `createdAt`, `lastActivityAt`, `isArchived`, `model`, `permissionMode`, `scheduledTaskId`, `spawnSeed`, plus permission and MCP config keys that an adapter must not read. This resolves the n1a risk for Claude desktop sessions: a whitelist adapter is feasible. The format is undocumented and may change.
+- Codex rollout files (`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`) start with a `session_meta` line whose payload has `id`, `cwd`, `git`, `timestamp`, `cli_version`, `model_provider`, `source`. No title. The payload also carries `base_instructions`, which is content and must not be read.
+- Cursor: one folder per chat under `~/.cursor/projects/<workspace>/agent-transcripts/<uuid>/` containing `.jsonl`. No title or branch field was seen at file-name level; metadata is thin (workspace from the folder name, times from file mtimes).
+- `pyproject.toml` already depends on PyYAML, Typer and Rich, so a `secretary estado --json` subcommand and YAML frontmatter parsing need no new dependency.
+
+### Round 15 answers
+- REC-1 own thin layer; SRC-1 yes, field whitelist; CUR-1 (a) Cursor included in degraded form; SCP-1 (a) auto-discover repos; PRS-1 yes, optional `--with-prs` with 60 s cache; LIV-1 (a) polling on file mtimes, no new hooks in v0.
+- PLN-2 reopened by the owner ("wouldn't it be better to use something external and proven?"). Research:
+  - Nimbalyst `planStatus` frontmatter (`docs/PLANNING_SYSTEM.md`): `planId`, `status`, `progress`, `agentSessions[{id, createdAt, status}]`. Plans live in `plans/`. Tracks sessions per plan, but has no node, branch, PR or harness concept.
+  - Spec Kit `tasks.md` (already installed as skills): checkbox lines `- [ ] T012 [P] [US1] description`. Per-feature task lists; no session, branch or PR.
+  - The owner's own `topology` skill already defines plan files in `docs/plans/`: frontmatter `id`, `status` (`active|paused|done`) and a `## Nodes` table (`id | mode | status | note`, status `pending|running|done|blocked`), updated append-only by sessions. This is the proven format already in use.
+  - Conclusion: do not invent a `nodes:` YAML block. Reuse the `topology` Nodes table and add optional columns `session`, `harness`, `branch`, `pr` (PLN-1). Parser reads columns by header name, so older plans without the extra columns still work. Reading Nimbalyst's `planStatus` is possible later as an alias; not needed in v0.
+  Pending the owner's confirmation as PLN-2b.
+
+### Round 15, second pass: answers
+- PLN-2b yes: reuse the `topology` `## Nodes` table, add optional columns `session`, `harness`, `branch`, `pr`; reader matches columns by header name.
+- SRV-1 (a): Python subcommand `secretary estado serve`, bound to 127.0.0.1, read-only, `Host` header check.
+
+Frontier empty. Final summary awaiting the owner's `confirmo`; no execution approved beyond n0.

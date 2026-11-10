@@ -104,11 +104,17 @@ flowchart LR
 
 ## Nodes
 
-| id | mode | status | note |
-|----|------|--------|------|
-| n1 | in_session | pending | ... |
+| id | mode | status | note | session | harness | branch | pr |
+|----|------|--------|------|---------|---------|--------|----|
+| n1 | in_session | pending | ... | | | | |
 
 Status values: `pending` | `running` | `done` | `blocked`
+
+The last four columns are optional and let tools link a node to its work. Fill them when a
+node starts or finishes: `session` (short session name or id), `harness` (`claude-code` |
+`codex` | `cursor`), `branch`, `pr` (number or URL). Readers match columns by header name, so
+plans without them stay valid. Append-only semantics apply: fill empty cells, do not rewrite
+other nodes.
 
 ## Log
 

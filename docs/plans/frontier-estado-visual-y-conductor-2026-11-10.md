@@ -51,5 +51,14 @@ Status: n0 evaluation approved by the owner and merged (PR #107, `docs/plans/est
 - Cursor: one folder per chat under `~/.cursor/projects/<workspace>/agent-transcripts/<uuid>/` containing `.jsonl`. No title or branch field was seen at file-name level; metadata is thin (workspace from the folder name, times from file mtimes).
 - `pyproject.toml` already depends on PyYAML, Typer and Rich, so a `secretary estado --json` subcommand and YAML frontmatter parsing need no new dependency.
 
-### Open questions (round 15)
-REC-1, SRC-1, CUR-1, PLN-2, SCP-1, PRS-1, LIV-1. See the session for the current text.
+### Round 15 answers
+- REC-1 own thin layer; SRC-1 yes, field whitelist; CUR-1 (a) Cursor included in degraded form; SCP-1 (a) auto-discover repos; PRS-1 yes, optional `--with-prs` with 60 s cache; LIV-1 (a) polling on file mtimes, no new hooks in v0.
+- PLN-2 reopened by the owner ("wouldn't it be better to use something external and proven?"). Research:
+  - Nimbalyst `planStatus` frontmatter (`docs/PLANNING_SYSTEM.md`): `planId`, `status`, `progress`, `agentSessions[{id, createdAt, status}]`. Plans live in `plans/`. Tracks sessions per plan, but has no node, branch, PR or harness concept.
+  - Spec Kit `tasks.md` (already installed as skills): checkbox lines `- [ ] T012 [P] [US1] description`. Per-feature task lists; no session, branch or PR.
+  - The owner's own `topology` skill already defines plan files in `docs/plans/`: frontmatter `id`, `status` (`active|paused|done`) and a `## Nodes` table (`id | mode | status | note`, status `pending|running|done|blocked`), updated append-only by sessions. This is the proven format already in use.
+  - Conclusion: do not invent a `nodes:` YAML block. Reuse the `topology` Nodes table and add optional columns `session`, `harness`, `branch`, `pr` (PLN-1). Parser reads columns by header name, so older plans without the extra columns still work. Reading Nimbalyst's `planStatus` is possible later as an alias; not needed in v0.
+  Pending the owner's confirmation as PLN-2b.
+
+### Open questions (round 15, second pass)
+PLN-2b (reuse topology Nodes table), SRV-1 (where the live HTML server lives).

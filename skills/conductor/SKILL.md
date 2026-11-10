@@ -21,15 +21,13 @@ comportamiento. No construye estado, HTML ni chat.
 
 - **Habla solo en 3 momentos** (abajo). Fuera de ellos calla, salvo que el propietario
   invoque `/conductor`. No vuelques listas largas sin que el propietario las pida.
-- **Formato de salida:** todo lo que produce el conductor va en un blockquote con
-  encabezado `▌ conductor`; la conversación natural del harness va fuera, en texto normal.
-  Las tablas SÍ se usan (el propietario las prefiere para estados y comparaciones).
-  Estructura en `references/ejemplos.md`: leyenda de una línea, tabla del backlog (una
-  fila por frente: qué busca, dónde va), grafo anidado en bloque `text` con marcas
-  ✅ hecho · ❓ en curso · ⏳ bloqueado, y secciones Estado, Decisiones, Riesgos,
-  Pregunta (omite las vacías). Decisiones y riesgos con código (DEC-1, RSK-1) y una línea
-  «qué significa para ti»; la pregunta con código y un bloque `text` de respuestas
-  prellenadas, como en `/frontier`.
+- **Origen:** todo lo del conductor va en un blockquote con encabezado `▌ conductor`; la conversación natural del harness va fuera, en texto normal.
+- **Tablas:** sí se usan, para estados y comparaciones.
+- **Leyenda:** cada bloque abre con una línea: «Fila = frente · nodo (n) = paso de la fila · F = fallo a corregir · #n = pull request».
+- **Backlog:** una tabla por fila (qué busca, dónde va) y el grafo de nodos anidado en un bloque `text` con ✅ hecho · ❓ en curso · ⏳ bloqueado.
+- **Secciones:** Estado, Decisiones, Riesgos, Pregunta, en ese orden; omite las vacías.
+- **Decisiones y riesgos:** con código (DEC-1, RSK-1) y una línea «qué significa para ti».
+- **Pregunta:** con código (p. ej. CND-1) y, al final, un bloque `text` con las respuestas prellenadas, como en `/frontier`.
 - **Nomenclatura:** «Fila G», «Fila ACC»; todo nodo con su fila («G n7», nunca «n7»
   solo). Ninguna sigla sin nombre y propósito en la primera mención («Fila G · publicación
   segura de entregas»). Códigos siempre con su título.
@@ -56,7 +54,7 @@ comportamiento. No construye estado, HTML ni chat.
 | PR | `gh pr list --state open --json number,title,headRefName,isDraft,mergeable` |
 | Estado amplio | `secretary-desk overview --context <cwd>` solo si hay duda; nunca pegar su salida |
 
-Cargar `references/ejemplos.md` solo para ver formatos de salida; `references/relevo.md`
+Cargar `references/ejemplos.md` solo para ver el formato (las reglas viven aquí); `references/relevo.md`
 solo al hacer relevo. No releer ninguno en la misma sesión.
 
 ## Momento 1 — abrir

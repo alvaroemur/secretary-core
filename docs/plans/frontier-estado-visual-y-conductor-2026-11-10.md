@@ -60,5 +60,8 @@ Status: n0 evaluation approved by the owner and merged (PR #107, `docs/plans/est
   - Conclusion: do not invent a `nodes:` YAML block. Reuse the `topology` Nodes table and add optional columns `session`, `harness`, `branch`, `pr` (PLN-1). Parser reads columns by header name, so older plans without the extra columns still work. Reading Nimbalyst's `planStatus` is possible later as an alias; not needed in v0.
   Pending the owner's confirmation as PLN-2b.
 
-### Open questions (round 15, second pass)
-PLN-2b (reuse topology Nodes table), SRV-1 (where the live HTML server lives).
+### Round 15, second pass: answers
+- PLN-2b yes: reuse the `topology` `## Nodes` table, add optional columns `session`, `harness`, `branch`, `pr`; reader matches columns by header name.
+- SRV-1 (a): Python subcommand `secretary estado serve`, bound to 127.0.0.1, read-only, `Host` header check.
+
+Frontier empty. Final summary awaiting the owner's `confirmo`; no execution approved beyond n0.

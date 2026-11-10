@@ -38,4 +38,5 @@ Guidelines and commands for developing in `secretary-core`.
 - **Branching**: Do NOT commit directly to `main`. One topic per worktree at `.wt/<branch-slug>`, branch `<scope>/<desc>` cut from `origin/main`, one PR, merged with a merge commit. Policy: instance `canon/rules/git/`.
 - **Commits**: Follow Conventional Commits format: `<type>(<scope>): <message>`.
   - Valid scopes: `wiki`, `routines`, `whatsapp`, `mail`, `core`, `docs`, `skills`.
+- **Language**: This repository is public. Write everything in English: PR titles and bodies, issues, commit messages, README, docs, and code comments. This overrides any default of the author's own working language.
 - **Anonymity**: The core repository (`secretary-core`) is public-ready. Do NOT commit private paths, personal emails, keys, or business/personal names. Use `.example` files and keep custom configs gitignored.

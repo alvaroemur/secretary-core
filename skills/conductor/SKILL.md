@@ -24,13 +24,13 @@ comportamiento. No construye estado, HTML ni chat.
 - **Origen:** todo lo del conductor va en un blockquote con encabezado `▌ conductor`; la conversación natural del harness va fuera, en texto normal.
 - **Tablas:** sí se usan, para estados y comparaciones.
 - **Leyenda:** cada bloque abre con una línea: «Fila = frente · nodo (n) = paso de la fila · F = fallo a corregir · #n = pull request».
-- **Backlog:** una tabla por fila (qué busca, dónde va) y el grafo de nodos anidado en un bloque `text` con ✅ hecho · ❓ en curso · ⏳ bloqueado.
+- **Backlog:** una tabla por fila (qué busca, dónde va) y el grafo de nodos anidado en un bloque `text` con ✅ hecho · ❓ en curso · ⏳ pendiente (con o sin bloqueo; marca el bloqueo en el texto).
 - **Secciones:** Estado, Decisiones, Riesgos, Pregunta, en ese orden; omite las vacías.
 - **Decisiones y riesgos:** con código (DEC-1, RSK-1) y una línea «qué significa para ti».
-- **Pregunta:** con código (p. ej. CND-1) y, al final, un bloque `text` con las respuestas prellenadas, como en `/frontier`.
+- **Pregunta:** con código (`Q-1`, `Q-2`…; `CND-` queda para las decisiones del plan) y, al final, un bloque `text` con las respuestas prellenadas, como en `/frontier`.
 - **Nomenclatura:** «Fila G», «Fila ACC»; todo nodo con su fila («G n7», nunca «n7»
   solo). Ninguna sigla sin nombre y propósito en la primera mención («Fila G · publicación
-  segura de entregas»). Códigos siempre con su título.
+  segura de entregas»). Códigos siempre con su título; si la fuente no nombra el nodo, escribe «(sin nombre en la fuente)», no lo inventes.
 - **Enlaces:** solo a archivos que existen (verifica con `ls`), uno por tema, en tres
   lugares: nombre de la fila, nodo que cambia, cada decisión o riesgo. La explicación
   larga vive en el documento enlazado, no en el chat.
@@ -49,7 +49,8 @@ comportamiento. No construye estado, HTML ni chat.
 
 | Qué | Cómo |
 |-----|------|
-| Planes | `docs/plans/*.md` del repo y sus worktrees: frontmatter `id`, `goal`, `status`; nodos `nX` en la tabla `## Nodes`. Un plan sin frontmatter se lee como «sin metadatos» y se cita por nombre de archivo. Ignora `status: done`. |
+| Planes | `docs/plans/*.md` del repo y sus worktrees: frontmatter `id`, `goal`, `status`; nodos `nX` en la tabla `## Nodes`. Un plan sin frontmatter se lee como «sin metadatos» y se cita por nombre de archivo. Ignora `status` en `done`, `complete`, `completed` o `closed`; lista `paused` aparte; valor desconocido = `draft` y avisa. Si el backlog tiene una fila para el plan, el estado de la fila manda sobre la tabla de nodos; avisa la discrepancia en Riesgos. |
+| Backlog | El plan que lo declare o `docs/plans/*backlog*.md`; leer solo la tabla de filas y las últimas 10 líneas del registro. |
 | Worktrees | `git worktree list --porcelain` (tolera `.wt/` y `.claude/worktrees/`) |
 | PR | `gh pr list --state open --json number,title,headRefName,isDraft,mergeable` |
 | Estado amplio | `secretary-desk overview --context <cwd>` solo si hay duda; nunca pegar su salida |
@@ -59,16 +60,16 @@ solo al hacer relevo. No releer ninguno en la misma sesión.
 
 ## Momento 1 — abrir
 
-Condición: repo con al menos un plan `active`/`draft`/sin `done`. Una vez por sesión.
+Condición: repo con al menos un plan `active`/`draft`/sin `done`. Una vez por sesión. Si el primer mensaje del propietario es una pregunta cerrada, aplaza M1 hasta el primer cambio de tema o hasta `/conductor`.
 Lee frontmatter y tablas de nodos (no cuerpos). Di, en el bloque: cuántos planes en
 marcha, el nodo siguiente más probable (primer `pending` cuyas dependencias estén
-`done`) y si la sesión parece haber caído en uno. Cierra con una pregunta corta o nada.
+`done`) y si la sesión parece haber caído en uno. Muestra como máximo 5 filas: primero las que tienen PR o rama activa, luego las que esperan decisión del propietario; agrupa rangos de nodos ✅ en una línea del grafo; si hay más, di «y N más; pide /conductor para la lista». Cierra con una pregunta corta o nada.
 
 ## Momento 2 — relación detectada
 
 Solo con señal **determinista**, en este orden: (1) misma rama que un nodo/PR;
 (2) mismos archivos que la rama de otro worktree (`git diff --name-only` contra
-`origin/main`); (3) mismo plan/nodo citado en commits, PR o rama; (4) referencia
+`origin/main`); (3) mismo plan/nodo citado en commits, PR o rama, solo si ambas ramas tienen commits sin integrar (`git rev-list --count origin/main..<rama>` > 0) o PR abierto; agrupa las ramas del mismo nodo en un solo aviso; (4) referencia
 explícita del propietario («esto es lo de X»). Sin señal, calla; no infieras por
 similitud de texto. Una vez por par (sesión, ítem). Contenido: «<título A> toca lo mismo
 que <título B> (<señal>). ¿Terminamos B antes y luego <C>?». Si procede mover algo,
@@ -77,8 +78,8 @@ ofrece `delegate` (idea suelta) o `jump` (siguiente paso); nunca los ejecutes so
 ## Momento 3 — cerrar
 
 Se activa con `/wind-down`, «cerremos» o fin evidente. Di, en el bloque: nodo que
-avanza (propón la fila del log para el plan, sin escribirla), qué falta para integrar
-(PR listo, CI, comentarios) y el siguiente ítem. Si hay relevo a otra sesión o arnés,
+avanza (propón la fila del log para el plan, sin escribirla), en Estado qué falta para integrar
+(PR listo, CI, comentarios; es estado, no decisión) y el siguiente ítem. Si hay relevo a otra sesión o arnés,
 usa `references/relevo.md`. Con OK, escribe en el plan solo la fila de estado y del log
 (append-only, como manda `topology`); no remodeles el grafo.
 
@@ -97,7 +98,7 @@ momento sin cambio de estado. Ante duda, calla.
 
 ## Costo de contexto
 
-SKILL.md ≈ 1.8 K tokens al cargarse. Cada momento lee solo frontmatter y tablas de
+SKILL.md ≈ 2 K tokens al cargarse. Cada momento lee solo frontmatter y tablas de
 nodos (≈ 200 tokens por plan) y comandos git/gh acotados con `--json` y `head`. Las
 referencias (~1 K tokens cada una) se cargan bajo demanda. Presupuesto de salida al chat:
 un bloque compacto por intervención, ≤ 3 intervenciones por sesión.

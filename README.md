@@ -115,6 +115,7 @@ The engine provides a python-based CLI tool and a local daemon:
 - **CLI (`secretary`)**: Offers atomic, scriptable, non-LLM operations. Commands include:
   - `secretary config` — Instance config and path resolution.
   - `secretary status` — Persist progress on today's briefing.
+  - `secretary estado [--json] [--with-prs]` — Per-repo view of agent sessions (Claude, Codex, Cursor), worktrees and plan nodes. Metadata only.
   - `secretary validate` — Run instance CI validators.
   - `secretary recall` — Deterministic memory search.
   - `secretary wiki build` — Safe legacy-to-instance wiki builds.

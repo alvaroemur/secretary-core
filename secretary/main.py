@@ -19,6 +19,7 @@ from secretary import __version__
 from secretary.acc import archive_actions, fold_action, show_action
 from secretary.build_root import run_wiki_build, run_wiki_serve
 from secretary.config import (
+    load_config,
     all_resolved_paths,
     config_show_dict,
     core_root,
@@ -72,6 +73,10 @@ contract_app = typer.Typer(help="Read or update module contract.yaml.")
 dream_app = typer.Typer(help="sec-dream deterministic collection (spec 020).")
 portal_app = typer.Typer(help="Operator portal (spec 019).")
 dispatch_app = typer.Typer(help="dispatch.executor allowlist ops (no LLM).")
+estado_app = typer.Typer(
+    help="Live per-repo status of agent sessions (metadata only).",
+    invoke_without_command=True,
+)
 app.add_typer(config_app, name="config")
 app.add_typer(context_app, name="context")
 app.add_typer(dispatch_app, name="dispatch")
@@ -81,6 +86,7 @@ app.add_typer(routines_app, name="routines")
 app.add_typer(modules_app, name="modules")
 app.add_typer(dream_app, name="dream")
 app.add_typer(portal_app, name="portal")
+app.add_typer(estado_app, name="estado")
 modules_app.add_typer(contract_app, name="contract")
 
 
@@ -316,6 +322,41 @@ def status_cmd(
         err_console.print(f"[red]secretary status:[/red] {exc}")
         raise typer.Exit(1) from exc
     console.print(summary)
+
+
+@estado_app.callback()
+def estado_main(
+    ctx: typer.Context,
+    json_out: bool = typer.Option(False, "--json", help="Emit the report as JSON"),
+    with_prs: bool = typer.Option(False, "--with-prs", help="Look up PRs via gh (60 s cache)"),
+    days: Optional[int] = typer.Option(None, "--days", help="Only sessions active in the last N days (default 7)"),
+) -> None:
+    """Sessions (Claude, Codex, Cursor), worktrees and plan nodes per repo. Metadata only."""
+    if ctx.invoked_subcommand is not None:
+        return
+    from secretary import estado
+
+    try:
+        cfg = (load_config() or {}).get("estado") or {}
+    except FileNotFoundError:
+        cfg = {}
+    report = estado.collect(
+        days=days if days is not None else int(cfg.get("days", 7)),
+        with_prs=with_prs,
+        exclude=list(cfg.get("exclude") or []),
+        scan_roots=cfg.get("scan_roots"),
+    )
+    estado.assert_whitelist(report)
+    if json_out:
+        typer.echo(json.dumps(report, indent=2, ensure_ascii=False))
+        return
+    table = Table(title="Sessions")
+    for col in ("time", "harness", "repo", "branch", "status", "plan/node", "title"):
+        table.add_column(col, overflow="fold")
+    for s in report["sessions"]:
+        node = f"{s['plan']}/{s['node']}" if s["plan"] else ""
+        table.add_row(s["time"], s["harness"], s["repo"] or "", s["branch"] or "", s["status"], node, s["title"] or "")
+    console.print(table)
 
 
 @app.command("validate")

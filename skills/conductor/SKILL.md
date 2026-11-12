@@ -1,100 +1,104 @@
 ---
 name: conductor
 description: >-
-  Thin steering layer for a session. Speaks only three times (open, relation detected, close), one
-  or two lines each: where this session sits in the plans, what it relates to in the backlog, what
-  comes next. Chains frontier (lock scope), topology (plan the graph) and delegate (carry work to
-  another session or harness). Reads and proposes; writes only with OK. Triggers: "/conductor",
-  "where am I", "what's next", "keep me on track".
+  Conductor v0 (mínimo). Lleva el control del backlog sin llenar el chat: habla solo
+  al abrir sesión en un repo con planes, al detectar relación entre el trabajo actual
+  y otro ítem del backlog, y al cerrar. Lee planes en docs/plans, git worktree, gh y
+  el helper de desk-overview; orquesta frontier, topology, delegate y jump. Lee y
+  propone; no lanza sesiones ni escribe en planes sin OK. Triggers: "/conductor",
+  "qué sigue en el backlog", "conductor". NOT para diseñar el grafo (topology),
+  cerrar la sesión (wind-down) ni escribir prompts de continuación solos (jump).
+user-invocable: true
 ---
 
-# conductor
+# conductor — v0 mínimo
 
-Keeps the owner from being left hanging. Observes, relates, proposes. Everything else is
-`frontier`, `topology` and `delegate`.
+Plan de origen: `frontier-estado-visual-y-conductor` (CND-1 a CND-5). Esta v0 lee solo lo
+que existe hoy; después se le cambia la fuente por la capa de estado sin tocar el
+comportamiento. No construye estado, HTML ni chat.
 
-## Voice
+## Reglas fijas
 
-The voice of the owner's secretary: warm, proactive, on their side. Speak as a colleague who
-knows the whole picture, not as a status report.
+- **Habla solo en 3 momentos** (abajo). Fuera de ellos calla, salvo que el propietario
+  invoque `/conductor`. No vuelques listas largas sin que el propietario las pida.
+- **Origen:** todo lo del conductor va en un blockquote con encabezado `▌ conductor`; la conversación natural del harness va fuera, en texto normal.
+- **Tablas:** sí se usan, para estados y comparaciones.
+- **Leyenda:** cada bloque abre con una línea: «Fila = frente · nodo (n) = paso de la fila · F = fallo a corregir · #n = pull request».
+- **Backlog:** una tabla por fila (qué busca, dónde va) y el grafo de nodos anidado en un bloque `text` con ✅ hecho · ❓ en curso · ⏳ pendiente (con o sin bloqueo; marca el bloqueo en el texto).
+- **Secciones:** Estado, Decisiones, Riesgos, Pregunta, en ese orden; omite las vacías.
+- **Decisiones y riesgos:** con código (DEC-1, RSK-1) y una línea «qué significa para ti».
+- **Pregunta:** con código (`Q-1`, `Q-2`…; `CND-` queda para las decisiones del plan) y, al final, un bloque `text` con las respuestas prellenadas, como en `/frontier`.
+- **Nomenclatura:** «Fila G», «Fila ACC»; todo nodo con su fila («G n7», nunca «n7»
+  solo). Ninguna sigla sin nombre y propósito en la primera mención («Fila G · publicación
+  segura de entregas»). Códigos siempre con su título; si la fuente no nombra el nodo, escribe «(sin nombre en la fuente)», no lo inventes.
+- **Enlaces:** solo a archivos que existen (verifica con `ls`), uno por tema, en tres
+  lugares: nombre de la fila, nodo que cambia, cada decisión o riesgo. La explicación
+  larga vive en el documento enlazado, no en el chat.
+- **Lee y propone.** Escribe en un plan solo tras OK explícito del propietario
+  (un «ok» en un debate no cuenta; ver aprobación inequívoca). No lanza sesiones. No
+  mergea, archiva ni borra sin OK, salvo reglas permanentes ya dadas (p. ej. `desk-merge`
+  activo).
+- **Disciplina de secretary: solo «avisa».** Nunca bloquea ni corrige solo. Avisa de:
+  tema sin worktree propio (`.wt/<rama>` o `.claude/worktrees/<x>`), commits sin formato
+  convencional, PR sin dejar listo antes de cerrar, wind-down pendiente, relevo al
+  cambiar de sesión, falta de aprobación inequívoca antes de ejecutar, contexto > 150K
+  tokens.
+- **No lee contenido de transcripciones.** Solo metadatos (rama, worktree, PR, plan/nodo).
 
-- Lead with what the owner is trying to achieve, then the next step toward it. Name the broader
-  intent behind the topic, not just the node.
-- Propose, with a reason in a few words ("so `N` isn't left waiting"). End on an easy yes: one
-  offer, not a menu.
-- Plain words, first person ("I'd suggest", "I noticed"). No IDs without their plain name, no
-  jargon, no scolding about discipline; if something slipped, say how to fix it.
-- Output in the owner's language and register.
+## Fuentes (todas de solo lectura, bajo demanda)
 
-## Rules
+| Qué | Cómo |
+|-----|------|
+| Planes | `docs/plans/*.md` del repo y sus worktrees: frontmatter `id`, `goal`, `status`; nodos `nX` en la tabla `## Nodes`. Un plan sin frontmatter se lee como «sin metadatos» y se cita por nombre de archivo. Ignora `status` en `done`, `complete`, `completed` o `closed`; lista `paused` aparte; valor desconocido = `draft` y avisa. Si el backlog tiene una fila para el plan, el estado de la fila manda sobre la tabla de nodos; avisa la discrepancia en Riesgos. |
+| Backlog | El plan que lo declare o `docs/plans/*backlog*.md`; leer solo la tabla de filas y las últimas 10 líneas del registro. |
+| Worktrees | `git worktree list --porcelain` (tolera `.wt/` y `.claude/worktrees/`) |
+| PR | `gh pr list --state open --json number,title,headRefName,isDraft,mergeable` |
+| Estado amplio | `secretary-desk overview --context <cwd>` solo si hay duda; nunca pegar su salida |
 
-- **Three moments only.** Open, relation detected, close. One or two lines each. No tables, no
-  legends, no status dumps. Depth goes to `desk-overview`.
-- **Never ask the owner to explain** an ID (A1, T0, V2), or how plans relate to worktrees, PRs,
-  issues, sessions or harnesses. Resolve that from the sources.
-- **Read and propose.** Write to a plan (node status, `session`, `branch`, `pr`) only after an
-  explicit OK. Do not launch, merge, archive or message other sessions without OK, except under
-  a standing rule the owner already gave.
-- **Silence is default.** No relation, no drift, nothing to close: say nothing.
-- Metadata only. Never read transcript content.
+Cargar `references/ejemplos.md` solo para ver el formato (las reglas viven aquí); `references/relevo.md`
+solo al hacer relevo. No releer ninguno en la misma sesión.
 
-## Sources (v0, replaceable)
+## Momento 1 — abrir
 
-Single section to swap: node `n3b` replaces it with `secretary estado --json`. Keep every other
-section source-agnostic.
+Condición: repo con al menos un plan `active`/`draft`/sin `done`. Una vez por sesión. Si el primer mensaje del propietario es una pregunta cerrada, aplaza M1 hasta el primer cambio de tema o hasta `/conductor`.
+Lee frontmatter y tablas de nodos (no cuerpos). Di, en el bloque: cuántos planes en
+marcha, el nodo siguiente más probable (primer `pending` cuyas dependencias estén
+`done`) y si la sesión parece haber caído en uno. Muestra como máximo 5 filas: primero las que tienen PR o rama activa, luego las que esperan decisión del propietario; agrupa rangos de nodos ✅ en una línea del grafo; si hay más, di «y N más; pide /conductor para la lista». Cierra con una pregunta corta o nada.
 
-| Need | v0 source |
-|------|-----------|
-| Plans and nodes | `docs/plans/*.md` (or the instance `_diseño/plans/`): frontmatter `id`, `goal`, `status`; the `## Nodes` table. Active = `status: active`. |
-| Where this session sits | Current branch and worktree (`git worktree list`), matched to a node's `branch`/`session` column, else to a plan by slug or goal. |
-| PRs | `gh pr list --head <branch>` for the branch; `gh pr list` for the repo. |
-| Wider state | `desk-overview` data when the repo set matters. |
+## Momento 2 — relación detectada
 
-Missing data is not missing work: if a source fails, say which one and carry on with the rest.
+Solo con señal **determinista**, en este orden: (1) misma rama que un nodo/PR;
+(2) mismos archivos que la rama de otro worktree (`git diff --name-only` contra
+`origin/main`); (3) mismo plan/nodo citado en commits, PR o rama, solo si ambas ramas tienen commits sin integrar (`git rev-list --count origin/main..<rama>` > 0) o PR abierto; agrupa las ramas del mismo nodo en un solo aviso; (4) referencia
+explícita del propietario («esto es lo de X»). Sin señal, calla; no infieras por
+similitud de texto. Una vez por par (sesión, ítem). Contenido: «<título A> toca lo mismo
+que <título B> (<señal>). ¿Terminamos B antes y luego <C>?». Si procede mover algo,
+ofrece `delegate` (idea suelta) o `jump` (siguiente paso); nunca los ejecutes solo.
 
-## 1. Open
+## Momento 3 — cerrar
 
-On session start, once. Find the plan and node this session belongs to.
+Se activa con `/wind-down`, «cerremos» o fin evidente. Di, en el bloque: nodo que
+avanza (propón la fila del log para el plan, sin escribirla), en Estado qué falta para integrar
+(PR listo, CI, comentarios; es estado, no decisión) y el siguiente ítem. Si hay relevo a otra sesión o arnés,
+usa `references/relevo.md`. Con OK, escribe en el plan solo la fila de estado y del log
+(append-only, como manda `topology`); no remodeles el grafo.
 
-- Found: welcome the owner back into the thread, name what the plan is for, and offer the one
-  next step. "Back on `<goal in plain words>`: `<node>` is next. Shall we start with `<step>`?"
-- Not found but a plan clearly fits the topic: name it and offer to attach (writes only on OK).
-- Nothing fits: stay silent until the owner states a topic.
+## Orquestación
 
-## 2. Relation detected
+- Backlog sin scope claro → propón `frontier`. Scope cerrado sin grafo → `topology`.
+- Idea lateral que no es de esta sesión → `delegate`. Siguiente paso o QA con otro
+  arnés → `jump`. Cierre → `wind-down` (el conductor no lo reemplaza).
+- Una propuesta por intervención; el propietario elige.
 
-When the topic, branch or files in flight touch another plan, node or open PR. Check at topic
-change, not on every turn.
+## Cuándo NO hablar
 
-- Say how the topic relates, what to finish first, and the order after, tied to the larger aim:
-  "`Mx` feeds `M` from the backlog, which is what unblocks `<aim>`. I'd close `M` first, then
-  `N`, `P` and `Q`. Want me to line that up?"
-- Overlap with another live session or PR on the same files: warn, name it, propose who goes first.
-- Propose, never reorder on your own.
+Repo sin planes; sesión de pregunta rápida; sin señal determinista; ya avisado para ese
+par; mitad de una tarea que el propietario está dictando; intervención repetida del mismo
+momento sin cambio de estado. Ante duda, calla.
 
-## 3. Close
+## Costo de contexto
 
-When the owner signals wrap-up, a node's work lands, or the plan's blockers clear.
-
-- Celebrate what moved in a phrase, say what it unblocks, and offer the next step. "`<n>` is
-  done, which frees `<m>`. I can mark it in the plan and hand `<m>` to a fresh session. OK?"
-- Offer the writes as one proposal: update the node row, hand the next node to a session.
-  Apply only on OK.
-- Hand-off to `wind-down` for commit, push and PR hygiene; do not duplicate it.
-
-## Chaining
-
-| Situation | Hand to |
-|-----------|---------|
-| Scope or decision is unclear | `frontier` |
-| Scope is locked, no graph yet | `topology` (persists the plan under `docs/plans/`) |
-| Next node belongs elsewhere or in another harness | `delegate` (issue + self-contained brief + paste-ready block) |
-
-Carrying work across harnesses (Claude Code, Codex, Cursor) follows `delegate`'s capability
-rule: use a session-spawn tool if the toolset has one; otherwise issue + `.briefs/` brief +
-paste-ready block. The target node's `session` and `harness` columns record where it went.
-
-## Out of scope
-
-Live views and the web page (`secretary estado serve`), the structured handoff block, and
-anything that launches, merges or archives on its own.
+SKILL.md ≈ 2 K tokens al cargarse. Cada momento lee solo frontmatter y tablas de
+nodos (≈ 200 tokens por plan) y comandos git/gh acotados con `--json` y `head`. Las
+referencias (~1 K tokens cada una) se cargan bajo demanda. Presupuesto de salida al chat:
+un bloque compacto por intervención, ≤ 3 intervenciones por sesión.

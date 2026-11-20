@@ -97,8 +97,21 @@ Deterministic (no LLM). Writes the contract v1 file in `docs/voice-bridge-contex
 atomically (tmp + rename). Sources: `commitment` (open commitments from the meetings action
 ledger), `brief` (`status: pending` briefs in `.briefs/` of the instance, `~/Dev/*` and
 `~/Cowork/*`; override with `--brief-root`), `session` (Claude Code sessions active in the last
-48 h, max 8). `mail` and `wiki` are accepted but stubbed (empty). Caps: 40 items, 200 chars per
+48 h, max 8), `repo` (opt-in: branch, uncommitted changes, ahead/behind and open PRs of the git repos directly under the configured roots; see below). `mail` and `wiki` are accepted but stubbed (empty). Caps: 40 items, 200 chars per
 item, ~1,600 chars in total.
+
+The `repo` source is off by default; enable it with `--sources commitment,brief,session,repo`.
+The repo list comes from `--repo-root <dir>` (repeatable), else from the instance config:
+
+```yaml
+# .secretary.yml
+voice_context:
+  repo_roots: [~/Dev, ~/Cowork]
+```
+
+Only direct subfolders that are git repos are scanned (max 30); the file keeps at most 6 repo
+lines (open PRs first, then uncommitted or unpushed work). Open PRs need `gh`; without it, or
+if it fails, the line simply has no PR info. No fetch is done, so ahead/behind is as of the last fetch.
 
 ```bash
 secretary voice-context compose --out ~/.cache/voice-bridge/context.json [--model sonnet]

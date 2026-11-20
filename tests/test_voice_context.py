@@ -328,3 +328,146 @@ def test_run_claude_reports_failures(tmp_path, monkeypatch):
     monkeypatch.setenv("VOICE_CONTEXT_CLAUDE", str(junk))
     with pytest.raises(ComposeError):
         run_claude("p", model="m")
+
+
+# --- repos (opt-in source) ----------------------------------------------------------------
+
+import shutil
+import subprocess
+
+needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
+
+
+def git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@localhost",
+                    "-c", "commit.gpgsign=false", *args], cwd=repo, check=True, capture_output=True)
+
+
+def make_repo(root: Path, name: str, *, dirty: int = 0, branch: str = "main") -> Path:
+    repo = root / name
+    repo.mkdir(parents=True)
+    git(repo, "init", "-q", "-b", branch)
+    (repo / "a.txt").write_text("a", encoding="utf-8")
+    git(repo, "add", "a.txt")
+    git(repo, "commit", "-q", "-m", "init")
+    for i in range(dirty):
+        (repo / f"new{i}.txt").write_text("x", encoding="utf-8")
+    return repo
+
+
+def test_parse_status_variants():
+    s = vc.parse_status("## main...origin/main [ahead 2, behind 1]\n M a\n?? b\n")
+    assert s == {"branch": "main", "dirty": 2, "ahead": 2, "behind": 1}
+    assert vc.parse_status("## feat/x\n")["branch"] == "feat/x"
+    assert vc.parse_status("## HEAD (no branch)\n")["branch"] == "detached"
+    assert vc.parse_status("## No commits yet on main\n")["branch"] == "main"
+
+
+@needs_git
+def test_repos_only_direct_git_subfolders(tmp_path):
+    root = tmp_path / "dev"
+    make_repo(root, "alpha")
+    (root / "plain").mkdir()
+    make_repo(root / "plain", "nested")  # two levels down: ignored
+    items = vc.collect_repos([root], have_gh=False)
+    assert [i.key for i in items] == ["dev/alpha"]
+    assert items[0].category == "repo" and items[0].id.startswith("r-")
+    assert vc.collect_repos([tmp_path / "missing"], have_gh=False) == []
+
+
+@needs_git
+def test_repo_line_branch_dirty_and_ranking(tmp_path):
+    root = tmp_path / "dev"
+    make_repo(root, "clean")
+    make_repo(root, "busy", dirty=3, branch="feat/x")
+    items = vc.collect_repos([root], labels=vc.LABELS["en"], have_gh=False)
+    assert items[0].text == "busy: branch feat/x, 3 uncommitted"  # activity first
+    assert items[1].text == "clean: branch main, clean"
+
+
+@needs_git
+def test_repo_ahead_behind_from_upstream(tmp_path):
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+    repo = make_repo(tmp_path / "dev", "r")
+    git(repo, "remote", "add", "origin", str(origin))
+    git(repo, "push", "-q", "-u", "origin", "main")
+    (repo / "b.txt").write_text("b", encoding="utf-8")
+    git(repo, "add", "b.txt")
+    git(repo, "commit", "-q", "-m", "second")
+    [item] = vc.collect_repos([tmp_path / "dev"], labels=vc.LABELS["en"], have_gh=False)
+    assert "ahead 1" in item.text and "behind" not in item.text
+
+
+@needs_git
+def test_open_prs_rank_first_and_gh_failures_are_silent(tmp_path):
+    root = tmp_path / "dev"
+    make_repo(root, "a", dirty=1)
+    make_repo(root, "b")
+
+    def fake(args, cwd, timeout):
+        if args[0] == "gh":
+            return json.dumps([{"number": 7, "title": "Fix the **thing**"}]) if cwd.name == "b" else None
+        return subprocess.run(args, cwd=cwd, capture_output=True, text=True).stdout
+
+    items = vc.collect_repos([root], labels=vc.LABELS["en"], run=fake, have_gh=True)
+    assert [i.key for i in items] == ["dev/b", "dev/a"]
+    assert items[0].text == "b: branch main, clean, 1 open PR (PR 7 Fix the thing)"
+    assert "PR" not in items[1].text  # gh failed for a: silently empty
+
+
+@needs_git
+def test_gh_absent_means_no_gh_call(tmp_path):
+    make_repo(tmp_path / "dev", "a")
+    calls = []
+
+    def fake(args, cwd, timeout):
+        calls.append(args[0])
+        return subprocess.run(args, cwd=cwd, capture_output=True, text=True).stdout
+
+    vc.collect_repos([tmp_path / "dev"], run=fake, have_gh=False)
+    assert "gh" not in calls
+
+
+@needs_git
+def test_repo_caps(tmp_path):
+    root = tmp_path / "dev"
+    for i in range(9):
+        make_repo(root, f"r{i}", dirty=1)
+    items = vc.collect_repos([root], have_gh=False)
+    assert len(items) == vc.MAX_REPOS
+    assert all(len(i.text) <= vc.REPO_TEXT for i in items)
+    long = vc.repo_line("x" * 300, {"branch": "b", "dirty": 0, "ahead": 0, "behind": 0}, [(1, "t" * 99)],
+                        vc.LABELS["en"])
+    assert len(long) <= vc.REPO_TEXT
+
+
+@needs_git
+def test_repo_is_opt_in(tmp_path):
+    make_repo(tmp_path / "dev", "a")
+    kw = dict(ledger=None, brief_roots=[], projects_dir=None, now=NOW, repo_roots=[tmp_path / "dev"])
+    assert vc.gather(**kw) == []  # default categories: no repos
+    assert [i.category for i in vc.gather(categories=("repo",), **kw)] == ["repo"]
+
+
+def test_configured_repo_roots(tmp_path):
+    cfg = {"voice_context": {"repo_roots": ["~/x", str(tmp_path)]}}
+    assert vc.configured_repo_roots(cfg) == [Path(os.path.expanduser("~/x")), tmp_path]
+    assert vc.configured_repo_roots({}) == []
+    assert vc.configured_repo_roots(None) == []
+    assert vc.configured_repo_roots({"voice_context": {"repo_roots": 3}}) == []
+
+
+@needs_git
+def test_cli_repo_source_with_repo_root(tmp_path):
+    from typer.testing import CliRunner
+
+    from secretary.main import app
+
+    make_repo(tmp_path / "dev", "a", dirty=1)
+    out = tmp_path / "ctx.json"
+    res = CliRunner().invoke(app, ["voice-context", "collect", "--out", str(out), "--sources", "repo",
+                                   "--repo-root", str(tmp_path / "dev"), "--lang", "en"])
+    assert res.exit_code == 0, res.output
+    doc = json.loads(out.read_text(encoding="utf-8"))
+    assert [i["category"] for i in doc["items"]] == ["repo"]

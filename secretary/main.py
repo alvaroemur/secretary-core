@@ -870,11 +870,13 @@ def whatsapp_command(ctx: typer.Context):
     from secretary.whatsapp_review import main as whatsapp_main
     raise typer.Exit(whatsapp_main(ctx.args))
 
-def _voice_context_inputs(sources: str, brief_root, projects_dir: Path, lang: str):
+def _voice_context_inputs(sources: str, brief_root, projects_dir: Path, lang: str, repo_root=None):
     from datetime import datetime
 
     from secretary.acc import _ledger_path
-    from secretary.voice_context import ALL_CATEGORIES, LABELS, default_brief_roots, gather
+    from secretary.voice_context import (
+        ALL_CATEGORIES, LABELS, configured_repo_roots, default_brief_roots, default_repo_roots, gather,
+    )
 
     cats = tuple(c.strip() for c in sources.split(",") if c.strip())
     bad = [c for c in cats if c not in ALL_CATEGORIES]
@@ -888,9 +890,16 @@ def _voice_context_inputs(sources: str, brief_root, projects_dir: Path, lang: st
         except (FileNotFoundError, KeyError) as exc:
             err_console.print(f"[yellow]commitments skipped:[/yellow] {exc}")
     roots = brief_root or default_brief_roots(instance_root())
+    repo_roots = None
+    if "repo" in cats:
+        try:
+            cfg = load_config()
+        except FileNotFoundError:
+            cfg = None
+        repo_roots = repo_root or configured_repo_roots(cfg) or default_repo_roots()
     now = datetime.now().astimezone()
     return now, gather(ledger=ledger, brief_roots=roots, projects_dir=projects_dir,
-                       now=now, categories=cats, lang=lang)
+                       now=now, categories=cats, lang=lang, repo_roots=repo_roots)
 
 
 def _voice_context_report(out: Path, doc: dict) -> None:
@@ -901,7 +910,11 @@ def _voice_context_report(out: Path, doc: dict) -> None:
     console.print(f"wrote {out}: {len(doc['items'])} items, {chars} chars {counts}")
 
 
-_VC_SOURCES = typer.Option("--sources", help="Comma list: commitment,brief,session,mail,wiki.")
+_VC_SOURCES = typer.Option(
+    "--sources", help="Comma list: commitment,brief,session,repo,mail,wiki. `repo` is off by default.")
+_VC_REPO_ROOT = typer.Option(
+    "--repo-root", help="Folder whose direct subfolders are git repos (repeatable). "
+    "Default: `voice_context.repo_roots` in the instance config, else ~/Dev and ~/Cowork.")
 _VC_BRIEF_ROOT = typer.Option(
     "--brief-root", help="Repo root holding .briefs/ (repeatable). Default: instance + ~/Dev/* + ~/Cowork/*.")
 _VC_PROJECTS = typer.Option("--projects-dir", help="Claude Code transcripts dir.")
@@ -915,11 +928,12 @@ def voice_context_collect(
     brief_root: Annotated[Optional[list[Path]], _VC_BRIEF_ROOT] = None,
     projects_dir: Annotated[Path, _VC_PROJECTS] = Path.home() / ".claude" / "projects",
     lang: Annotated[str, _VC_LANG] = "es",
+    repo_root: Annotated[Optional[list[Path]], _VC_REPO_ROOT] = None,
 ) -> None:
     """Collect commitments, pending briefs and recent sessions into the voice bridge file (no LLM)."""
     from secretary.voice_context import apply_caps, build_document, write_atomic
 
-    now, items = _voice_context_inputs(sources, brief_root, projects_dir, lang)
+    now, items = _voice_context_inputs(sources, brief_root, projects_dir, lang, repo_root)
     doc = build_document(apply_caps(items), now)
     write_atomic(out, doc)
     _voice_context_report(out, doc)
@@ -933,11 +947,12 @@ def voice_context_compose(
     projects_dir: Annotated[Path, _VC_PROJECTS] = Path.home() / ".claude" / "projects",
     lang: Annotated[str, _VC_LANG] = "es",
     model: Annotated[str, typer.Option("--model", help="Model alias for `claude -p`.")] = "sonnet",
+    repo_root: Annotated[Optional[list[Path]], _VC_REPO_ROOT] = None,
 ) -> None:
     """Collect, then let `claude -p` (no tools) pick and shorten items. Falls back to `collect` output."""
     from secretary.voice_context import compose, write_atomic
 
-    now, candidates = _voice_context_inputs(sources, brief_root, projects_dir, lang)
+    now, candidates = _voice_context_inputs(sources, brief_root, projects_dir, lang, repo_root)
     doc, warning = compose(candidates, now, lang=lang, model=model)
     write_atomic(out, doc)
     if warning:

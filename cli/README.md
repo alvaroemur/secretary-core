@@ -86,6 +86,31 @@ secretary gwork --help              # passthrough to the gwork plugin CLI
 empty stdout when `cwd` isn't nested under any `dispatch.executor.repos` path — replaces
 the `jq`-based bash loop that used to live in `sec-drone`'s SKILL.md.
 
+### Voice bridge context file
+
+```bash
+secretary voice-context collect --out ~/.cache/voice-bridge/context.json
+secretary voice-context collect --out ctx.json --sources commitment,brief --lang en
+```
+
+Deterministic (no LLM). Writes the contract v1 file in `docs/voice-bridge-context-contract.md`
+atomically (tmp + rename). Sources: `commitment` (open commitments from the meetings action
+ledger), `brief` (`status: pending` briefs in `.briefs/` of the instance, `~/Dev/*` and
+`~/Cowork/*`; override with `--brief-root`), `session` (Claude Code sessions active in the last
+48 h, max 8). `mail` and `wiki` are accepted but stubbed (empty). Caps: 40 items, 200 chars per
+item, ~1,600 chars in total.
+
+```bash
+secretary voice-context compose --out ~/.cache/voice-bridge/context.json [--model sonnet]
+```
+
+Same sources and options, then one `claude -p` call picks the most relevant items and shortens
+them (<= 160 chars). The call has no tools, no MCP and no user settings (`--tools ""`,
+`--strict-mcp-config`, `--setting-sources ""`, `--no-session-persistence`, `--max-budget-usd 0.5`).
+Only ids that exist among the candidates are accepted; category and date come from the candidate.
+On any failure it writes the deterministic items and warns on stderr. Draft of the scheduled
+routine: `docs/voice-bridge-routine-draft.md`.
+
 ## Single source for skills and playbooks
 
 `skills/` and `playbooks/` are the only, versioned source. They hold no personal data:

@@ -73,6 +73,7 @@ contract_app = typer.Typer(help="Read or update module contract.yaml.")
 dream_app = typer.Typer(help="sec-dream deterministic collection (spec 020).")
 portal_app = typer.Typer(help="Operator portal (spec 019).")
 dispatch_app = typer.Typer(help="dispatch.executor allowlist ops (no LLM).")
+voice_context_app = typer.Typer(help="Voice bridge context file (contract v1, deterministic).")
 estado_app = typer.Typer(
     help="Live per-repo status of agent sessions (metadata only).",
     invoke_without_command=True,
@@ -87,6 +88,7 @@ app.add_typer(modules_app, name="modules")
 app.add_typer(dream_app, name="dream")
 app.add_typer(portal_app, name="portal")
 app.add_typer(estado_app, name="estado")
+app.add_typer(voice_context_app, name="voice-context")
 modules_app.add_typer(contract_app, name="contract")
 
 
@@ -867,6 +869,81 @@ def whatsapp_command(ctx: typer.Context):
     """Read local WhatsApp: probe, chats, collect, audio, transcribe, record."""
     from secretary.whatsapp_review import main as whatsapp_main
     raise typer.Exit(whatsapp_main(ctx.args))
+
+def _voice_context_inputs(sources: str, brief_root, projects_dir: Path, lang: str):
+    from datetime import datetime
+
+    from secretary.acc import _ledger_path
+    from secretary.voice_context import ALL_CATEGORIES, LABELS, default_brief_roots, gather
+
+    cats = tuple(c.strip() for c in sources.split(",") if c.strip())
+    bad = [c for c in cats if c not in ALL_CATEGORIES]
+    if bad or lang not in LABELS:
+        err_console.print(f"[red]Invalid --sources/--lang:[/red] {bad or lang}")
+        raise typer.Exit(2)
+    ledger = None
+    if "commitment" in cats:
+        try:
+            ledger = _ledger_path("meetings")
+        except (FileNotFoundError, KeyError) as exc:
+            err_console.print(f"[yellow]commitments skipped:[/yellow] {exc}")
+    roots = brief_root or default_brief_roots(instance_root())
+    now = datetime.now().astimezone()
+    return now, gather(ledger=ledger, brief_roots=roots, projects_dir=projects_dir,
+                       now=now, categories=cats, lang=lang)
+
+
+def _voice_context_report(out: Path, doc: dict) -> None:
+    counts: dict[str, int] = {}
+    for it in doc["items"]:
+        counts[it["category"]] = counts.get(it["category"], 0) + 1
+    chars = sum(len(i["text"]) for i in doc["items"])
+    console.print(f"wrote {out}: {len(doc['items'])} items, {chars} chars {counts}")
+
+
+_VC_SOURCES = typer.Option("--sources", help="Comma list: commitment,brief,session,mail,wiki.")
+_VC_BRIEF_ROOT = typer.Option(
+    "--brief-root", help="Repo root holding .briefs/ (repeatable). Default: instance + ~/Dev/* + ~/Cowork/*.")
+_VC_PROJECTS = typer.Option("--projects-dir", help="Claude Code transcripts dir.")
+_VC_LANG = typer.Option("--lang", help="Text language: es or en.")
+
+
+@voice_context_app.command("collect")
+def voice_context_collect(
+    out: Path = typer.Option(..., "--out", help="Output JSON path (written atomically)."),
+    sources: Annotated[str, _VC_SOURCES] = "commitment,brief,session",
+    brief_root: Annotated[Optional[list[Path]], _VC_BRIEF_ROOT] = None,
+    projects_dir: Annotated[Path, _VC_PROJECTS] = Path.home() / ".claude" / "projects",
+    lang: Annotated[str, _VC_LANG] = "es",
+) -> None:
+    """Collect commitments, pending briefs and recent sessions into the voice bridge file (no LLM)."""
+    from secretary.voice_context import apply_caps, build_document, write_atomic
+
+    now, items = _voice_context_inputs(sources, brief_root, projects_dir, lang)
+    doc = build_document(apply_caps(items), now)
+    write_atomic(out, doc)
+    _voice_context_report(out, doc)
+
+
+@voice_context_app.command("compose")
+def voice_context_compose(
+    out: Path = typer.Option(..., "--out", help="Output JSON path (written atomically)."),
+    sources: Annotated[str, _VC_SOURCES] = "commitment,brief,session",
+    brief_root: Annotated[Optional[list[Path]], _VC_BRIEF_ROOT] = None,
+    projects_dir: Annotated[Path, _VC_PROJECTS] = Path.home() / ".claude" / "projects",
+    lang: Annotated[str, _VC_LANG] = "es",
+    model: Annotated[str, typer.Option("--model", help="Model alias for `claude -p`.")] = "sonnet",
+) -> None:
+    """Collect, then let `claude -p` (no tools) pick and shorten items. Falls back to `collect` output."""
+    from secretary.voice_context import compose, write_atomic
+
+    now, candidates = _voice_context_inputs(sources, brief_root, projects_dir, lang)
+    doc, warning = compose(candidates, now, lang=lang, model=model)
+    write_atomic(out, doc)
+    if warning:
+        err_console.print(f"[yellow]{warning}[/yellow]")
+    _voice_context_report(out, doc)
+
 
 if __name__ == "__main__":
     run()

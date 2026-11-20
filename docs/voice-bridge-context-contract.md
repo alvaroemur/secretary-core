@@ -33,11 +33,21 @@ The producer writes atomically: write `<path>.tmp`, then rename. The bridge neve
 | `generator` | string | Optional. Shown in the preview for debugging. |
 | `items` | array | Required. Ordered by relevance, most relevant first. Max 40 entries. |
 | `items[].id` | string | Required. Stable for the same underlying fact across runs, so a checkbox exclusion survives a refresh. Unique in the file. |
-| `items[].category` | string | Required. One of `commitment`, `brief`, `session`, `mail`, `wiki`. The bridge maps unknown values to `other`. |
+| `items[].category` | string | Required. One of `commitment`, `brief`, `session`, `repo`, `mail`, `wiki`. The bridge maps unknown values to `other`. |
 | `items[].text` | string | Required. One short plain-text sentence, max 200 characters, no newlines, no markdown. |
 | `items[].date` | string, `YYYY-MM-DD` | Optional. Due date or event date. |
 
-Default sources (producer side): `commitment`, `brief`, `session`. `mail` and `wiki` appear only if the user turns them on.
+Default sources (producer side): `commitment`, `brief`, `session`. `repo`, `mail` and `wiki` appear only if the user turns them on.
+
+## Repo source (`repo`, opt-in)
+
+One item per git repo: current branch, uncommitted changes, ahead/behind of the upstream, and open pull requests when `gh` is available (a missing or failing `gh` yields no PR info, silently). Example: `api: branch feat/x, 3 uncommitted, ahead 1, 2 open PRs (PR 7 Fix login; PR 9 Bump deps)`.
+
+- Enabled only with `--sources ...,repo`. The default sources do not change.
+- The repo list is producer-side configuration, never in the bridge: `--repo-root <dir>` (repeatable), else `voice_context.repo_roots` in the instance config, else `~/Dev` and `~/Cowork`. Only the direct subfolders of each root that are git repos are inspected (at most 30).
+- At most 6 items, 160 characters each. Repos with open PRs come first, then those with uncommitted or unpushed work, then the rest by latest commit. Items sort after `session`, so the 1,600-character cap drops them first.
+- Ahead/behind reflect the last fetch; the producer does not fetch.
+- Item `id` is stable per `<root name>/<repo name>`. No `date`.
 
 ## Size cap
 

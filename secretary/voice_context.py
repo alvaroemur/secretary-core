@@ -34,15 +34,26 @@ ACTIVE_WITHIN_MIN = 120
 TAIL_BYTES = 1_000_000
 
 DEFAULT_CATEGORIES = ("commitment", "brief", "session")
-ALL_CATEGORIES = ("commitment", "brief", "session", "mail", "wiki")
-_PREFIX = {"commitment": "c", "brief": "b", "session": "s", "mail": "m", "wiki": "w"}
+MAX_REPOS = 6  # repo lines in the file (opt-in source)
+MAX_REPO_SCAN = 30  # repos inspected before ranking
+REPO_TEXT = 160
+MAX_PR_LISTED = 2
+GIT_TIMEOUT_S = 5
+GH_TIMEOUT_S = 10
+
+ALL_CATEGORIES = ("commitment", "brief", "session", "repo", "mail", "wiki")
+_PREFIX = {"commitment": "c", "brief": "b", "session": "s", "repo": "r", "mail": "m", "wiki": "w"}
 
 # Per-line labels. The producer writes in the owner's primary language.
 LABELS = {
     "es": {"due": "vence", "pending": "pendiente", "days": "d", "active": "activa",
-           "idle": "inactiva hace", "hours": "h", "last": "último pedido"},
+           "idle": "inactiva hace", "hours": "h", "last": "último pedido",
+           "branch": "rama", "dirty": "con cambios", "ahead": "adelante", "behind": "atrás",
+           "clean": "limpio", "prs": "PR abiertos", "pr": "PR abierto"},
     "en": {"due": "due", "pending": "pending", "days": "d", "active": "active",
-           "idle": "idle for", "hours": "h", "last": "last request"},
+           "idle": "idle for", "hours": "h", "last": "last request",
+           "branch": "branch", "dirty": "uncommitted", "ahead": "ahead", "behind": "behind",
+           "clean": "clean", "prs": "open PRs", "pr": "open PR"},
 }
 
 
@@ -271,6 +282,123 @@ def collect_sessions(projects_dir: Path, now: datetime, window_h: int = SESSION_
     return items
 
 
+# --- Repos (opt-in source) ------------------------------------------------------------
+
+Runner = Callable[[list[str], Path, int], "str | None"]
+
+
+def _run(args: list[str], cwd: Path, timeout: int) -> str | None:
+    """Run a command and return stdout, or None on any failure (missing binary, timeout, exit != 0)."""
+    import subprocess
+
+    try:
+        proc = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout,
+                              env={**os.environ, "GIT_OPTIONAL_LOCKS": "0", "GH_PROMPT_DISABLED": "1"})
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def find_repos(roots: list[Path], limit: int = MAX_REPO_SCAN) -> list[Path]:
+    """Direct subfolders of each root that are git repos (a `.git` dir or file), sorted by name."""
+    found: list[Path] = []
+    for root in roots:
+        if not root.is_dir():
+            continue
+        try:
+            children = sorted(root.iterdir())
+        except OSError:
+            continue
+        found.extend(p for p in children if p.is_dir() and (p / ".git").exists())
+    return found[:limit]
+
+
+_BRANCH_LINE = re.compile(r"^## (?P<branch>.+?)(?:\.\.\.\S+)?(?: \[(?P<track>[^\]]*)\])?$")
+
+
+def parse_status(porcelain: str) -> dict[str, Any]:
+    """Parse `git status --porcelain=v1 -b`: branch, dirty file count, ahead and behind."""
+    info: dict[str, Any] = {"branch": "?", "dirty": 0, "ahead": 0, "behind": 0}
+    for line in porcelain.splitlines():
+        if line.startswith("## "):
+            m = _BRANCH_LINE.match(line)
+            if m:
+                branch = m.group("branch")
+                info["branch"] = branch.removeprefix("No commits yet on ")
+                if branch.startswith("HEAD (no branch)"):
+                    info["branch"] = "detached"
+                for part in (m.group("track") or "").split(","):
+                    kind, _, n = part.strip().partition(" ")
+                    if kind in ("ahead", "behind") and n.isdigit():
+                        info[kind] = int(n)
+        elif line.strip():
+            info["dirty"] += 1
+    return info
+
+
+def _open_prs(repo: Path, run: Runner, have_gh: bool) -> list[tuple[int, str]]:
+    if not have_gh:
+        return []
+    out = run(["gh", "pr", "list", "--state", "open", "--limit", "5", "--json", "number,title"],
+              repo, GH_TIMEOUT_S)
+    if not out:
+        return []
+    try:
+        rows = json.loads(out)
+    except ValueError:
+        return []
+    return [(r["number"], str(r.get("title", ""))) for r in rows
+            if isinstance(r, dict) and isinstance(r.get("number"), int)]
+
+
+def repo_line(name: str, info: dict[str, Any], prs: list[tuple[int, str]], lb: dict[str, str]) -> str:
+    parts = [f"{lb['branch']} {info['branch']}"]
+    parts.append(f"{info['dirty']} {lb['dirty']}" if info["dirty"] else lb["clean"])
+    if info["ahead"]:
+        parts.append(f"{lb['ahead']} {info['ahead']}")
+    if info["behind"]:
+        parts.append(f"{lb['behind']} {info['behind']}")
+    head = f"{name}: " + ", ".join(parts)
+    if prs:
+        label = lb["pr"] if len(prs) == 1 else lb["prs"]
+        head += f", {len(prs)} {label}"
+        room = REPO_TEXT - len(head) - 4
+        listed = "; ".join(f"PR {n} {clean_text(t, 40)}" for n, t in prs[:MAX_PR_LISTED])
+        if room > 15:
+            head += f" ({clean_text(listed, room)})"
+    return clean_text(head, REPO_TEXT)
+
+
+def collect_repos(roots: list[Path], labels: dict[str, str] | None = None, limit: int = MAX_REPOS,
+                  run: Runner = _run, have_gh: bool | None = None) -> list[Item]:
+    """State of the git repos found directly under `roots`: branch, dirty, ahead/behind, open PRs.
+
+    Repos with open PRs come first, then those with uncommitted or unpushed work, then the
+    rest by most recent commit. `gh` is optional: when absent or failing, PRs are left out.
+    Ahead/behind reflect the last fetch; this collector never touches the network except
+    through `gh pr list`.
+    """
+    import shutil
+
+    lb = labels or LABELS["es"]
+    if have_gh is None:
+        have_gh = shutil.which("gh") is not None
+    ranked: list[tuple[tuple[int, int, int], Item]] = []
+    for repo in find_repos(roots):
+        status = run(["git", "status", "--porcelain=v1", "-b"], repo, GIT_TIMEOUT_S)
+        if status is None:
+            continue
+        info = parse_status(status)
+        prs = _open_prs(repo, run, have_gh)
+        stamp = (run(["git", "log", "-1", "--format=%ct"], repo, GIT_TIMEOUT_S) or "").strip()
+        last = int(stamp) if stamp.isdigit() else 0
+        active = int(bool(info["dirty"] or info["ahead"]))
+        item = Item("repo", f"{repo.parent.name}/{repo.name}", repo_line(repo.name, info, prs, lb))
+        ranked.append(((-int(bool(prs)), -active, -last), item))
+    ranked.sort(key=lambda r: r[0])
+    return [item for _, item in ranked[:limit]]
+
+
 def collect_stub(_category: str) -> list[Item]:
     """`mail` and `wiki` are off by default and not implemented in the producer yet."""
     return []
@@ -297,7 +425,7 @@ def apply_caps(ordered: list[Item], max_items: int = MAX_ITEMS,
 
 
 def in_priority_order(groups: list[list[Item]]) -> list[Item]:
-    """Commitments, then briefs, then sessions (`ALL_CATEGORIES` order), under the text cap."""
+    """Commitments, briefs, sessions, then repos (`ALL_CATEGORIES` order), under the text cap."""
     flat = [it for g in groups for it in g]
     return sorted(flat, key=lambda it: ALL_CATEGORIES.index(it.category))  # stable within a category
 
@@ -320,7 +448,7 @@ def write_atomic(path: Path, document: dict[str, Any]) -> None:
 
 def gather(*, ledger: Path | None, brief_roots: list[Path], projects_dir: Path | None,
            now: datetime, categories: tuple[str, ...] = DEFAULT_CATEGORIES,
-           lang: str = "es") -> list[Item]:
+           lang: str = "es", repo_roots: list[Path] | None = None) -> list[Item]:
     """Ordered candidates from every requested source, before the caps."""
     labels = LABELS[lang]
     today = now.date()
@@ -332,6 +460,8 @@ def gather(*, ledger: Path | None, brief_roots: list[Path], projects_dir: Path |
             groups.append(collect_briefs(brief_roots, today, labels=labels))
         elif cat == "session":
             groups.append(collect_sessions(projects_dir, now, labels=labels) if projects_dir else [])
+        elif cat == "repo":
+            groups.append(collect_repos(repo_roots, labels=labels) if repo_roots else [])
         else:
             groups.append(collect_stub(cat))
     return in_priority_order(groups)
@@ -349,6 +479,23 @@ def default_brief_roots(instance: Path, home: Path | None = None) -> list[Path]:
         if parent.is_dir():
             roots.extend(sorted(p for p in parent.iterdir() if (p / ".briefs").is_dir()))
     return roots
+
+
+def default_repo_roots(home: Path | None = None) -> list[Path]:
+    """Fallback when the instance config declares no `voice_context.repo_roots`."""
+    home = home or Path.home()
+    return [home / "Dev", home / "Cowork"]
+
+
+def configured_repo_roots(config: dict[str, Any] | None) -> list[Path]:
+    """`voice_context.repo_roots` from the instance config (a list of paths, `~` expanded)."""
+    section = (config or {}).get("voice_context")
+    raw = section.get("repo_roots") if isinstance(section, dict) else None
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return []
+    return [Path(os.path.expanduser(str(p))) for p in raw if isinstance(p, (str, Path)) and str(p).strip()]
 
 
 # --- Composition (n4): claude -p with no tools ----------------------------------------

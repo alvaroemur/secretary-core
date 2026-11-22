@@ -361,6 +361,43 @@ def estado_main(
     console.print(table)
 
 
+@estado_app.command("serve")
+def estado_serve(
+    port: int = typer.Option(8765, "--port", min=1, max=65535, help="Loopback TCP port"),
+    poll_seconds: float = typer.Option(1.0, "--poll", min=0.1, help="Mtime poll interval in seconds"),
+    with_prs: bool = typer.Option(False, "--with-prs", help="Look up PRs via gh (60 s cache)"),
+    days: Optional[int] = typer.Option(None, "--days", help="Only sessions active in the last N days (default 7)"),
+) -> None:
+    """Serve the read-only live HTML view on 127.0.0.1."""
+    from secretary import estado
+    from secretary.estado_server import LOOPBACK, make_server
+
+    try:
+        cfg = (load_config() or {}).get("estado") or {}
+    except FileNotFoundError:
+        cfg = {}
+    selected_days = days if days is not None else int(cfg.get("days", 7))
+    collect = lambda: estado.collect(
+        days=selected_days,
+        with_prs=with_prs,
+        exclude=list(cfg.get("exclude") or []),
+        scan_roots=cfg.get("scan_roots"),
+    )
+    server = make_server(
+        port=port,
+        collect=collect,
+        fingerprint=lambda repos: estado.fingerprint(repo_paths=repos),
+        poll_seconds=poll_seconds,
+    )
+    console.print(f"secretary estado: http://{LOOPBACK}:{server.server_port}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+
+
 @app.command("validate")
 def validate_cmd(
     target: str = typer.Argument(

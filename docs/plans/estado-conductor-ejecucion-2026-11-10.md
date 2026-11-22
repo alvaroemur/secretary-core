@@ -43,7 +43,7 @@ flowchart LR
 | n1 | autonomous | done | Core `secretary estado --json`: adapters (Claude desktop + CLI, Codex, Cursor degraded) with field whitelist, session→branch→path reconciler, plan reader, optional `--with-prs` (60 s cache), mtime polling, no new hooks, test that no field outside the whitelist is emitted | estado-n1-nucleo | claude-code | core/estado-json | 111 |
 | n2 | autonomous | done | `secretary estado serve`: 127.0.0.1, read-only, `Host` header check, mtime polling. Depends on n1 | estado-n2-serve | codex | core/estado-serve | 117 |
 | n3 | parallel_hitl | done | Skill `conductor` v0 on current sources; speaks on open, relation detected, close (CND-2). Owner reviews tone | estado-n3-conductor | claude-code | skills/conductor-v0 | 112 |
-| n3b | autonomous | pending | Conductor reads the n1 core instead of current sources (CND-5) | | | | |
+| n3b | autonomous | done | Conductor reads the n1 core instead of current sources (CND-5) | estado-n3b-conductor-core | codex | skills/conductor-estado-core | 118 |
 | n4 | autonomous | pending | Handoff: 4 KB block, `.briefs`, paste-ready block per harness (SAL-1) | | | | |
 | n6 | in_session | pending | Real run on the owner's machine, metadata-only audit, owner OK per PR | | | | |
 
@@ -68,3 +68,5 @@ Status values: `pending` | `running` | `done` | `blocked`
 | 2026-11-11 | n3 | estado-n3-conductor | done, PR 112 |
 | 2026-11-11 | n2 | estado-n2-serve | running |
 | 2026-11-22 | n2 | estado-n2-serve | done, PR 117 |
+| 2026-11-22 | n3b | estado-n3b-conductor-core | running |
+| 2026-11-22 | n3b | estado-n3b-conductor-core | done, PR 118 |

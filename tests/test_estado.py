@@ -180,6 +180,20 @@ class CollectTests(EstadoFixture):
         (self.src.codex_sessions / "2026/11/10/rollout-x.jsonl").write_text("{}")
         self.assertNotEqual(before, estado.fingerprint(self.src))
 
+    def test_fingerprint_watches_repo_plan_mtimes(self):
+        before = estado.fingerprint(self.src, [str(self.repo)])
+        time.sleep(0.01)
+        (self.repo / "docs/plans/demo.md").write_text(PLAN + "\n")
+        self.assertNotEqual(before, estado.fingerprint(self.src, [str(self.repo)]))
+
+    def test_fingerprint_watches_git_ref_mtimes(self):
+        before = estado.fingerprint(self.src, [str(self.repo)])
+        time.sleep(0.01)
+        (self.repo / "marker").write_text("changed")
+        git(self.repo, "add", "marker")
+        git(self.repo, "commit", "-q", "-m", "change ref")
+        self.assertNotEqual(before, estado.fingerprint(self.src, [str(self.repo)]))
+
 
 class PrCacheTests(EstadoFixture):
     def test_cache_within_60_seconds(self):

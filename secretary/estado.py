@@ -572,8 +572,8 @@ def assert_whitelist(report: dict[str, Any]) -> None:
                 check(n, NODE_KEYS, "node")
 
 
-def fingerprint(sources: Sources | None = None) -> str:
-    """Cheap change signal for mtime polling (used by a future `serve`)."""
+def fingerprint(sources: Sources | None = None, repo_paths: Iterable[str] = ()) -> str:
+    """Return a metadata-only change signal for sessions, plans and git state."""
     src = sources or Sources()
     newest, count = 0.0, 0
     for root, pattern in [
@@ -584,4 +584,16 @@ def fingerprint(sources: Sources | None = None) -> str:
             for f in root.glob(pattern):
                 count += 1
                 newest = max(newest, _mtime(f) or 0)
+    for root_value in repo_paths:
+        root = Path(root_value)
+        git_dir_value = _git(["rev-parse", "--path-format=absolute", "--git-dir"], root)
+        git_dir = Path(git_dir_value) if git_dir_value else root / ".git"
+        watch = [git_dir / "HEAD", git_dir / "packed-refs", git_dir / "worktrees"]
+        watch.extend((git_dir / "refs" / "heads").glob("**/*"))
+        watch.extend((root / "docs" / "plans").glob("*.md"))
+        watch.extend((git_dir / "worktrees").glob("*/HEAD"))
+        for path in watch:
+            if path.is_file():
+                count += 1
+                newest = max(newest, _mtime(path) or 0)
     return f"{count}:{newest}"

@@ -1,7 +1,7 @@
 ---
 name: handover
 metadata:
-  close-contract: "3"
+  close-contract: "4"
 description: >-
   Write a self-contained handover with work state, decisions, blockers and how to
   resume. Reuse the single brief and close_context when called during wind-down.
@@ -12,6 +12,43 @@ description: >-
 # handover — session, repo or person handoff
 
 Produce a Markdown brief that another session or person can resume from without chat history. Do not run tests, builds or linters to write it.
+
+## Compact cross-harness handoff
+
+When the request changes sessions or harnesses, the `.briefs/` file is the canonical
+handoff payload. Its complete UTF-8 representation, including frontmatter, must be
+at most **4096 bytes**. Do not split one handoff across files. If it exceeds the
+limit, remove history and supporting detail before removing the next action,
+blockers, or verification command.
+
+Use this compact body after the lifecycle frontmatter:
+
+```markdown
+# <title>
+
+plan: <id or none> | node: <id and title or none>
+branch: <branch or none> | worktree: <path> | PR: <number or none>
+
+## Done
+- <up to three facts>
+
+## Decisions
+- <up to three decisions; identify the decision maker when material>
+
+## Pending
+- <up to three actions; put the next action first>
+
+## Blockers
+<blockers or "None.">
+
+## Verify first
+`<command or deterministic check that detects completed work>`
+```
+
+Keep only metadata, decisions, and operational state. Never include transcript
+content, credentials, secrets, or private data. Validate the final byte count with
+`python3 skills/handover/scripts/check_handoff.py <brief>` when that script is
+available in the source checkout.
 
 ## Shared context
 
@@ -71,6 +108,9 @@ Keep sections that carry information. Explain missing material facts instead of 
 
 Write the handover in the user's configured language. Do not copy global instructions or a transcript. A chat link is supplemental, never the only context. Redact secrets.
 
+For a compact cross-harness handoff, the compact schema replaces this longer
+content list. Do not expand the compact handoff to satisfy both schemas.
+
 ## Preview and write
 
 For a standalone handover, show the proposed Markdown and destination before writing when not already approved. Write only after approval. During wind-down, include the destination and summary in its single proposal; do not introduce another confirmation after the owner approved that proposal.
@@ -81,4 +121,5 @@ Return the absolute path and a short summary. Follow the configured signature po
 
 Do not change AGENTS.md or harness memory. Do not push. During wind-down, leave git work (including the brief's commit) to its orchestrator.
 
-Jump consumes this brief and does not create a second one.
+Jump consumes this brief, emits one target-specific paste block, and does not
+create a second brief.

@@ -1,30 +1,26 @@
-# conductor — relevo entre arneses (Claude Code, Codex, Cursor)
+# conductor — cross-harness handoff
 
-Se usa al cambiar de sesión o de arnés. Tope **4 KB** para el handoff completo; si no
-cabe, recorta detalle, nunca el bloque pegable. Solo metadatos y decisiones: sin
-contenido de transcripciones, credenciales ni datos privados. Un solo archivo en
-`.briefs/YYYY-MM-DD-HHMM-<slug>.md` (reusa el brief vigente si existe; con `handover`
-activo, delega en él). Escribir el brief requiere OK.
+Use this contract when changing sessions or harnesses. `handover` owns the
+canonical payload and `jump` owns the paste-ready continuation block. Conductor
+coordinates them; it does not create a second format or launch a session.
 
-## Estructura del handoff
+## Canonical payload
 
-```
-plan: <id> · nodo: <nX · título>   rama: <rama>   worktree: <ruta>   PR: <#n o ninguno>
-Hecho: <≤3 viñetas>
-Decidido: <≤3 viñetas, con quién decidió>
-Pendiente: <≤3 viñetas, la primera es el siguiente paso>
-Bloqueos: <o "ninguno">
-Verifica primero: <comando que confirma si el trabajo ya está hecho>
-```
+- Keep one `.briefs/YYYY-MM-DD-HHMM-<slug>.md` file. Reuse the active brief.
+- The complete UTF-8 file, including frontmatter, must not exceed 4096 bytes.
+- Keep metadata, decisions, pending work, blockers, and a verification-first check.
+- Exclude transcripts, credentials, secrets, and private data.
+- Ask for approval before writing the brief unless the enclosing workflow already
+  obtained approval.
 
-## Bloque pegable (uno por arnés destino)
+Use `handover` to produce and validate the compact schema. Do not copy the schema
+here; `skills/handover/SKILL.md` is the single source of truth.
 
-Un bloque `text` que empieza por «Verifica si ya está hecho: <comando>». Luego el
-handoff pegado. Ajustes por destino:
+## Paste-ready continuation
 
-- **Claude Code:** indica abrir en el worktree; el skill `conductor` se invoca con `/conductor`.
-- **Codex:** pide leer `AGENTS.md` y el brief; no asume skills de Claude.
-- **Cursor:** apunta a `.briefs/<archivo>` y a `.cursorrules`.
+Use `jump` to emit one fenced `text` block for the requested target: Claude Code,
+Codex, or Cursor. The block must start by checking whether the work is already
+done, cite the canonical brief, include a completion criterion, and be ready to
+paste without edits. It references the brief instead of duplicating its contents.
 
-El conductor propone el bloque; no lanza la sesión. Para lanzarla usa `jump`/`delegate`
-con OK.
+Conductor proposes the block. Launching a session remains an explicit owner action.

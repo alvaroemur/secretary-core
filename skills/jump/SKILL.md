@@ -1,7 +1,7 @@
 ---
 name: jump
 metadata:
-  close-contract: "3"
+  close-contract: "4"
 description: >-
   From any in-progress session, propose continuations that fit the context (new
   inputs, revisit assumptions, QA with another model or harness, related
@@ -77,6 +77,22 @@ Every prompt, whatever its size:
 
 Size follows need: a one-line instruction when the next agent only has to read the repo; a 120–200 word self-contained prose block when it starts cold.
 
+### Cross-harness continuation
+
+When a compact handoff brief exists, emit one block for the requested target
+harness. Cite the canonical `.briefs/` file instead of copying its payload into the
+prompt. Do not create another brief.
+
+- **Claude Code:** tell it to open the named worktree, read the brief, and invoke
+  `/conductor` when the skill is installed.
+- **Codex:** tell it to read the repository `AGENTS.md` and the brief. Do not assume
+  Claude Code skills or commands exist.
+- **Cursor:** tell it to open the named worktree and read both `.cursorrules` and the
+  brief when present.
+
+Keep the common verification-first opening, objective, completion criterion, and
+no-goals in every variant. The result must be ready to paste without edits.
+
 ## Output
 
 - Each prompt goes in **one fenced `text` block**, with no fence and no rendered markdown inside. When there is one prompt, its block is the **last element** of the answer.
@@ -88,6 +104,7 @@ Prompt shape (prose, no headings inside):
 ```text
 Before starting, check whether this is already done: <where to look: PRs, branches, newer briefs, the output file>. If it is, report where and stop.
 Repo: <absolute path>. Objective: <one sentence>. Read first: <absolute path of brief or file>.
+Target: <Claude Code | Codex | Cursor>. <target-specific startup instruction>.
 <Inputs and context the next agent needs, in prose.>
 Done when: <observable criterion>. Then mark the brief done (move it to .briefs/_archivo/ with closed: <date>).
 Do not <no-goals>.

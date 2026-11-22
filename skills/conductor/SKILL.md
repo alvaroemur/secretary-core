@@ -1,21 +1,21 @@
 ---
 name: conductor
 description: >-
-  Conductor v0 (mínimo). Lleva el control del backlog sin llenar el chat: habla solo
-  al abrir sesión en un repo con planes, al detectar relación entre el trabajo actual
-  y otro ítem del backlog, y al cerrar. Lee planes en docs/plans, git worktree, gh y
-  el helper de desk-overview; orquesta frontier, topology, delegate y jump. Lee y
-  propone; no lanza sesiones ni escribe en planes sin OK. Triggers: "/conductor",
-  "qué sigue en el backlog", "conductor". NOT para diseñar el grafo (topology),
-  cerrar la sesión (wind-down) ni escribir prompts de continuación solos (jump).
+  Minimal conductor for backlog control without chat noise. Speaks only when opening a
+  session in a repo with plans, when it detects a deterministic relation to another
+  backlog item, and when closing. Reads the metadata-only `secretary estado` core and
+  bounded git queries; orchestrates frontier, topology, delegate and jump. Reads and
+  proposes; never launches sessions or writes plans without approval. Triggers:
+  "/conductor", "qué sigue en el backlog", "conductor". NOT for graph design
+  (topology), session closure (wind-down), or standalone continuation prompts (jump).
 user-invocable: true
 ---
 
-# conductor — v0 mínimo
+# conductor — minimal v0 on estado
 
-Plan de origen: `frontier-estado-visual-y-conductor` (CND-1 a CND-5). Esta v0 lee solo lo
-que existe hoy; después se le cambia la fuente por la capa de estado sin tocar el
-comportamiento. No construye estado, HTML ni chat.
+Source plan: `frontier-estado-visual-y-conductor` (CND-1 through CND-5). Conductor consumes
+the estado layer instead of rebuilding its projection of sessions, plans, worktrees and PRs.
+It does not build status, HTML or chat.
 
 ## Reglas fijas
 
@@ -45,43 +45,62 @@ comportamiento. No construye estado, HTML ni chat.
   tokens.
 - **No lee contenido de transcripciones.** Solo metadatos (rama, worktree, PR, plan/nodo).
 
-## Fuentes (todas de solo lectura, bajo demanda)
+## Primary source (read-only, on demand)
 
-| Qué | Cómo |
-|-----|------|
-| Planes | `docs/plans/*.md` del repo y sus worktrees: frontmatter `id`, `goal`, `status`; nodos `nX` en la tabla `## Nodes`. Un plan sin frontmatter se lee como «sin metadatos» y se cita por nombre de archivo. Ignora `status` en `done`, `complete`, `completed` o `closed`; lista `paused` aparte; valor desconocido = `draft` y avisa. Si el backlog tiene una fila para el plan, el estado de la fila manda sobre la tabla de nodos; avisa la discrepancia en Riesgos. |
-| Backlog | El plan que lo declare o `docs/plans/*backlog*.md`; leer solo la tabla de filas y las últimas 10 líneas del registro. |
-| Worktrees | `git worktree list --porcelain` (tolera `.wt/` y `.claude/worktrees/`) |
-| PR | `gh pr list --state open --json number,title,headRefName,isDraft,mergeable` |
-| Estado amplio | `secretary-desk overview --context <cwd>` solo si hay duda; nunca pegar su salida |
+Run `secretary estado --json` once per moment. Add `--with-prs` only at closure or when a
+decision depends on current PR state. Consume only the n1 contract keys: `schema`,
+`generated_at`, `repos`, `sessions`, `warnings` and their whitelisted fields. If the command
+fails, the JSON does not parse, or `schema` is not `1`, report that estado is unavailable.
+Do not rebuild the same projection with ad hoc searches.
+
+| Data | Estado report field |
+|------|---------------------|
+| Plans | `repos[].plans[]`: `id`, `goal`, `status`, `path` and `nodes`. Ignore `done`, `complete`, `completed` and `closed`; list `paused` separately; treat unknown values as `draft` and warn. |
+| Current session | Match `sessions[]` by worktree, branch or id, in that order. Never infer from the title. |
+| Worktrees | `repos[].worktrees[]`; accept `.wt/` and harness-managed worktrees. |
+| PR | `sessions[].pr`, using `--with-prs` when fresh PR state matters. |
+
+Allowed supplemental reads for data that n1 does not model:
+
+- Backlog: from the plan that declares it or `docs/plans/*backlog*.md`; read only the rows
+  table and the last 10 log lines. If a row conflicts with an n1 node, the row wins and the
+  discrepancy appears under Riesgos.
+- File overlap: `git diff --name-only origin/main...<branch>` only for candidate branches
+  already returned by the report.
 
 Cargar `references/ejemplos.md` solo para ver el formato (las reglas viven aquí); `references/relevo.md`
 solo al hacer relevo. No releer ninguno en la misma sesión.
 
 ## Momento 1 — abrir
 
-Condición: repo con al menos un plan `active`/`draft`/sin `done`. Una vez por sesión. Si el primer mensaje del propietario es una pregunta cerrada, aplaza M1 hasta el primer cambio de tema o hasta `/conductor`.
-Lee frontmatter y tablas de nodos (no cuerpos). Di, en el bloque: cuántos planes en
-marcha, el nodo siguiente más probable (primer `pending` cuyas dependencias estén
-`done`) y si la sesión parece haber caído en uno. Muestra como máximo 5 filas: primero las que tienen PR o rama activa, luego las que esperan decisión del propietario; agrupa rangos de nodos ✅ en una línea del grafo; si hay más, di «y N más; pide /conductor para la lista». Cierra con una pregunta corta o nada.
+Condition: the report returns at least one `active`, `draft` or non-`done` plan for the repo.
+Once per session. If the owner's first message is a closed question, defer M1 until the first
+topic change or `/conductor`. In the block, report the number of active plans, the most likely
+next node (the first `pending` node whose dependencies are `done`) and whether the current
+session matches one. Show at most five rows: active PRs or branches first, then rows waiting
+for an owner decision. Group consecutive ✅ nodes on one graph line. If more remain, say
+«y N más; pide /conductor para la lista». End with one short question or no question.
 
 ## Momento 2 — relación detectada
 
-Solo con señal **determinista**, en este orden: (1) misma rama que un nodo/PR;
-(2) mismos archivos que la rama de otro worktree (`git diff --name-only` contra
-`origin/main`); (3) mismo plan/nodo citado en commits, PR o rama, solo si ambas ramas tienen commits sin integrar (`git rev-list --count origin/main..<rama>` > 0) o PR abierto; agrupa las ramas del mismo nodo en un solo aviso; (4) referencia
-explícita del propietario («esto es lo de X»). Sin señal, calla; no infieras por
-similitud de texto. Una vez por par (sesión, ítem). Contenido: «<título A> toca lo mismo
-que <título B> (<señal>). ¿Terminamos B antes y luego <C>?». Si procede mover algo,
-ofrece `delegate` (idea suelta) o `jump` (siguiente paso); nunca los ejecutes solo.
+Speak only on a **deterministic** signal, in this order: (1) the report links the same branch
+to a node or PR; (2) the branch shares changed files with another worktree branch, using
+`git diff --name-only` against `origin/main`; (3) commits, PR or branch cite the same plan or
+node, but only when both branches have unmerged commits (`git rev-list --count
+origin/main..<branch>` > 0) or an open PR; group branches for the same node in one warning;
+(4) an explicit owner reference («esto es lo de X»). Stay silent without a signal. Never infer
+from text similarity. Speak once per session-item pair. Content: «<título A> toca lo mismo
+que <título B> (<señal>). ¿Terminamos B antes y luego <C>?». When work should move, offer
+`delegate` for a loose idea or `jump` for a next step; never run them automatically.
 
 ## Momento 3 — cerrar
 
-Se activa con `/wind-down`, «cerremos» o fin evidente. Di, en el bloque: nodo que
-avanza (propón la fila del log para el plan, sin escribirla), en Estado qué falta para integrar
-(PR listo, CI, comentarios; es estado, no decisión) y el siguiente ítem. Si hay relevo a otra sesión o arnés,
-usa `references/relevo.md`. Con OK, escribe en el plan solo la fila de estado y del log
-(append-only, como manda `topology`); no remodeles el grafo.
+Trigger on `/wind-down`, «cerremos» or an evident end. Run the core with `--with-prs`. In the
+block, show the node that advances and propose the plan log row without writing it. Under
+Estado, show what remains for integration (ready PR, CI and comments) and the next item. This
+is status, not a decision. For a handoff to another session or harness, use
+`references/relevo.md`. After approval, write only the node status and log row to the plan,
+append-only as required by `topology`; never reshape the graph.
 
 ## Orquestación
 
@@ -98,7 +117,7 @@ momento sin cambio de estado. Ante duda, calla.
 
 ## Costo de contexto
 
-SKILL.md ≈ 2 K tokens al cargarse. Cada momento lee solo frontmatter y tablas de
-nodos (≈ 200 tokens por plan) y comandos git/gh acotados con `--json` y `head`. Las
-referencias (~1 K tokens cada una) se cargan bajo demanda. Presupuesto de salida al chat:
-un bloque compacto por intervención, ≤ 3 intervenciones por sesión.
+SKILL.md costs about 2 K tokens when loaded. Each moment consumes one reconciled JSON report
+and runs supplemental git queries only when a signal requires them. Load the references
+(about 1 K tokens each) on demand. Chat output budget: one compact block per intervention,
+at most three interventions per session.

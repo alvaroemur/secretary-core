@@ -96,7 +96,7 @@ _REGULAR_HEADER_RE = re.compile(r"(acc-\d{8}-\d+)([ \t]+\[update\])?")
 _FIELD_RE = re.compile(r"^- ([^\W\d]\w*):[ \t]*(.*)$", re.M)
 _DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # Collapsed backfill ranges: `acc-20250702-001 al 005`.
-_RANGE_RE = re.compile(r"(acc-\d{8})-(\d+) al (\d+)")
+_RANGE_RE = re.compile(r"(acc-\d{8})-(\d+)(?: al |\.\.)(\d+)")
 
 
 def _ledger_path(module: str) -> Path:

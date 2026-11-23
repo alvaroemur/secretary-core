@@ -140,6 +140,12 @@ class PlanTests(unittest.TestCase):
         self.assertEqual([b.acc_id for b in plan.moves["2026-06"]], ["acc-20260110-001 al 005", "acc-20260110-003"])
         self.assertEqual(plan.skipped["update-huerfano"], ["acc-20260110-009"])
 
+    def test_dotted_range_moves(self) -> None:
+        text = PREAMBLE + "## acc-20260110-001..003\n- estado: caducada\n- cerrado: 2026-06-16\n\n---\n\n"
+        _, blocks = acc.parse_ledger(text)
+        plan = acc.plan_archive(blocks, today=TODAY, retention_days=14)
+        self.assertEqual(plan.moved_count, 1)
+
     def test_retention_window(self) -> None:
         _, blocks = acc.parse_ledger(LEDGER)
         plan = acc.plan_archive(blocks, today=TODAY, retention_days=3)

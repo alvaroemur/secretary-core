@@ -258,6 +258,21 @@ El owner o una sesión de `reuniones-update` / `sec-status` / **`sec-acc-fold`**
 > `secretary-briefing` § "Automatismos de catálogo" porque el bounded context de housekeeping es
 > higiene del ecosistema de repos, no seguimiento de comunicaciones/reuniones. No reintroducir aquí.
 
+### Archivo del ledger (después de aplicar)
+
+Con los folds ya escritos, mover las acciones cerradas fuera de la ventana de retención a
+`acciones/archivo/YYYY-MM.md` para que `acciones.md` no crezca sin límite. Es sin pérdida e
+idempotente (los rangos colapsados `acc-X-001..005` cerrados viajan con sus `[update]`):
+
+```bash
+# desde $WT, mismo SECRETARY_INSTANCE
+secretary acc archive --apply
+```
+
+Si aborta por conflicto con un archivo existente, no forzar: reportarlo en 🔄 Compromisos y seguir.
+Los bloques que omite (`encabezado-irregular`, `id-duplicado`, `sin-estado`, `update-huerfano`) se
+listan en el reporte una sola línea por motivo; no se reparan automáticamente.
+
 ## Fase 3.6 — Issues de backlog vs specs (rules/issues-relacionados.md)
 
 Backstop periódico: issues abiertos que referencian un spec bajo `_diseño/specs/` pueden quedar

@@ -37,6 +37,9 @@ from secretary.config import (  # noqa: E402
 )
 
 ACC_RE = re.compile(r"acc-\d{8}-\d+")
+# Routine report PRs (<scope>/auto-YYYYMMDD[-HHMM]) list overdue or touched acc-ids in their
+# body as a report, not as the work that closes them. They never count as a link.
+REPORT_BRANCH_RE = re.compile(r"(^|/)auto-\d{8}(-\d{4})?$")
 LEDGER_KEY_RE = re.compile(r"^extractors\.[^.]+\.memory$")
 LECTURA_PLACEHOLDER = "<!-- lectura: pendiente (3–5 líneas, las escribe la sesión) -->"
 
@@ -199,7 +202,8 @@ def build_match(invs: list[dict], open_a: dict, closed_a: dict, today: date) -> 
         pr_heads = {p["headRefName"] for p in inv["prs"]}
         for pr in inv["prs"]:
             ids = set(ACC_RE.findall(" ".join([pr["headRefName"], pr["title"], pr.get("body") or ""])))
-            ids_open = sorted(i for i in ids if i in open_a)
+            report = bool(REPORT_BRANCH_RE.search(pr["headRefName"]))
+            ids_open = [] if report else sorted(i for i in ids if i in open_a)
             ref = {"repo": inv["repo"], "kind": "pr", "number": pr["number"], "url": pr["url"],
                    "draft": pr.get("isDraft"), "text": " ".join([pr["headRefName"], pr["title"], pr.get("body") or ""]),
                    "title": pr["title"], "head": pr["headRefName"]}
@@ -208,6 +212,8 @@ def build_match(invs: list[dict], open_a: dict, closed_a: dict, today: date) -> 
             if not ids_open:
                 closed_ids = sorted(i for i in ids if i in closed_a)
                 nota = f"cita {', '.join(closed_ids)} (cerrada)" if closed_ids else "sin acc-id"
+                if report and ids:
+                    nota = "reporte de rutina: sus acc-id no cuentan como vínculo"
                 rows.append({"acc": "—", "title": pr["title"], "repo": slug(inv["repo"]),
                              "ref": f"[PR #{pr['number']}]({pr['url']})" + (" draft" if pr.get("isDraft") else ""),
                              "estado": "—", "evidencia": f"gh pr list ({slug(inv['repo'])})",

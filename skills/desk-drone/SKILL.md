@@ -98,9 +98,9 @@ TODAY=$(TZ="$TIMEZONE" date '+%Y-%m-%d')
 BRIEF_REPO=$(echo "$CFG" | jq -r '.brief.repo // empty')
 [ -z "$BRIEF_REPO" ] && BRIEF_REPO=$(gh -R "$SECRETARY_INSTANCE" repo view --json nameWithOwner -q .nameWithOwner)
 HOST_PWD=$(pwd)
-WIP_ROOT=$(secretary config path operations.wip 2>/dev/null || secretary config path subsystem.wip)
-HEARTBEAT_LATEST="$(secretary config path operations.heartbeat)/latest.md"
-DRONE_ROOT=$(secretary config path subsystem.drone 2>/dev/null || secretary config path operations.drone)
+WIP_ROOT=$(secretary config path subsystem.wip)
+HEARTBEAT_LATEST="$(secretary config path subsystem.heartbeat)/latest.md"
+DRONE_ROOT=$(secretary config path subsystem.drone)
 SOUL_PATH="${DRONE_ROOT}/soul.md"
 OBJECTIVES_ROOT=$(secretary config path knowledge.objectives.root 2>/dev/null || echo "")
 ```

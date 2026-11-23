@@ -95,7 +95,7 @@ def _iter_search_files() -> list[Path]:
             if p.is_file() and p.suffix in {".md", ".txt"}:
                 files.add(p)
 
-    hb = resolved.get("operations.heartbeat")
+    hb = resolved.get("subsystem.heartbeat") or resolved.get("operations.heartbeat")
     if hb and hb.is_dir():
         latest = hb / "latest.md"
         if latest.is_file():

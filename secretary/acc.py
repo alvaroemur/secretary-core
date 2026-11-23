@@ -95,6 +95,8 @@ _HEADER_RE = re.compile(r"^## (acc-\d{8}[^\n]*?)[ \t]*$", re.M)
 _REGULAR_HEADER_RE = re.compile(r"(acc-\d{8}-\d+)([ \t]+\[update\])?")
 _FIELD_RE = re.compile(r"^- ([^\W\d]\w*):[ \t]*(.*)$", re.M)
 _DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+# Collapsed backfill ranges: `acc-20250702-001 al 005`.
+_RANGE_RE = re.compile(r"(acc-\d{8})-(\d+)(?: al |\.\.)(\d+)")
 
 
 def _ledger_path(module: str) -> Path:
@@ -213,8 +215,24 @@ def plan_archive(
     def skip(reason: str, acc_id: str) -> None:
         plan.skipped.setdefault(reason, []).append(acc_id)
 
+    # Closed collapsed ranges (`acc-… al NNN`) move like a closed entry; the ids they
+    # cover are remembered so their `[update]` blocks travel with them.
+    range_moves: list[tuple[Block, str]] = []
+    range_ids: dict[str, str] = {}  # covered acc_id -> month
     for b in blocks:
-        if b.irregular:
+        if not b.irregular:
+            continue
+        rng = _RANGE_RE.fullmatch(b.acc_id)
+        closed = b.cerrado
+        if (rng and b.estado in CLOSED_STATES and closed and closed <= cutoff
+                and not b.pendiente_wiki):
+            month = closed.strftime("%Y-%m")
+            range_moves.append((b, month))
+            prefix, lo, hi = rng.group(1), int(rng.group(2)), int(rng.group(3))
+            width = len(rng.group(2))
+            for n in range(lo, hi + 1):
+                range_ids[f"{prefix}-{n:0{width}d}"] = month
+        else:
             skip("encabezado-irregular", b.acc_id)
     regular = [b for b in blocks if not b.irregular]
     canon_count = Counter(b.acc_id for b in regular if not b.is_update)
@@ -226,7 +244,10 @@ def plan_archive(
     for acc_id, group in by_id.items():
         canon = [b for b in group if not b.is_update]
         if not canon:
-            skip("update-huerfano", acc_id)
+            if acc_id in range_ids:
+                move_ids[acc_id] = range_ids[acc_id]  # updates of an archived range
+            else:
+                skip("update-huerfano", acc_id)
             continue
         if canon_count[acc_id] > 1:
             skip("id-duplicado", acc_id)
@@ -248,6 +269,8 @@ def plan_archive(
             continue  # inside the retention window: stays
         move_ids[acc_id] = closed.strftime("%Y-%m")
 
+    for b, month in range_moves:
+        plan.moves.setdefault(month, []).append(b)
     for b in regular:
         month = move_ids.get(b.acc_id)
         if month:
@@ -293,8 +316,8 @@ def archive_actions(
         raise ValueError("parse_ledger no es lossless; abortando")
 
     plan = plan_archive(blocks, today=today, retention_days=retention_days)
-    moved_ids = {b.acc_id for group in plan.moves.values() for b in group}
-    kept_blocks = [b for b in blocks if b.irregular or b.acc_id not in moved_ids]
+    moved = {id(b) for group in plan.moves.values() for b in group}
+    kept_blocks = [b for b in blocks if id(b) not in moved]
     new_active = preamble + "".join(b.raw for b in kept_blocks)
     stats = {
         "bytes_before": len(text.encode("utf-8")),

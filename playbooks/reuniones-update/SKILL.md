@@ -599,11 +599,10 @@ REPO="$SECRETARY_INSTANCE"
 ROUTINE_PR="${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/routine-pr.sh"
 cd "$WT"
 if [ -n "$(git status --porcelain)" ]; then
-  python3 "$WT/scripts/ci/contract_health.py" --sync-contract || true
-  # contract_health --sync-contract only bumps last_success_at on modules it judges
-  # healthy; validated 2026-08-28 it left extractors/meetings/contract.yaml untouched
-  # (stuck at 2026-06-30, SLA window too tight for a stub). If still stale after the
-  # call above, patch last_success_at by hand in extractors/meetings/contract.yaml.
+  # Stamp freshness deterministically. contract_health --sync-contract only bumps
+  # modules it already judges healthy, so it never repaired a stale meetings contract.
+  python3 "${SECRETARY_CORE:-$HOME/Dev/secretary-core}/secretary/routines/ops/stamp-freshness.py" \
+    "$WT/extractors/meetings/contract.yaml"
 fi
 # Write report (Markdown) with Write tool to /tmp/pr-reuniones.md before this call
 # (always: close requires --body-file even when it ends with no changes).

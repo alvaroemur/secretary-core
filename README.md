@@ -44,7 +44,7 @@ That's it. The agent will read the docs, ask you the right questions, and config
 
 2. **Transformation** — The wiki-sync routine reads all evidence, integrates it into Markdown articles, rebuilds the static HTML, and deploys. It also merges the extraction PRs automatically (after checking for unresolved comments).
 
-3. **Dispatch** *(planned)* — Handovers and notes pushed to external repos or systems based on actions extracted from your channels.
+3. **Dispatch** — Issues labelled `dispatch:execute` in allowlisted repos are worked by the `dispatch-executor` routine in an isolated worktree and come back as a PR. It never merges; review stays human.
 
 ## Architecture
 
@@ -71,6 +71,8 @@ secretary-core/            ← this repo (engine, public)
 Open `architecture/index.html` via a local server to browse the system diagrams interactively.
 
 `plugin.json` follows [Agent Plugins 1.0.0](https://agent-plugins.org/schemas/1.0.0/plugin.schema.json). Compatible clients discover skills under `skills/`.
+
+Session skills are named `desk-*` (for example `desk-recall`, `desk-overview`, `desk-mail`); the older `sec-*`, `pulse` and `dispatch` names remain as thin compatibility aliases. Work-method skills (`frontier`, `topology`, `conductor`, `wind-down`, `handover`, `jump`) carry no prefix. Each skill's `SKILL.md` description is the reference.
 
 ## Core / instance split
 
@@ -125,15 +127,17 @@ The engine provides a python-based CLI tool and a local daemon:
 
 ## Routines
 
-Each folder in `playbooks/` contains structured prompts/instructions for scheduled tasks. They are designed for [Claude Code scheduled tasks](https://docs.anthropic.com/en/docs/claude-code) or cron schedules:
+Each folder in `playbooks/` is one scheduled routine: a `SKILL.md` entry point plus its procedure. They run under [Claude Code scheduled tasks](https://docs.anthropic.com/en/docs/claude-code) or cron. **Schedules live in your instance** (its routines manifest), not here, so this list only names what each family does:
 
-| Routine | Schedule | What it does |
-|---------|----------|-------------|
-| **revision-correo** | Daily AM | Summarizes email, creates draft replies, cleans inbox, tracks follow-ups |
-| **reuniones-update** | Daily PM | Processes new meeting transcriptions, extracts actions and entities |
-| **whatsapp-review** | Daily PM | Reads approved local Mac chats, transcribes eligible audio, and persists partial evidence for wiki and briefing |
-| **drive-crawler** | Daily PM | Indexes new/modified files, proposes Drive organization improvements |
-| **wiki-update** | Daily late PM | Merges extractor PRs, integrates all evidence into wiki, rebuilds HTML |
+| Family | Routines | What they do |
+|--------|----------|--------------|
+| **Extraction** | `revision-correo`, `reuniones-update`, `whatsapp-review`, `drive-crawler` | Read a channel, write evidence to `memory/`, open a PR |
+| **Consolidation** | `wiki-update` | Auto-merges routine PRs, integrates evidence into the wiki, rebuilds HTML |
+| **State and briefing** | `sec-heartbeat`, `secretary-briefing`, `pulse-headless` | Heartbeat of commitments vs git; the daily brief issue |
+| **Hygiene** | `housekeeping`, `tidy-up` | Repo health with a technical traffic light; weekly folder audit (proposes only) |
+| **Execution and synthesis** | `dispatch-executor`, `sec-dream`, `job-search-crawler` | Work labelled issues; nightly synthesis; job feeds |
+
+`wiki-update` only auto-merges branches named `<scope>/auto-YYYYMMDD-HHMM`. Open and close routine branches with `secretary/routines/ops/routine-pr.sh` so that name is always right.
 
 ### How routines report
 

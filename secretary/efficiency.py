@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from secretary.config import instance_root, load_config, flatten_paths
+from secretary.config import canonical_path_key, instance_root, load_config, flatten_paths
 
 PILOTS = ('dispatch-executor', 'wiki-update', 'revision-correo')
 TOKEN_KEYS = {'input': ('input_tokens', 'inputTokens'), 'output': ('output_tokens', 'outputTokens'),
@@ -58,7 +58,7 @@ def file_inventory(root: Path, cfg: dict, keys: list[str]) -> dict[str, str]:
     paths = flatten_paths(cfg.get('paths', {}))
     result = {}
     for key in keys:
-        raw = paths.get(key)
+        raw = paths.get(key) or paths.get(canonical_path_key(key))
         if raw is None:
             raise ValueError(f'Falta paths.{key}')
         path = Path(os.path.expanduser(raw))

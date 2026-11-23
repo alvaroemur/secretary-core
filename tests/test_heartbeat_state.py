@@ -58,6 +58,16 @@ class LinkedTest(unittest.TestCase):
         self.assertEqual([r["acc"] for r in rows_by(rows, "🔗 linked")], ["acc-20300101-002"])
         self.assertEqual(rows_by(rows, "🌿 loose-git"), [])
 
+    def test_routine_report_pr_body_is_not_a_link(self) -> None:
+        # Un PR de reporte de rutina lista acciones vencidas en el cuerpo; no las trabaja.
+        open_a = {"acc-20300101-003": acc(), "acc-20300101-004": acc()}
+        body = "Vencidas: acc-20300101-003, acc-20300101-004"
+        rows, _ = hs.build_match([inv([pr(9, head="housekeeping/auto-20300114-0610", body=body),
+                                       pr(10, head="whatsapp/auto-20300114", body=body)])], open_a, {}, TODAY)
+        self.assertEqual(rows_by(rows, "🔗 linked"), [])
+        notas = [r["nota"] for r in rows_by(rows, "🌿 loose-git")]
+        self.assertEqual(notas, ["reporte de rutina: sus acc-id no cuentan como vínculo"] * 2)
+
     def test_non_literal_mention_is_not_linked(self) -> None:
         # Mención sin el acc-id literal (formato distinto o solo el workspace): no hay linked.
         open_a = {"acc-20300101-003": acc(deadline=iso(1))}

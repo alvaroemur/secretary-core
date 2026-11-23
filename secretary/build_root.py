@@ -10,20 +10,23 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-from secretary.config import core_root, flatten_paths, instance_root, load_config
+from secretary.config import canonical_path_key, core_root, flatten_paths, instance_root, load_config
 
 
 def _legacy_symlinks(instance: Path, flat: dict[str, str]) -> list[tuple[str, Path]]:
     """Map legacy build.py roots → instance paths."""
     links: list[tuple[str, Path]] = []
 
-    articles = flat.get("wiki.articles")
+    def get(key: str) -> str | None:
+        return flat.get(key) or flat.get(canonical_path_key(key))
+
+    articles = get("wiki.articles")
     if articles:
         # build.py reads SECRETARY/wiki/articulos
         wiki_root = (instance / articles).parent
         links.append(("wiki", wiki_root))
 
-    mail_state = flat.get("mail.state")
+    mail_state = get("mail.state")
     if mail_state:
         links.append(("correo", (instance / mail_state).parent))
     elif (instance / "extractores" / "correo").is_dir():
@@ -34,7 +37,7 @@ def _legacy_symlinks(instance: Path, flat: dict[str, str]) -> list[tuple[str, Pa
         ("reuniones", "meetings.memory"),
         ("job-search", "job_search.inbox"),
     ):
-        rel = flat.get(key)
+        rel = get(key)
         if rel:
             links.append((legacy, (instance / rel).parent))
         else:

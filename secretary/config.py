@@ -51,14 +51,50 @@ def flatten_paths(node: dict[str, Any], prefix: str = "") -> dict[str, str]:
     return out
 
 
+# Legacy path keys → canonical keys. Older skills, playbooks and installed copies
+# still ask for these; the engine translates them so the instance config can drop
+# its duplicated alias blocks. Exact keys first, then prefixes, first match wins.
+LEGACY_PATH_KEYS: tuple[tuple[str, str], ...] = (
+    ("doctrines", "rules"),
+    ("policies.skills_vs_policies", "operational.skills_vs_operational"),
+    ("policies.", "operational."),
+    ("operations.", "subsystem."),
+    ("memoria.", "knowledge."),
+    ("extractores.job_search.", "loops.job_search."),
+    ("extractores.", "extractors."),
+    ("mail.", "extractors.mail."),
+    ("whatsapp.", "extractors.whatsapp."),
+    ("meetings.", "extractors.meetings."),
+    ("drive.", "extractors.drive."),
+    ("job_search.", "loops.job_search."),
+)
+
+
+def canonical_path_key(key: str) -> str:
+    """Translate a legacy dotted path key to its canonical form (identity if none applies)."""
+    for old, new in LEGACY_PATH_KEYS:
+        if old.endswith("."):
+            if key.startswith(old):
+                return new + key[len(old):]
+        elif key == old:
+            return new
+    return key
+
+
 def resolve_path_key(key: str, config: dict[str, Any] | None = None) -> Path:
-    """Resolve a dotted path key (e.g. `mail.memory`) to an absolute path."""
+    """Resolve a dotted path key (e.g. `extractors.mail.memory`) to an absolute path.
+
+    A key present in the config wins. Otherwise a legacy key (e.g. `mail.memory`)
+    resolves through its canonical form.
+    """
     cfg = config if config is not None else load_config()
     paths = cfg.get("paths")
     if not isinstance(paths, dict):
         raise KeyError("`.secretary.yml` no tiene sección `paths`")
 
     flat = flatten_paths(paths)
+    if key not in flat:
+        key = canonical_path_key(key)
     if key not in flat:
         raise KeyError(f"Clave de path desconocida: {key!r}")
 

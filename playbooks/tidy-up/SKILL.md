@@ -28,7 +28,8 @@ cd "$INSTANCE"
 git worktree prune
 git fetch origin main
 TS=$(date +%Y%m%d-%H%M)
-BRANCH="subsystem/housekeeping/tidy-up-$TS"
+# housekeeping/auto-<ts>: the only branch form wiki-update auto-merges (W0 gate).
+BRANCH="housekeeping/auto-$TS"
 WT="$(mktemp -d)/secretary-tidy"
 git worktree add -b "$BRANCH" "$WT" origin/main
 echo "WT=$WT  BRANCH=$BRANCH"

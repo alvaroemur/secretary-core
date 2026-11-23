@@ -70,7 +70,7 @@ Sale de `git.tsv` (rama, ahead/behind, dirty, stashes). Con `git fetch --prune` 
 Sale de `prs.json`, filtrando `state=="OPEN"`.
 
 Clasificar cada PR:
-- **PRs automáticos** (rama matchea `^(correo|reuniones|whatsapp|wiki|housekeeping)/auto-`): ¿tiene comentarios sin resolver? ¿está listo para merge? ¿hace cuánto se creó?
+- **PRs automáticos** (rama matchea `^(correo|reuniones|whatsapp|wiki|housekeeping|job-search|drive)/auto-`; los que empiezan por esos scopes pero no calzan el gate de `wiki-update` van al semáforo, 4.5): ¿tiene comentarios sin resolver? ¿está listo para merge? ¿hace cuánto se creó?
 - **PRs manuales**: listar para visibilidad.
 - **PRs stale** (>7 días sin actividad): flaggear.
 - **PRs sin revisión (≥1 día)**: abiertos hace 24 h o más y sin revisión (`reviewDecision` vacío o
@@ -258,6 +258,21 @@ El owner o una sesión de `reuniones-update` / `sec-status` / **`sec-acc-fold`**
 > `secretary-briefing` § "Automatismos de catálogo" porque el bounded context de housekeeping es
 > higiene del ecosistema de repos, no seguimiento de comunicaciones/reuniones. No reintroducir aquí.
 
+### Archivo del ledger (después de aplicar)
+
+Con los folds ya escritos, mover las acciones cerradas fuera de la ventana de retención a
+`acciones/archivo/YYYY-MM.md` para que `acciones.md` no crezca sin límite. Es sin pérdida e
+idempotente (los rangos colapsados `acc-X-001..005` cerrados viajan con sus `[update]`):
+
+```bash
+# desde $WT, mismo SECRETARY_INSTANCE
+secretary acc archive --apply
+```
+
+Si aborta por conflicto con un archivo existente, no forzar: reportarlo en 🔄 Compromisos y seguir.
+Los bloques que omite (`encabezado-irregular`, `id-duplicado`, `sin-estado`, `update-huerfano`) se
+listan en el reporte una sola línea por motivo; no se reparan automáticamente.
+
 ## Fase 3.6 — Issues de backlog vs specs (rules/issues-relacionados.md)
 
 Backstop periódico: issues abiertos que referencian un spec bajo `_diseño/specs/` pueden quedar
@@ -341,6 +356,32 @@ jq -c --arg c "$(date -v-60d +%Y-%m-%d)" 'select(.fecha_visto>=$c)' "$LEDGER" > 
 Reportar los nuevos en la sección correspondiente de Fase 5. Si encuentras feedback claramente sobre una rutina, indicarlo (`→ feedback para rutina X`).
 
 
+### 4.5 Semáforo de salud del sistema
+
+Mide la salud **técnica** de secretary con comandos, nunca a ojo. Las métricas de negocio
+(postulaciones, rebotes de ventas, cola de prospección) no entran aquí: van al brief.
+
+| Ítem | Comando | 🟢 verde | 🔴 rojo |
+|------|---------|----------|---------|
+| Tokens Google | `secretary gog-health --format json` | `ok: true` | alguna cuenta `fail` |
+| Frescura de extractoras | `python3 "$WT/scripts/ci/contract_health.py"` (solo filas `extractor`) | todas `ok` | alguna `stale` o `unknown` |
+| PRs de rutina fuera del gate | `prs.json` de `.secretary`: PRs abiertos >24 h cuya rama empieza por un scope de rutina (`correo\|reuniones\|whatsapp\|wiki\|housekeeping\|job-search\|drive`) y **no** calza `^<scope>/auto-[0-9]{8}-[0-9]{4}$` | 0 | ≥1 (un productor nombra mal su rama y `wiki-update` no lo va a mergear) |
+| PRs auto acumulados | 4.3 | 0 con >3 días | ≥1 |
+| Checkout principal | `git.tsv` de `.secretary` | en `main`, behind 0, sin dirty rastreado | behind >0 con dirty, o fuera de `main` |
+| Validadores | `secretary validate` | exit 0 | exit ≠0 |
+
+```bash
+secretary gog-health --format json > "$SCRATCH/gog.json" || true
+python3 "$WT/scripts/ci/contract_health.py" > "$SCRATCH/contracts.md" || true
+```
+
+- Si **gog-health** falla, abrir (o comentar, si ya existe uno abierto con el mismo título) un issue
+  `para-alvaro` en el repo de la instancia: `🔑 Token Google vencido: <cuenta>` con el `fix` que
+  devuelve el comando. Un token vencido rompe correo, Drive y calendario del brief en silencio.
+- Cualquier 🔴 del semáforo es una decisión: va a **Atención primero** y obliga a abrir el PR del
+  reporte (spec 024). Todo 🟢 no abre PR por sí solo.
+- Escribe la tabla con el estado de cada ítem en la sección **🚦 Semáforo** del reporte.
+
 ## Fase 5 — Reporte como PR
 
 El reporte sigue el **contrato de output expresivo** de Álvaro
@@ -370,6 +411,12 @@ Si no hay nada, una sola línea: `🟢 Nada urgente — todo en verde.`
 - 🟡 [pendiente que conviene atender] → [acción]
 - ⚠️ [stale / cuidado] → [acción]
 - 🟡 [PR #N](url) — título — N días sin revisión → revisar o cerrar
+
+## 🚦 Semáforo
+
+| Ítem | Estado | Detalle |
+|------|--------|---------|
+| Tokens Google | 🟢/🔴 | … |
 
 ## Estado de repos
 

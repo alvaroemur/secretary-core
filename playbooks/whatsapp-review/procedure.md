@@ -6,7 +6,7 @@ Read `secretary config path whatsapp.review_config`, then that private YAML. Res
 
 The source is the WhatsApp macOS database in **read-only mode**, including committed WAL pages. The Mac app must have synced its data. Database accessibility and latest message time do not prove full account synchronization. Report gaps precisely; silence is not a failed connection.
 
-Use a worktree from fresh origin/main for versioned outputs, following the instance's worktree convention. Shared untracked inputs, audio/transcript cache, and message receipts stay in the primary private instance. Commands accept `--instance` (primary) and `record --output-root` (delivery worktree). Set `PYTHONPATH` to the configured core when exercising unmerged changes; installed operation uses `secretary whatsapp`.
+Open the delivery worktree with the common prelude: `eval "$("$SECRETARY_CORE/secretary/routines/ops/routine-pr.sh" open --scope whatsapp)"`. It creates `whatsapp/auto-<YYYYMMDD-HHMM>` from fresh origin/main; that is the only branch form `wiki-update` auto-merges, so never name the branch by hand (`whatsapp/review-*` or a date without time piles up unmerged). Shared untracked inputs, audio/transcript cache, and message receipts stay in the primary private instance. Commands accept `--instance` (primary) and `record --output-root` (delivery worktree). Set `PYTHONPATH` to the configured core when exercising unmerged changes; installed operation uses `secretary whatsapp`.
 
 ## Runtime bootstrap
 
@@ -52,6 +52,6 @@ This creates signed evidence in `extractors/whatsapp/summaries/` and `memory/rev
 
 Write signed `extractors/whatsapp/state.md` with date, source accessibility, sync status/limitations, selected coverage, processed/retried counts, outstanding media/identities, relevant changes, and metadata-based contact suggestions. No-op runs still perform source and policy checks and report honestly; do not create empty PRs or duplicate alerts.
 
-Deliver versioned outputs by the existing routine PR process with required signatures and checks. Keep the PR merge-ready under instance rules; no unauthorized merge. `wiki-update` consumes `memory/reviews/*.md` and their summaries. The next briefing consumes this report and commitment evidence, including contacts worth saving and actionable failures. Do not write directly into client workspaces, calendar, contacts, or wiki from this extractor.
+After a run that reached the source and recorded its review, stamp freshness: `python3 "$SECRETARY_CORE/secretary/routines/ops/stamp-freshness.py" "$WT/extractors/whatsapp/contract.yaml"`. Skip it when the probe or capture failed. Deliver with `routine-pr.sh close --wt "$WT" --branch "$BRANCH" --routine whatsapp-review --title ... --body-file ...`, which adds the required signature. Keep the PR merge-ready under instance rules; no unauthorized merge. `wiki-update` consumes `memory/reviews/*.md` and their summaries. The next briefing consumes this report and commitment evidence, including contacts worth saving and actionable failures. Do not write directly into client workspaces, calendar, contacts, or wiki from this extractor.
 
 Recheck real scheduler registration: exactly one active `whatsapp-review` at the approved local schedule, the retired `whatsapp-monitor` disabled. A manifest entry alone is not activation proof.

@@ -207,7 +207,7 @@ If pipeline cannot run, delegate individual routines via `run-routine.sh <id>`.
 Verify beat:
 
 ```bash
-head -40 "$(secretary config path operations.heartbeat)/latest.md"
+head -40 "$(secretary config path subsystem.heartbeat)/latest.md"
 ```
 
 If missing or >3h stale on workday → run the routine: `HEARTBEAT_SLOT=session bash "$SECRETARY_CORE/secretary/routines/run-routine.sh" sec-heartbeat`.

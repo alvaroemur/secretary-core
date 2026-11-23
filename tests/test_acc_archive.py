@@ -50,8 +50,8 @@ LEDGER = PREAMBLE + "".join(
         entry("acc-20260108-001", "caducada", "2026-06-16"),  # duplicate id → stays
         entry("acc-20260108-001", "caducada", "2026-06-17"),
         entry("acc-20260109-001", "hecha", "2026-06-20", update=True),  # orphan update → stays
-        "## acc-20260110-001 al 005\n- titulo: rango\n- estado: caducada\n- cerrado: 2026-06-16\n\n---\n\n",
-        entry("acc-20260111-001", "caducada", "2026-06-16"),  # moves; must not drag the irregular block
+        "## acc-20260110-001 al 005\n- titulo: rango\n- estado: caducada\n- cerrado: 2026-06-16\n\n---\n\n",  # closed range → moves
+        entry("acc-20260111-001", "caducada", "2026-06-16"),  # moves
     ]
 )
 
@@ -106,14 +106,39 @@ class PlanTests(unittest.TestCase):
         _, blocks = acc.parse_ledger(LEDGER)
         plan = acc.plan_archive(blocks, today=TODAY, retention_days=14)
         self.assertEqual(sorted(plan.moves), ["2026-06", "2026-08"])
-        self.assertEqual([b.is_update for b in plan.moves["2026-06"]], [False, True, False])
-        self.assertEqual(plan.moved_count, 4)
-        self.assertEqual(plan.kept, 9)
-        self.assertEqual(plan.skipped["encabezado-irregular"], ["acc-20260110-001 al 005"])
+        self.assertEqual([b.is_update for b in plan.moves["2026-06"]], [False, False, True, False])
+        self.assertEqual(plan.moves["2026-06"][0].acc_id, "acc-20260110-001 al 005")
+        self.assertEqual(plan.moved_count, 5)
+        self.assertEqual(plan.kept, 8)
+        self.assertNotIn("encabezado-irregular", plan.skipped)
         self.assertEqual(plan.skipped["pendiente-wiki"], ["acc-20260106-001"])
         self.assertEqual(plan.skipped["sin-cerrado"], ["acc-20260107-001"])
         self.assertEqual(plan.skipped["id-duplicado"], ["acc-20260108-001"])
         self.assertEqual(plan.skipped["update-huerfano"], ["acc-20260109-001"])
+
+    def test_non_range_irregular_header_stays(self) -> None:
+        text = PREAMBLE + "## acc-20260110-002 [bloque incompleto]\n- estado: caducada\n- cerrado: 2026-06-16\n\n---\n\n"
+        _, blocks = acc.parse_ledger(text)
+        plan = acc.plan_archive(blocks, today=TODAY, retention_days=14)
+        self.assertEqual(plan.moved_count, 0)
+        self.assertIn("encabezado-irregular", plan.skipped)
+
+    def test_open_range_stays(self) -> None:
+        text = PREAMBLE + "## acc-20260110-001 al 003\n- estado: abierta\n- cerrado: null\n\n---\n\n"
+        _, blocks = acc.parse_ledger(text)
+        plan = acc.plan_archive(blocks, today=TODAY, retention_days=14)
+        self.assertEqual(plan.moved_count, 0)
+
+    def test_update_of_range_member_travels_with_range(self) -> None:
+        text = PREAMBLE + (
+            "## acc-20260110-001 al 005\n- estado: caducada\n- cerrado: 2026-06-16\n\n---\n\n"
+            + entry("acc-20260110-003", "caducada", "2026-06-16", update=True)
+            + entry("acc-20260110-009", "caducada", "2026-06-16", update=True)  # outside range
+        )
+        _, blocks = acc.parse_ledger(text)
+        plan = acc.plan_archive(blocks, today=TODAY, retention_days=14)
+        self.assertEqual([b.acc_id for b in plan.moves["2026-06"]], ["acc-20260110-001 al 005", "acc-20260110-003"])
+        self.assertEqual(plan.skipped["update-huerfano"], ["acc-20260110-009"])
 
     def test_retention_window(self) -> None:
         _, blocks = acc.parse_ledger(LEDGER)
@@ -130,7 +155,7 @@ class ArchiveTests(LedgerFixture):
     def test_apply_is_lossless_and_idempotent(self) -> None:
         before = self.all_digests()
         plan, stats = acc.archive_actions(apply=True, today=TODAY)
-        self.assertEqual(plan.moved_count, 4)
+        self.assertEqual(plan.moved_count, 5)
         self.assertLess(stats["bytes_after"], stats["bytes_before"])
         self.assertEqual(self.all_digests(), before)
         self.assertTrue((self.mem / "acciones" / "archivo" / "2026-06.md").is_file())

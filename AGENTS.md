@@ -2,6 +2,10 @@
 
 Este repo contiene el engine reutilizable. Los datos, políticas y configuración privada pertenecen a la instancia. No commitees rutas personales, emails reales, claves, nombres de clientes ni datasets privados.
 
+## Before asking the owner
+
+Instance-specific development and debug context (local paths, who merges what, external repos, credentials, working-method skills) lives in the private instance repo at `canon/operational/contexto-desarrollo.md`. Read it before asking questions the repos already answer. This file stays generic because this repo is public.
+
 ## Desarrollo
 
 - Python >=3.11; CLI Typer en `secretary/main.py`. Instala con `pip install -e .` o `uv pip install -e .`.

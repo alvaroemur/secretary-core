@@ -2,6 +2,10 @@
 
 Guidelines and commands for developing in `secretary-core`.
 
+> **Before asking the owner:** instance-specific dev/debug context lives in the private instance repo at
+> `canon/operational/contexto-desarrollo.md`. Note: run `pip install -e . "pytest>=8"` before `python -m pytest -q tests`
+> (this is what CI runs; plain `unittest discover` misses the editable install).
+
 ## Commands
 
 ### Setup & Install

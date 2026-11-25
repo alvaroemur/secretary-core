@@ -22,8 +22,8 @@ flowchart LR
 
 | id | mode | status | note |
 |---|---|---|---|
-| n1 | in_session | running | Version the skill and renderer together. Add routing from the authoritative modeling skill. |
-| n2 | in_session | pending | Select an element, apply feedback in preview, and verify the change in the transparent 2× export. |
+| n1 | in_session | done | Version the skill and renderer together. Add routing from the authoritative modeling skill. |
+| n2 | in_session | done | Select an element, apply feedback in preview, and verify the change in the transparent 2× export. |
 | n3 | parallel_hitl | pending | Repeat the same acceptance test with Launch preview in a separate session. |
 
 ## Log
@@ -33,3 +33,5 @@ flowchart LR
 | 2026-11-25 | n1 | scope and execution design | Scope and graph approved. Implementation started. |
 | 2026-11-25 | n1 | implementation | Added the standalone skill and renderer. The modeling skill exists in divergent installed copies. Its versioned source is still unidentified, so the routing change remains open. |
 | 2026-11-25 | n2 | verification | Playwright confirmed a targeted content edit after reload and verified the transparent export at twice the capture dimensions. Interactive acceptance remains open because the desktop browser session could not initialize. |
+| 2026-11-25 | n1 | implementation | Opened the companion change in the private instance to version the modeling skill and route branded composition to the new skill. |
+| 2026-11-25 | n2 | acceptance | The owner identified the footer in the local preview and supplied a replacement. Reloaded the same HTML, verified the text and the changed pixels, and checked the 2× RGBA export. |
